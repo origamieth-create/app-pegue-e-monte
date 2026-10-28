@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Reservas</title>
+<meta name="theme-color" content="#FFFBF7">
+<link rel="icon" href="icone.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito+Sans:wght@400;600;700;800&display=swap">
+<link rel="stylesheet" href="estilo.css">
+<style>
+  main { max-width: 720px; margin: 0 auto; padding: 24px 18px 48px; display: flex; flex-direction: column; gap: 20px; }
+  .cabeca { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; padding-top: 8px; }
+  .cabeca img { width: 84px; height: 84px; border-radius: 999px; object-fit: cover; }
+  .grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); gap: 14px; }
+  .cartao.kit { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+  .kit .nome { font-weight: 800; font-size: 17px; line-height: 1.2; }
+  .preco { font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 20px; }
+  .cal button.passado:disabled { text-decoration: none; color: #CFC7D8; }
+  .rodape { text-align: center; font-size: 13px; color: var(--texto2); padding-top: 12px; }
+  .pix { word-break: break-all; font-weight: 800; background: var(--lilas); padding: 12px 14px; border-radius: 14px; }
+</style>
+</head>
+<body>
+<main id="raiz"><div class="carregando">Carregando…</div></main>
+<div id="painel"></div>
+<div id="toast" class="toast oculto" role="status" aria-live="polite"></div>
+<script type="module" src="reservar.js"></script>
+</body>
+</html>

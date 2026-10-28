@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>App Pegue e Monte</title>
+<meta name="theme-color" content="#2A1B3D">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icone.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icone-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Pegue e Monte">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito+Sans:wght@400;600;700;800&display=swap">
+<link rel="stylesheet" href="estilo.css">
+<style>
+  body { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
+  .topo { position: sticky; top: 0; z-index: 20; background: var(--fundo); padding: calc(14px + env(safe-area-inset-top)) 18px 10px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .topo .marca { font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  main { max-width: 640px; margin: 0 auto; padding: 4px 18px 24px; display: flex; flex-direction: column; gap: 16px; }
+  nav.abas { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: #fff; border-top: 1px solid var(--linha); display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); padding-bottom: env(safe-area-inset-bottom); }
+  nav.abas button { border: 0; background: none; min-height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 13px; font-weight: 800; color: var(--texto2); cursor: pointer; }
+  nav.abas button.ativa { color: var(--destaque); }
+  nav.abas button { position: relative; }
+  .contador { position: absolute; top: 6px; left: calc(50% + 6px); min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px; background: var(--destaque); color: #fff; font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center; border: 2px solid #fff; }
+  .secao-titulo { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 4px; }
+  .lista { display: flex; flex-direction: column; gap: 10px; }
+  .item-res { display: flex; align-items: center; gap: 12px; }
+  .item-res .info { flex: 1; min-width: 0; }
+  .item-res .nome { font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .vazio-txt { color: var(--texto2); font-weight: 600; padding: 6px 2px; }
+  .kits-grade { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .kit-card { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+  .kit-card .nome { font-weight: 800; line-height: 1.2; }
+  .entrada { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px 18px; }
+  .entrada .caixa { width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: 16px; }
+  .logo-app { width: 64px; height: 64px; border-radius: 18px; background: var(--destaque); display: flex; align-items: center; justify-content: center; margin: 0 auto; }
+  .resumo-num { font-family: 'Fredoka', sans-serif; font-size: 28px; font-weight: 700; }
+</style>
+</head>
+<body>
+<div id="faixa"></div>
+<div id="raiz"><div class="carregando">Carregando…</div></div>
+<div id="painel"></div>
+<div id="toast" class="toast oculto" role="status" aria-live="polite"></div>
+<script type="module" src="app.js"></script>
+</body>
+</html>
