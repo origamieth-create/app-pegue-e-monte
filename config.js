@@ -15,4 +15,4 @@ export const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 export const PERMITIR_CADASTRO = true;
 
 // E-mail que aparece no botão de ajuda do app.
-export const EMAIL_SUPORTE = 'COLE_AQUI_SEU_EMAIL_DE_SUPORTE';
+export const EMAIL_SUPORTE = 'origami.eth@gmail.com';
