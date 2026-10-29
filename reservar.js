@@ -2,7 +2,7 @@
 // App Pegue e Monte — link público de reservas (a cliente final usa)
 // Endereço: reservar.html?l=<link-do-negocio>
 // =====================================================================
-import * as dados from './dados.js';
+import * as dados from './dados.js?v=20261029b';
 
 const { hojeISO, somaDias } = dados;
 const $ = (s, el = document) => el.querySelector(s);

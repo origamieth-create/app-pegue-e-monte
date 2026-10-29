@@ -2,8 +2,8 @@
 // App Pegue e Monte — app da dona
 // Abas: Hoje, Agenda, Kits, Mais
 // =====================================================================
-import * as dados from './dados.js';
-import { PERMITIR_CADASTRO, EMAIL_SUPORTE, LINK_MENSAL, LINK_ANUAL } from './config.js';
+import * as dados from './dados.js?v=20261029b';
+import { PERMITIR_CADASTRO, EMAIL_SUPORTE, LINK_MENSAL, LINK_ANUAL } from './config.js?v=20261029b';
 
 const { hojeISO, somaDias, cruza } = dados;
 
