@@ -176,7 +176,7 @@ export async function minhaAssinatura() {
     const a = D().assinatura || { status: 'ativa', plano: 'mensal', carencia_ate: null };
     const agora = new Date().toISOString();
     const liberado = a.status === 'ativa' || (!!a.carencia_ate && a.carencia_ate > agora);
-    return { email: 'demo@exemplo.com', cortesia: false, encontrada: true, ...a, liberado, agora };
+    return { email: 'demo@exemplo.com', cortesia: false, encontrada: true, ...a, liberado, admin: true, agora };
   }
   const s = await cliente();
   return ok(s.rpc('minha_assinatura'));
@@ -331,4 +331,55 @@ export async function solicitarReserva(slug, kitId, dataFesta, nome, whatsapp) {
   }
   const s = await cliente();
   return ok(s.rpc('solicitar_reserva', { p_slug: slug, p_kit: kitId, p_data_festa: dataFesta, p_nome: nome, p_whatsapp: whatsapp }));
+}
+
+// =====================================================================
+// Painel do administrador (só funciona para e-mails da tabela
+// "administradores"; o banco recusa qualquer outra pessoa)
+// =====================================================================
+function demoAdmin() {
+  const dias = (n) => new Date(Date.now() - n * 864e5).toISOString();
+  const mes = (n) => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - n); return d.toISOString().slice(0, 7); };
+  const clientes = [
+    { email: 'maria@festasdamaria.com', nome: 'Maria Souza', telefone: '5511987654321', situacao: 'ativa', status: 'ativa', plano: 'anual', tem_conta: true, negocio: 'Festas da Maria', slug: 'festas-da-maria', kits: 6, reservas: 23, total_pago: 269, primeira_compra: dias(40), ultimo_acesso: dias(0), ultimo_aviso: dias(40), ultimo_aviso_evento: 'purchase_approved' },
+    { email: 'julia.kits@gmail.com', nome: 'Júlia Andrade', telefone: '5521998877665', situacao: 'ativa', status: 'ativa', plano: 'mensal', tem_conta: true, negocio: 'Ju Pegue e Monte', slug: 'ju-pegue-e-monte', kits: 3, reservas: 9, total_pago: 59.8, primeira_compra: dias(35), ultimo_acesso: dias(1), ultimo_aviso: dias(4), ultimo_aviso_evento: 'subscription_renewed' },
+    { email: 'carla.decor@hotmail.com', nome: 'Carla Lima', telefone: '5531991234567', situacao: 'carencia', status: 'carencia', plano: 'mensal', carencia_ate: new Date(Date.now() + 30 * 36e5).toISOString(), tem_conta: true, negocio: 'Carla Decor', slug: 'carla-decor', kits: 4, reservas: 5, total_pago: 29.9, primeira_compra: dias(31), ultimo_acesso: dias(2), ultimo_aviso: dias(0), ultimo_aviso_evento: 'subscription_renewal_refused' },
+    { email: 'bia.festas@gmail.com', nome: 'Beatriz Rocha', telefone: '5541988880000', situacao: 'ativa', status: 'ativa', plano: 'mensal', tem_conta: false, kits: 0, reservas: 0, total_pago: 29.9, primeira_compra: dias(0), ultimo_aviso: dias(0), ultimo_aviso_evento: 'purchase_approved' },
+    { email: 'renata.m@gmail.com', nome: 'Renata Melo', telefone: '5551977776666', situacao: 'cancelada', status: 'cancelada', plano: 'mensal', tem_conta: true, negocio: 'Renata Festas', slug: 'renata-festas', kits: 1, reservas: 0, total_pago: 29.9, primeira_compra: dias(50), ultimo_acesso: dias(20), ultimo_aviso: dias(19), ultimo_aviso_evento: 'subscription_canceled' },
+    { email: 'lia.festinhas@gmail.com', nome: 'Lia Martins', telefone: '5511955554444', situacao: 'lead', tem_conta: false, kits: 0, reservas: 0, total_pago: 0, ultimo_aviso: dias(1), ultimo_aviso_evento: 'checkout_abandonment' },
+    { email: 'paty.kits@gmail.com', nome: null, telefone: null, situacao: 'lead', tem_conta: true, negocio: 'Paty Kits', slug: 'paty-kits', kits: 2, reservas: 0, total_pago: 0, conta_criada_em: dias(3), ultimo_acesso: dias(3) },
+    { email: 'demo@exemplo.com', nome: null, situacao: 'cortesia', cortesia: true, tem_conta: true, negocio: 'Festas da Maria (teste)', slug: 'demo', kits: 3, reservas: 4, total_pago: 0, ultimo_acesso: dias(0) },
+  ];
+  const eventos = clientes.filter((c) => c.ultimo_aviso).map((c) => ({
+    recebido_em: c.ultimo_aviso, evento: c.ultimo_aviso_evento, email: c.email, nome: c.nome, telefone: c.telefone, plano: c.plano,
+    valor: c.ultimo_aviso_evento === 'purchase_approved' || c.ultimo_aviso_evento === 'subscription_renewed' ? (c.plano === 'anual' ? 269 : 29.9) : null,
+  })).sort((a, b) => b.recebido_em.localeCompare(a.recebido_em));
+  const resumo = {
+    ativas: 3, ativas_mensal: 2, ativas_anual: 1, ativas_manual: 0, carencia: 1, canceladas: 1, suspensas: 0, cortesias: 1,
+    receita_mensal_estimada: 82.22,
+    mes: { vendas: 2, renovacoes: 1, recuperadas: 0, falhas: 1, cancelamentos: 0, reembolsos: 0, faturamento: 328.8, contas_novas: 3 },
+    contas: 6, contas_usando: 5, reservas_mes: 18,
+    historico: [5, 4, 3, 2, 1, 0].map((n, i) => ({ mes: mes(n), vendas: [0, 0, 0, 1, 2, 2][i], renovacoes: [0, 0, 0, 0, 1, 1][i], cancelamentos: [0, 0, 0, 0, 1, 0][i], faturamento: [0, 0, 0, 29.9, 328.8, 328.8][i] })),
+  };
+  return { clientes, eventos, resumo };
+}
+export async function adminResumo() {
+  if (MODO_DEMO) return demoAdmin().resumo;
+  const s = await cliente();
+  return ok(s.rpc('admin_resumo'));
+}
+export async function adminClientes() {
+  if (MODO_DEMO) return demoAdmin().clientes;
+  const s = await cliente();
+  return ok(s.rpc('admin_clientes'));
+}
+export async function adminEventos(limite = 80) {
+  if (MODO_DEMO) return demoAdmin().eventos;
+  const s = await cliente();
+  return ok(s.rpc('admin_eventos', { p_limite: limite }));
+}
+export async function adminDefinirAcesso(email, liberar) {
+  if (MODO_DEMO) return { ok: true, email, liberado: liberar };
+  const s = await cliente();
+  return ok(s.rpc('admin_definir_acesso', { p_email: email, p_liberar: liberar }));
 }

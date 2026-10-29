@@ -875,6 +875,7 @@ function abaMais(tela) {
     <section class="coluna">
       <button class="cartao clicavel" id="meus-dados"><div class="nome" style="font-weight:800">Meus dados</div><div class="pequeno">Nome, link, WhatsApp, Pix e dias de retirada</div></button>
       <div class="cartao"><div style="font-weight:800">Clientes</div><div class="pequeno">Chega na próxima atualização do app.</div></div>
+      ${estado.assinatura && estado.assinatura.admin ? '<a class="cartao clicavel" style="text-decoration:none; background: var(--tinta); color: #fff; border-color: var(--tinta)" href="admin.html"><div style="font-weight:800">Painel do administrador</div><div class="pequeno" style="color:#D9CFE6">Clientes, renovações, leads e acessos</div></a>' : ''}
       <a class="cartao clicavel" style="text-decoration:none" href="mailto:${esc(EMAIL_SUPORTE)}?subject=${encodeURIComponent('Ajuda no App Pegue e Monte')}"><div style="font-weight:800">Preciso de ajuda</div><div class="pequeno">Respondemos por e-mail</div></a>
     </section>
     ${dados.MODO_DEMO ? '<button class="btn contorno cheio" id="demo-falha">Simular: pagamento falhou</button><button class="btn contorno cheio" id="demo-reset">Recomeçar a demonstração</button>' : ''}

@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Painel do administrador · App Pegue e Monte</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#2A1B3D">
+<link rel="icon" href="icone.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icone-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito+Sans:wght@400;600;700;800&display=swap">
+<link rel="stylesheet" href="estilo.css">
+<style>
+  body { padding-bottom: calc(32px + env(safe-area-inset-bottom)); }
+  .topo { position: sticky; top: 0; z-index: 20; background: var(--tinta); color: #fff; padding: calc(8px + env(safe-area-inset-top)) 10px 0; }
+  .topo-in { max-width: 760px; margin: 0 auto; }
+  .topo .btn-voltar { color: #D9CFE6; }
+  .topo h1 { font-size: 22px; padding: 0 8px 10px; }
+  .abas-adm { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+  .abas-adm button { border: 0; background: none; color: #D9CFE6; font-weight: 800; font-size: 15px; min-height: 46px; border-bottom: 3px solid transparent; cursor: pointer; }
+  .abas-adm button.ativa { color: #fff; border-bottom-color: var(--coral); }
+  main { max-width: 760px; margin: 0 auto; padding: 18px; display: flex; flex-direction: column; gap: 16px; }
+  .destaque { background: var(--tinta); color: #fff; border-radius: 22px; padding: 20px; display: flex; flex-direction: column; gap: 4px; }
+  .destaque .rot { font-size: 14px; font-weight: 700; color: #D9CFE6; }
+  .destaque .num { font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 44px; line-height: 1.05; }
+  .destaque .sub { font-size: 14px; font-weight: 800; color: #9FE3BD; }
+  .grade-num { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  @media (min-width: 560px) { .grade-num { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  .num-cartao { background: #fff; border: 1px solid var(--linha); border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 2px; }
+  .num-cartao .rot { font-size: 13px; font-weight: 700; color: var(--texto2); }
+  .num-cartao b { font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 26px; line-height: 1.15; }
+  .num-cartao.alerta { background: #FFF6E3; border-color: #F1D9A4; }
+  .num-cartao.ruim { background: #FFE9EB; border-color: #F0A9B1; }
+  .num-cartao.bom { background: #EAF7EF; border-color: #BFE3CE; }
+  .barras { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; align-items: end; height: 150px; padding-top: 18px; }
+  .barra { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; height: 100%; font-size: 11px; font-weight: 800; color: var(--texto2); }
+  .barra i { display: block; width: 100%; max-width: 44px; background: var(--coral); border-radius: 8px 8px 3px 3px; min-height: 3px; }
+  .barra.atual i { background: var(--destaque); }
+  .filtros { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; }
+  .filtro { flex: 0 0 auto; border: 0; border-radius: 999px; padding: 8px 14px; min-height: 40px; font-weight: 800; font-size: 14px; background: #fff; box-shadow: inset 0 0 0 2px var(--linha); cursor: pointer; }
+  .filtro.ativo { background: var(--tinta); color: #fff; box-shadow: none; }
+  .pessoa { display: flex; flex-direction: column; gap: 10px; }
+  .pessoa .cab { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+  .pessoa .nome { font-weight: 800; font-size: 17px; line-height: 1.25; word-break: break-word; }
+  .pessoa .email { font-size: 14px; color: var(--texto2); overflow-wrap: anywhere; }
+  .infos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 12px; font-size: 13px; color: var(--texto2); }
+  .infos b { color: var(--tinta); font-weight: 800; }
+  .acoes { display: flex; flex-wrap: wrap; gap: 8px; }
+  .sit { display: inline-flex; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; white-space: nowrap; color: #fff; }
+  .sit-ativa { background: #1F7A52; }
+  .sit-carencia { background: #9A5B00; }
+  .sit-cancelada { background: #6B6470; }
+  .sit-suspensa { background: #B3202E; }
+  .sit-lead { background: #5B3A99; }
+  .sit-cortesia { background: #1E5FA8; }
+  .evento { display: flex; gap: 12px; align-items: flex-start; }
+  .evento .bola { width: 12px; height: 12px; border-radius: 99px; margin-top: 6px; flex: 0 0 auto; }
+  .evento .txt { flex: 1; min-width: 0; }
+  .evento .quem { font-size: 14px; color: var(--texto2); overflow-wrap: anywhere; }
+  .evento .valor { font-weight: 800; white-space: nowrap; }
+  .aviso-tela { min-height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; text-align: center; padding: 24px; }
+</style>
+</head>
+<body>
+<div id="raiz"><div class="carregando">Carregando…</div></div>
+<div id="toast" class="toast oculto" role="status" aria-live="polite"></div>
+<script type="module" src="admin.js"></script>
+</body>
+</html>
