@@ -1,1 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="112" fill="#C73B48"/><g fill="none" stroke="#fff" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"><rect x="112" y="128" width="288" height="272" rx="40"/><path d="M192 96v64M320 96v64M112 216h288"/><path d="M200 304l40 40 72-72"/></g></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="App Pegue e Monte">
+  <rect width="512" height="512" rx="128" fill="#E4505C"/>
+  <path d="M84 150 Q256 236 428 150" fill="none" stroke="#FFFBF7" stroke-width="14" stroke-linecap="round"/>
+  <path d="M114 166 L180 182 L142 246 Z" fill="#FFC94A" stroke="#FFC94A" stroke-width="10" stroke-linejoin="round"/>
+  <path d="M222 190 L290 190 L256 262 Z" fill="#FFFBF7" stroke="#FFFBF7" stroke-width="10" stroke-linejoin="round"/>
+  <path d="M398 166 L332 182 L370 246 Z" fill="#FFC94A" stroke="#FFC94A" stroke-width="10" stroke-linejoin="round"/>
+  <path d="M168 336 L230 396 L346 282" fill="none" stroke="#FFFBF7" stroke-width="42" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

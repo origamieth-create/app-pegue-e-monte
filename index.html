@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#2A1B3D">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icone.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="icone-192.png">
+<link rel="apple-touch-icon" href="icone-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Pegue e Monte">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -15,8 +15,11 @@
 <link rel="stylesheet" href="estilo.css">
 <style>
   body { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
-  .topo { position: sticky; top: 0; z-index: 20; background: var(--fundo); padding: calc(14px + env(safe-area-inset-top)) 18px 10px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-  .topo .marca { font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #faixa { position: sticky; top: 0; z-index: 40; }
+  .topo { position: sticky; top: var(--altura-faixa, 0px); z-index: 20; background: var(--fundo); padding: calc(14px + env(safe-area-inset-top)) 18px 10px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .topo .marca { display: flex; align-items: center; gap: 10px; min-width: 0; font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 18px; }
+  .topo .marca svg { flex: 0 0 auto; }
+  .marca-nome { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   main { max-width: 640px; margin: 0 auto; padding: 4px 18px 24px; display: flex; flex-direction: column; gap: 16px; }
   nav.abas { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: #fff; border-top: 1px solid var(--linha); display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); padding-bottom: env(safe-area-inset-bottom); }
   nav.abas button { border: 0; background: none; min-height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 13px; font-weight: 800; color: var(--texto2); cursor: pointer; }
@@ -34,7 +37,21 @@
   .kit-card .nome { font-weight: 800; line-height: 1.2; }
   .entrada { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px 18px; }
   .entrada .caixa { width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: 16px; }
-  .logo-app { width: 64px; height: 64px; border-radius: 18px; background: var(--destaque); display: flex; align-items: center; justify-content: center; margin: 0 auto; }
+  .logo-app { width: 72px; height: 72px; display: flex; align-items: center; justify-content: center; margin: 0 auto; }
+  .bandeirinhas { width: 100%; max-width: 320px; height: auto; display: block; margin: 0 auto -4px; }
+  .fin { display: flex; flex-direction: column; gap: 12px; }
+  .fin-mes { font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 22px; }
+  .fin-destaque { background: var(--tinta); color: #fff; border-radius: 22px; padding: 20px; display: flex; flex-direction: column; gap: 4px; }
+  .fin-rotulo { font-size: 14px; font-weight: 700; color: #D9CFE6; }
+  .fin-valor { font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 38px; line-height: 1.1; }
+  .fin-sub { font-size: 14px; font-weight: 800; color: #9FE3BD; }
+  .fin-grade { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .fin-cartao { background: #fff; border: 1px solid var(--linha); border-radius: 16px; padding: 12px; display: flex; flex-direction: column; gap: 2px; text-align: left; }
+  .fin-cartao b { font-size: 16px; }
+  .clicavel-fin { cursor: pointer; font: inherit; color: inherit; box-shadow: inset 0 0 0 2px var(--lilas); }
+  .titulo-alerta { display: flex; align-items: center; gap: 8px; }
+  .titulo-alerta::before { content: ''; width: 12px; height: 12px; border-radius: 99px; background: var(--cor); flex: 0 0 auto; }
+  .num-alerta { min-width: 26px; height: 26px; padding: 0 8px; border-radius: 999px; color: #fff; font-weight: 800; font-size: 14px; display: inline-flex; align-items: center; justify-content: center; }
   .resumo-num { font-family: 'Fredoka', sans-serif; font-size: 28px; font-weight: 700; }
 </style>
 </head>

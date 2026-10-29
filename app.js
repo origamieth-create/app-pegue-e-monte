@@ -3,7 +3,7 @@
 // Abas: Hoje, Agenda, Kits, Mais
 // =====================================================================
 import * as dados from './dados.js';
-import { PERMITIR_CADASTRO, EMAIL_SUPORTE } from './config.js';
+import { PERMITIR_CADASTRO, EMAIL_SUPORTE, LINK_MENSAL, LINK_ANUAL } from './config.js';
 
 const { hojeISO, somaDias, cruza } = dados;
 
@@ -11,6 +11,8 @@ const estado = {
   negocio: null,
   kits: [],
   reservas: [],
+  gastos: [],
+  mesFin: null,
   aba: 'hoje',
   mes: hojeISO().slice(0, 7),   // AAAA-MM mostrado na agenda
   dia: hojeISO(),               // dia selecionado na agenda
@@ -49,7 +51,7 @@ function slugDe(texto) {
 }
 function linkPublico(slug) { return new URL(`reservar.html?l=${encodeURIComponent(slug)}`, location.href).href; }
 function kitDe(id) { return estado.kits.find((k) => k.id === id) || { nome: 'Kit removido', pecas: [] }; }
-function podeEditar() { return !!(estado.negocio && estado.negocio.assinatura_ativa); }
+function podeEditar() { return !!(estado.assinatura && estado.assinatura.liberado); }
 
 const STATUS = {
   aguardando_sinal: 'Aguardando sinal',
@@ -59,6 +61,8 @@ const STATUS = {
   cancelada: 'Cancelada',
 };
 const etiqueta = (status, texto) => `<span class="etiqueta et-${status}">${esc(texto || STATUS[status] || status)}</span>`;
+
+const BANDEIRINHAS = '<svg class="bandeirinhas" viewBox="0 0 480 64" aria-hidden="true"><path d="M4 6 Q120 34 240 10 Q360 -10 476 18" fill="none" stroke="#2A1B3D" stroke-width="3" stroke-linecap="round"/><path d="M28 13 L60 19 L42 52 Z" fill="#E4505C"/><path d="M84 22 L116 25 L98 58 Z" fill="#FFC94A"/><path d="M140 25 L172 23 L156 58 Z" fill="#5B3A99"/><path d="M196 18 L228 13 L214 48 Z" fill="#E4505C"/><path d="M252 9 L284 5 L270 40 Z" fill="#FFC94A"/><path d="M308 3 L340 3 L324 38 Z" fill="#1F7A52"/><path d="M364 4 L396 7 L378 42 Z" fill="#E4505C"/><path d="M420 10 L452 15 L434 48 Z" fill="#FFC94A"/></svg>';
 
 const ICONE = {
   hoje: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
@@ -70,7 +74,8 @@ const ICONE = {
   zap: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-12.4 7.4L3 21l2.1-5.4A8.4 8.4 0 1 1 21 11.5z"/></svg>',
   esq: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>',
   dir: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>',
-  logo: '<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M8 2v4M16 2v4M3 10h18"/><path d="M9 15l2 2 4-4"/></svg>',
+  logo: '<svg width="72" height="72" viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="128" fill="#E4505C"/><path d="M84 150 Q256 236 428 150" fill="none" stroke="#FFFBF7" stroke-width="14" stroke-linecap="round"/><path d="M114 166 L180 182 L142 246 Z" fill="#FFC94A" stroke="#FFC94A" stroke-width="10" stroke-linejoin="round"/><path d="M222 190 L290 190 L256 262 Z" fill="#FFFBF7" stroke="#FFFBF7" stroke-width="10" stroke-linejoin="round"/><path d="M398 166 L332 182 L370 246 Z" fill="#FFC94A" stroke="#FFC94A" stroke-width="10" stroke-linejoin="round"/><path d="M168 336 L230 396 L346 282" fill="none" stroke="#FFFBF7" stroke-width="42" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  marca: '<svg width="30" height="30" viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="128" fill="#E4505C"/><path d="M84 150 Q256 236 428 150" fill="none" stroke="#FFFBF7" stroke-width="14" stroke-linecap="round"/><path d="M114 166 L180 182 L142 246 Z" fill="#FFC94A" stroke="#FFC94A" stroke-width="10" stroke-linejoin="round"/><path d="M222 190 L290 190 L256 262 Z" fill="#FFFBF7" stroke="#FFFBF7" stroke-width="10" stroke-linejoin="round"/><path d="M398 166 L332 182 L370 246 Z" fill="#FFC94A" stroke="#FFC94A" stroke-width="10" stroke-linejoin="round"/><path d="M168 336 L230 396 L346 282" fill="none" stroke="#FFFBF7" stroke-width="42" stroke-linecap="round" stroke-linejoin="round"/></svg>',
 };
 
 let toastTimer = null;
@@ -92,23 +97,50 @@ async function acao(botao, fn) {
 }
 
 // ---------------------------------------------------------------------
-// Painel deslizante
+// Telas internas (detalhe da reserva, formulários, checklist)
+// Abrem em tela cheia, com botão "Voltar" no topo. O botão voltar do
+// celular também volta para a tela anterior em vez de sair do app.
 // ---------------------------------------------------------------------
-function abrirPainel(titulo, corpo, aoMontar) {
+let painelAberto = false;
+let voltarAtual = null;
+
+function abrirPainel(titulo, corpo, aoMontar, voltar) {
   const p = $('#painel');
+  if (!painelAberto) { history.pushState({ painel: true }, ''); painelAberto = true; }
+  voltarAtual = voltar || null;
   p.innerHTML = `
     <div class="painel-fundo">
       <div class="painel" role="dialog" aria-modal="true" aria-label="${esc(titulo)}">
-        <div class="painel-topo"><h2>${esc(titulo)}</h2><button class="fechar" aria-label="Fechar">${ICONE.fechar}</button></div>
+        <div class="painel-barra"><button class="btn-voltar" type="button">${ICONE.esq} Voltar</button></div>
+        <h1 class="painel-titulo">${esc(titulo)}</h1>
         ${corpo}
       </div>
     </div>`;
-  $('.fechar', p).onclick = fecharPainel;
-  $('.painel-fundo', p).addEventListener('click', (e) => { if (e.target.classList.contains('painel-fundo')) fecharPainel(); });
+  $('.btn-voltar', p).onclick = voltarPainel;
+  $('.painel-fundo', p).scrollTop = 0;
   document.body.style.overflow = 'hidden';
   if (aoMontar) aoMontar($('.painel', p));
 }
-function fecharPainel() { $('#painel').innerHTML = ''; document.body.style.overflow = ''; }
+function voltarPainel() {
+  if (voltarAtual) { const f = voltarAtual; f(); } else fecharPainel();
+}
+function fecharPainel(vindoDoCelular) {
+  if (!painelAberto) return;
+  painelAberto = false;
+  voltarAtual = null;
+  $('#painel').innerHTML = '';
+  document.body.style.overflow = '';
+  if (!vindoDoCelular) history.back();
+}
+window.addEventListener('popstate', () => {
+  if (!painelAberto) return;
+  if (voltarAtual) {
+    history.pushState({ painel: true }, '');
+    const f = voltarAtual; f();
+  } else {
+    fecharPainel(true);
+  }
+});
 
 // =====================================================================
 // Início
@@ -122,7 +154,7 @@ async function iniciar() {
   });
   try {
     const sessao = await dados.sessaoAtual();
-    if (!sessao) return telaLogin('entrar');
+    if (!sessao) return telaLogin(new URLSearchParams(location.search).has('bemvinda') && PERMITIR_CADASTRO ? 'criar' : 'entrar');
     await carregarTudo();
   } catch (e) {
     $('#raiz').innerHTML = `<main><div class="erro">${esc(e.message)}</div><button class="btn" onclick="location.reload()">Tentar de novo</button></main>`;
@@ -130,17 +162,115 @@ async function iniciar() {
 }
 
 async function carregarTudo() {
-  estado.negocio = await dados.meuNegocio();
+  [estado.negocio, estado.assinatura] = await Promise.all([dados.meuNegocio(), dados.minhaAssinatura()]);
+  marcarRelogio();
+  const a = estado.assinatura || {};
+  if (!a.cortesia && !a.encontrada) return telaSemAssinatura();
   if (!estado.negocio) return telaConfiguracaoInicial();
-  [estado.kits, estado.reservas] = await Promise.all([dados.listarKits(), dados.listarReservas()]);
+  [estado.kits, estado.reservas, estado.gastos] = await Promise.all([dados.listarKits(), dados.listarReservas(), dados.listarGastos().catch(() => [])]);
   estado.carregadoEm = Date.now();
   montarApp();
 }
 
 async function recarregar() {
-  [estado.kits, estado.reservas] = await Promise.all([dados.listarKits(), dados.listarReservas()]);
+  const antes = estado.assinatura ? estado.assinatura.liberado : null;
+  [estado.kits, estado.reservas, estado.gastos, estado.assinatura] = await Promise.all([
+    dados.listarKits(), dados.listarReservas(), dados.listarGastos().catch(() => []), dados.minhaAssinatura()]);
+  marcarRelogio();
   estado.carregadoEm = Date.now();
+  if (antes !== estado.assinatura.liberado) { montarApp(); return; }
   desenharAba();
+}
+
+// =====================================================================
+// Assinatura: aviso de pagamento com contador e link para regularizar
+// =====================================================================
+// Diferença entre o relógio do servidor e o do aparelho, para o contador não depender da hora do celular.
+let diferencaRelogio = 0;
+function marcarRelogio() {
+  const a = estado.assinatura;
+  if (a && a.agora) diferencaRelogio = new Date(a.agora).getTime() - Date.now();
+}
+function agoraServidor() { return Date.now() + diferencaRelogio; }
+function linkPagamento() { return (estado.assinatura && estado.assinatura.plano === 'anual') ? LINK_ANUAL : LINK_MENSAL; }
+function tempoRestante(ms) {
+  const min = Math.max(0, Math.floor(ms / 60000));
+  const d = Math.floor(min / 1440); const h = Math.floor((min % 1440) / 60); const m = min % 60;
+  return `${d ? d + 'd ' : ''}${h}h ${String(m).padStart(2, '0')}min`;
+}
+
+// Situação para a faixa: null (tudo certo), 'carencia' ou 'suspensa'
+function situacaoAssinatura() {
+  const a = estado.assinatura || {};
+  if (a.cortesia || a.status === 'ativa') return null;
+  if (a.liberado && a.carencia_ate) return 'carencia';
+  return 'suspensa';
+}
+
+let relogioFaixa = null;
+function ajustarAlturaFaixa() {
+  const f = $('#faixa');
+  document.documentElement.style.setProperty('--altura-faixa', (f ? f.offsetHeight : 0) + 'px');
+}
+function desenharFaixaAssinatura() {
+  clearInterval(relogioFaixa);
+  setTimeout(ajustarAlturaFaixa, 0);
+  const faixa = $('#faixa');
+  const base = dados.MODO_DEMO ? '<div class="faixa demo">Modo demonstração: os dados são de exemplo e ficam só neste aparelho.</div>' : '';
+  const sit = situacaoAssinatura();
+  if (!sit) { faixa.innerHTML = base; return; }
+  const a = estado.assinatura;
+  const cancelada = a.status === 'cancelada';
+  if (sit === 'carencia') {
+    faixa.innerHTML = base + `
+      <div class="faixa-pagamento" role="alert">
+        <div><b>${cancelada ? 'Sua assinatura foi cancelada.' : 'Pagamento não confirmado.'}</b>
+        ${cancelada ? 'Reative' : 'Regularize'} em <b id="contagem">${tempoRestante(new Date(a.carencia_ate).getTime() - agoraServidor())}</b> para não perder o acesso.</div>
+        <a class="btn mini" href="${esc(linkPagamento())}" target="_blank" rel="noopener">${cancelada ? 'Reativar assinatura' : 'Regularizar pagamento'}</a>
+      </div>`;
+    relogioFaixa = setInterval(() => {
+      const resta = new Date(a.carencia_ate).getTime() - agoraServidor();
+      const c = $('#contagem');
+      if (c) c.textContent = tempoRestante(resta);
+      if (resta <= 0) { clearInterval(relogioFaixa); recarregar().catch(() => {}); }
+    }, 30000);
+  } else {
+    faixa.innerHTML = base + `
+      <div class="faixa-pagamento suspensa" role="alert">
+        <div><b>Assinatura suspensa.</b> Você ainda vê suas reservas, mas não pode criar ou alterar nada, e seu link de reservas está fora do ar.</div>
+        <div class="linha-flex" style="flex-wrap:wrap">
+          <a class="btn mini" href="${esc(linkPagamento())}" target="_blank" rel="noopener">Regularizar pagamento</a>
+          <button class="btn mini contorno-claro" id="ja-paguei">Já paguei</button>
+        </div>
+      </div>`;
+    $('#ja-paguei').onclick = (e) => acao(e.currentTarget, async () => {
+      await recarregar();
+      aviso(estado.assinatura.liberado ? 'Pagamento confirmado!' : 'Ainda não recebemos a confirmação. Pode levar alguns minutos.');
+    });
+  }
+}
+
+function telaSemAssinatura() {
+  const email = (estado.assinatura && estado.assinatura.email) || '';
+  desenharFaixaAssinatura();
+  $('#faixa').innerHTML = dados.MODO_DEMO ? $('#faixa').innerHTML : '';
+  $('#raiz').innerHTML = `
+    <div class="entrada"><div class="caixa">
+      ${BANDEIRINHAS}<div class="logo-app">${ICONE.logo}</div>
+      <h1 class="centro">Falta ativar sua assinatura</h1>
+      <p class="centro">Não encontramos uma assinatura para <b>${esc(email)}</b>.</p>
+      <p class="centro pequeno">Se você já comprou, confira se entrou com o <b>mesmo e-mail usado na compra</b>. A confirmação do pagamento pode levar alguns minutos.</p>
+      <button class="btn verde cheio" id="verificar">Já paguei, verificar de novo</button>
+      <a class="btn principal cheio" href="${esc(LINK_ANUAL)}" target="_blank" rel="noopener">Assinar o anual: R$ 269 ou 12x de R$ 27,79</a>
+      <a class="btn contorno cheio" href="${esc(LINK_MENSAL)}" target="_blank" rel="noopener">Assinar o mensal: R$ 29,90</a>
+      <button type="button" class="link-btn" id="trocar">Entrar com outro e-mail</button>
+    </div></div>`;
+  $('#verificar').onclick = (e) => acao(e.currentTarget, async () => {
+    await carregarTudo();
+    const a = estado.assinatura || {};
+    if (!a.cortesia && !a.encontrada) aviso('Ainda não recebemos a confirmação. Tente de novo em alguns minutos.');
+  });
+  $('#trocar').onclick = async () => { await dados.sair(); telaLogin('entrar'); };
 }
 
 // Quando a dona volta para o app (troca de aplicativo e volta), busca pedidos novos.
@@ -164,7 +294,7 @@ function atualizarContador() {
   c.textContent = n > 9 ? '9+' : String(n);
   c.classList.toggle('oculto', n === 0);
   const b = c.closest('button');
-  if (b) b.setAttribute('aria-label', n ? `Hoje, ${n} pedido(s) aguardando sinal` : 'Hoje');
+  if (b) b.setAttribute('aria-label', n ? `Início, ${n} pedido(s) aguardando sinal` : 'Início');
 }
 
 // =====================================================================
@@ -174,9 +304,9 @@ function telaLogin(modo) {
   const titulos = { entrar: 'Entrar', criar: 'Criar conta', esqueci: 'Recuperar senha' };
   $('#raiz').innerHTML = `
     <div class="entrada"><form class="caixa" novalidate>
-      <div class="logo-app">${ICONE.logo}</div>
+      ${BANDEIRINHAS}<div class="logo-app">${ICONE.logo}</div>
       <h1 class="centro">App Pegue e Monte</h1>
-      <p class="centro pequeno">${modo === 'esqueci' ? 'Enviaremos um link para você criar uma nova senha.' : 'Sua agenda de kits no celular.'}</p>
+      <p class="centro pequeno">${modo === 'esqueci' ? 'Enviaremos um link para você criar uma nova senha.' : modo === 'criar' ? 'Crie sua senha usando o <b>mesmo e-mail da compra</b>.' : 'Sua agenda de kits no celular.'}</p>
       <label class="campo">E-mail<input type="email" name="email" autocomplete="email" inputmode="email" required></label>
       ${modo !== 'esqueci' ? `<label class="campo">Senha<input type="password" name="senha" autocomplete="${modo === 'criar' ? 'new-password' : 'current-password'}" minlength="6" required></label>` : ''}
       <div class="erro oculto" id="erro-login"></div>
@@ -228,7 +358,7 @@ function telaNovaSenha() {
   fecharPainel();
   $('#raiz').innerHTML = `
     <div class="entrada"><form class="caixa">
-      <div class="logo-app">${ICONE.logo}</div>
+      ${BANDEIRINHAS}<div class="logo-app">${ICONE.logo}</div>
       <h1 class="centro">Nova senha</h1>
       <label class="campo">Nova senha<input type="password" name="senha" minlength="6" autocomplete="new-password" required></label>
       <div class="erro oculto" id="erro-senha"></div>
@@ -300,7 +430,7 @@ function ligarPreviaLink(form) {
 function telaConfiguracaoInicial() {
   $('#raiz').innerHTML = `
     <div class="entrada"><form class="caixa" novalidate>
-      <div class="logo-app">${ICONE.logo}</div>
+      ${BANDEIRINHAS}<div class="logo-app">${ICONE.logo}</div>
       <h1 class="centro">Vamos começar</h1>
       <p class="centro pequeno">Quatro informações e seu app está pronto.</p>
       ${camposNegocio({}, true)}
@@ -350,18 +480,16 @@ function painelNegocio() {
 // Estrutura do app e abas
 // =====================================================================
 function montarApp() {
-  if (!estado.negocio.assinatura_ativa) {
-    $('#faixa').innerHTML = '<div class="faixa leitura">Sua assinatura não está ativa. Você pode ver suas reservas, mas não pode criar ou alterar.</div>';
-  }
+  desenharFaixaAssinatura();
   $('#raiz').innerHTML = `
     <header class="topo">
-      <span class="marca">${esc(estado.negocio.nome)}</span>
+      <span class="marca">${ICONE.marca}<span class="marca-nome">${esc(estado.negocio.nome)}</span></span>
       ${podeEditar() ? `<button class="btn principal mini" id="nova-res">${ICONE.mais1} Reserva</button>` : ''}
     </header>
     <main id="tela"></main>
     <nav class="abas" aria-label="Menu principal">
       ${['hoje', 'agenda', 'kits', 'mais'].map((a) => `
-        <button data-aba="${a}" aria-label="${{ hoje: 'Hoje', agenda: 'Agenda', kits: 'Kits', mais: 'Mais' }[a]}">${ICONE[a]}<span>${{ hoje: 'Hoje', agenda: 'Agenda', kits: 'Kits', mais: 'Mais' }[a]}</span>${a === 'hoje' ? '<span class="contador oculto" id="cont-hoje" aria-hidden="true"></span>' : ''}</button>`).join('')}
+        <button data-aba="${a}" aria-label="${{ hoje: 'Início', agenda: 'Agenda', kits: 'Kits', mais: 'Mais' }[a]}">${ICONE[a]}<span>${{ hoje: 'Início', agenda: 'Agenda', kits: 'Kits', mais: 'Mais' }[a]}</span>${a === 'hoje' ? '<span class="contador oculto" id="cont-hoje" aria-hidden="true"></span>' : ''}</button>`).join('')}
     </nav>`;
   $$('nav.abas button').forEach((b) => (b.onclick = () => irPara(b.dataset.aba)));
   const nova = $('#nova-res');
@@ -389,54 +517,191 @@ function desenharAba() {
   ({ hoje: abaHoje, agenda: abaAgenda, kits: abaKits, mais: abaMais }[estado.aba])(tela);
 }
 
-// Um item de reserva clicável
+// Reserva atrasada: devolução passou e o kit não voltou, ou a retirada passou e o kit não saiu.
+function estaAtrasada(r) {
+  const h = hojeISO();
+  return (r.status === 'retirada' && r.data_devolucao < h) || (r.status === 'confirmada' && r.data_retirada < h);
+}
+
+// Um item de reserva clicável, colorido pela situação
 function itemReserva(r, extra) {
   const k = kitDe(r.kit_id);
+  const atrasada = estaAtrasada(r);
   return `
-    <button class="cartao clicavel" data-res="${esc(r.id)}">
+    <button class="cartao clicavel res-${atrasada ? 'atrasada' : r.status}" data-res="${esc(r.id)}">
       <div class="item-res">
         <div class="info">
           <div class="nome">${esc(k.nome)} · ${esc(r.cliente_nome)}</div>
           <div class="pequeno">${extra || 'Festa ' + dataCurta(r.data_festa)}</div>
         </div>
-        ${etiqueta(r.status)}
+        ${atrasada ? etiqueta('atrasada', 'Atrasada') : etiqueta(r.status)}
       </div>
     </button>`;
 }
 function ligarItens(el) { $$('[data-res]', el).forEach((b) => (b.onclick = () => abrirReserva(b.dataset.res))); }
 
 // ---------------------------------------------------------------------
-// HOJE
+// INÍCIO: financeiro do mês + alertas
 // ---------------------------------------------------------------------
+function resumoDoMes(mes) {
+  const rs = estado.reservas.filter((r) => r.status !== 'cancelada' && r.data_festa.startsWith(mes));
+  let recebido = 0;
+  let aReceber = 0;
+  rs.forEach((r) => {
+    if (r.status === 'aguardando_sinal') return;
+    const sinal = Number(r.valor_sinal) || 0;
+    const resto = Math.max(0, (Number(r.valor_total) || 0) - sinal);
+    if (r.sinal_recebido) recebido += sinal; else aReceber += sinal;
+    if (r.restante_recebido) recebido += resto; else aReceber += resto;
+  });
+  const gastosLista = estado.gastos.filter((g) => g.data.startsWith(mes));
+  const gastos = gastosLista.reduce((s, g) => s + (Number(g.valor) || 0), 0);
+  const porKit = {};
+  rs.forEach((r) => { porKit[r.kit_id] = (porKit[r.kit_id] || 0) + 1; });
+  const top = Object.entries(porKit).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([id, n]) => ({ nome: kitDe(id).nome, n }));
+  return {
+    recebido, aReceber, gastos, gastosLista, lucro: recebido - gastos, top,
+    confirmadas: rs.filter((r) => r.status === 'confirmada' || r.status === 'retirada').length,
+    aguardando: rs.filter((r) => r.status === 'aguardando_sinal').length,
+    concluidas: rs.filter((r) => r.status === 'concluida').length,
+    total: rs.length,
+  };
+}
+function mesAnterior(mes) { const [a, m] = mes.split('-').map(Number); return dados.isoDe(new Date(a, m - 2, 1)).slice(0, 7); }
+function nomeDoMes(mes) { const [a, m] = mes.split('-').map(Number); return maiuscula(new Date(a, m - 1, 1).toLocaleDateString('pt-BR', { month: 'long' })); }
+
 function abaHoje(tela) {
   const h = hojeISO();
+  const mes = estado.mesFin || h.slice(0, 7);
+  const atual = resumoDoMes(mes);
+  const anterior = resumoDoMes(mesAnterior(mes));
+  const temGastos = atual.gastosLista.length > 0;
+  let comparacao = '';
+  if (temGastos && anterior.gastosLista.length && anterior.lucro > 0) {
+    const pct = Math.round(((atual.lucro - anterior.lucro) / anterior.lucro) * 100);
+    comparacao = `${pct >= 0 ? '+' : ''}${pct}% em relação a ${nomeDoMes(mesAnterior(mes)).toLowerCase()}`;
+  }
+
   const ativas = estado.reservas.filter((r) => r.status !== 'cancelada');
   const pendentes = ativas.filter((r) => r.status === 'aguardando_sinal').sort((a, b) => a.data_festa.localeCompare(b.data_festa));
   const retiradas = ativas.filter((r) => r.status === 'confirmada' && r.data_retirada === h);
   const devolucoes = ativas.filter((r) => r.status === 'retirada' && r.data_devolucao === h);
-  const atrasadas = ativas.filter((r) => (r.status === 'retirada' && r.data_devolucao < h) || (r.status === 'confirmada' && r.data_retirada < h));
+  const atrasadas = ativas.filter(estaAtrasada);
   const proximas = ativas.filter((r) => r.status === 'confirmada' && r.data_retirada > h && r.data_retirada <= somaDias(h, 7))
     .sort((a, b) => a.data_retirada.localeCompare(b.data_retirada));
 
-  const bloco = (titulo, lista, extra, vazio) => `
+  const bloco = (titulo, cor, lista, extra) => `
     <section class="coluna">
-      <div class="secao-titulo"><h2>${titulo}</h2>${lista.length ? `<span class="pequeno">${lista.length}</span>` : ''}</div>
-      ${lista.length ? `<div class="lista">${lista.map((r) => itemReserva(r, extra(r))).join('')}</div>` : `<p class="vazio-txt">${vazio}</p>`}
+      <div class="secao-titulo"><h2 class="titulo-alerta" style="--cor:${cor}">${titulo}</h2><span class="num-alerta" style="background:${cor}">${lista.length}</span></div>
+      <div class="lista">${lista.map((r) => itemReserva(r, extra(r))).join('')}</div>
     </section>`;
+  const algumAlerta = atrasadas.length + pendentes.length + retiradas.length + devolucoes.length > 0;
 
   tela.innerHTML = `
-    <h1>${esc(dataLonga(h))}</h1>
-    ${atrasadas.length ? bloco('Atrasadas', atrasadas, (r) => r.status === 'retirada'
-      ? `<b style="color: var(--destaque-escuro)">Devolução era ${dataCurta(r.data_devolucao)}</b>`
-      : `<b style="color: var(--destaque-escuro)">Retirada era ${dataCurta(r.data_retirada)}</b>`, '') : ''}
-    ${pendentes.length ? bloco('Pedidos aguardando sinal', pendentes, (r) => `${r.origem === 'link' ? 'Pelo link · ' : ''}Festa ${dataCurta(r.data_festa)} · sinal ${reais(r.valor_sinal)}`, '') : ''}
-    ${bloco('Retiradas de hoje', retiradas, () => 'Abra para conferir as peças', 'Nenhuma retirada hoje.')}
-    ${bloco('Devoluções de hoje', devolucoes, () => 'Abra para conferir as peças', 'Nenhuma devolução hoje.')}
-    ${bloco('Próximos 7 dias', proximas, (r) => `Retirada ${dataCurta(r.data_retirada)}`, 'Nada marcado para os próximos dias.')}
+    <section class="fin">
+      <div class="linha-flex entre">
+        <button class="fechar" id="fin-ant" aria-label="Mês anterior">${ICONE.esq}</button>
+        <div class="centro"><div class="fin-mes">${esc(nomeDoMes(mes))}</div><div class="pequeno">${esc(dataLonga(h))}</div></div>
+        <button class="fechar" id="fin-prox" aria-label="Próximo mês">${ICONE.dir}</button>
+      </div>
+      <div class="fin-destaque">
+        <div class="fin-rotulo">${temGastos ? 'Lucro do mês' : 'Recebido no mês'}</div>
+        <div class="fin-valor">${reais(temGastos ? atual.lucro : atual.recebido)}</div>
+        <div class="fin-sub">${comparacao ? esc(comparacao) : (temGastos ? `${atual.total} reserva(s) no mês` : 'Lance seus gastos para ver o lucro')}</div>
+      </div>
+      <div class="fin-grade">
+        <div class="fin-cartao"><div class="pequeno">Recebido</div><b>${reais(atual.recebido)}</b></div>
+        <div class="fin-cartao"><div class="pequeno">A receber</div><b>${reais(atual.aReceber)}</b></div>
+        <button class="fin-cartao clicavel-fin" id="ver-gastos"><div class="pequeno">Gastos</div><b>${reais(atual.gastos)}</b></button>
+      </div>
+      <div class="fin-cartao coluna" style="gap:10px">
+        <div class="pequeno">Pedidos do mês</div>
+        <div class="legenda">
+          <span class="etiqueta et-confirmada">${atual.confirmadas} confirmada${atual.confirmadas === 1 ? '' : 's'}</span>
+          <span class="etiqueta et-aguardando_sinal">${atual.aguardando} aguardando sinal</span>
+          <span class="etiqueta et-concluida">${atual.concluidas} concluída${atual.concluidas === 1 ? '' : 's'}</span>
+        </div>
+        ${atual.top.length ? `<div class="pequeno">Mais alugados: <b>${atual.top.map((t) => `${esc(t.nome)} (${t.n})`).join(', ')}</b></div>` : ''}
+      </div>
+      ${podeEditar() ? `<button class="btn claro cheio" id="novo-gasto">${ICONE.mais1} Lançar gasto</button>` : ''}
+    </section>
+
+    <h2 style="margin-top:6px">Alertas</h2>
+    ${atrasadas.length ? bloco('Atrasadas', '#B3202E', atrasadas, (r) => r.status === 'retirada'
+      ? `<b style="color:#B3202E">Devolução era ${dataCurta(r.data_devolucao)}</b>`
+      : `<b style="color:#B3202E">Retirada era ${dataCurta(r.data_retirada)}</b>`) : ''}
+    ${pendentes.length ? bloco('Aguardando sinal', '#9A5B00', pendentes, (r) => `${r.origem === 'link' ? 'Pelo link · ' : ''}Festa ${dataCurta(r.data_festa)} · sinal ${reais(r.valor_sinal)}`) : ''}
+    ${retiradas.length ? bloco('Retiradas de hoje', '#5B3A99', retiradas, () => 'Abra para conferir as peças') : ''}
+    ${devolucoes.length ? bloco('Devoluções de hoje', '#1E5FA8', devolucoes, () => 'Abra para conferir as peças') : ''}
+    ${algumAlerta ? '' : '<div class="cartao res-concluida"><b>Tudo em dia!</b><div class="pequeno">Nenhuma pendência para hoje.</div></div>'}
+    ${proximas.length ? bloco('Próximos 7 dias', '#4E4459', proximas, (r) => `Retirada ${dataCurta(r.data_retirada)}`) : ''}
     ${estado.kits.length === 0 ? `<div class="cartao coluna"><h3>Comece cadastrando seus kits</h3><p class="pequeno">Eles aparecem no seu link de reservas.</p><button class="btn principal" id="ir-kits">Cadastrar meu primeiro kit</button></div>` : ''}`;
   ligarItens(tela);
+  const muda = (delta) => { const [a, m] = mes.split('-').map(Number); estado.mesFin = dados.isoDe(new Date(a, m - 1 + delta, 1)).slice(0, 7); abaHoje(tela); };
+  $('#fin-ant', tela).onclick = () => muda(-1);
+  $('#fin-prox', tela).onclick = () => muda(1);
+  $('#ver-gastos', tela).onclick = () => telaGastos(mes);
+  const ng = $('#novo-gasto', tela);
+  if (ng) ng.onclick = () => formGasto(mes);
   const b = $('#ir-kits', tela);
   if (b) b.onclick = () => irPara('kits');
+}
+
+function telaGastos(mes) {
+  const lista = estado.gastos.filter((g) => g.data.startsWith(mes)).sort((a, b) => b.data.localeCompare(a.data));
+  const total = lista.reduce((s, g) => s + (Number(g.valor) || 0), 0);
+  abrirPainel(`Gastos de ${nomeDoMes(mes).toLowerCase()}`, `
+    <div class="fin-cartao"><div class="pequeno">Total do mês</div><b style="font-size:22px">${reais(total)}</b></div>
+    ${podeEditar() ? `<button class="btn principal cheio" id="add-gasto">${ICONE.mais1} Lançar gasto</button>` : ''}
+    <div class="lista">${lista.length ? lista.map((g) => `
+      <div class="cartao"><div class="item-res">
+        <div class="info"><div class="nome">${esc(g.descricao)}</div><div class="pequeno">${dataCurta(g.data)}</div></div>
+        <b>${reais(g.valor)}</b>
+        ${podeEditar() ? `<button class="btn perigo mini" data-apagar="${esc(g.id)}" aria-label="Apagar gasto ${esc(g.descricao)}">Apagar</button>` : ''}
+      </div></div>`).join('') : '<p class="vazio-txt">Nenhum gasto lançado neste mês.</p>'}</div>`, (p) => {
+    const add = $('#add-gasto', p);
+    if (add) add.onclick = () => formGasto(mes, () => telaGastos(mes));
+    $$('[data-apagar]', p).forEach((b) => (b.onclick = () => {
+      if (!confirm('Apagar este gasto?')) return;
+      acao(b, async () => { await dados.apagarGasto(b.dataset.apagar); await recarregar(); aviso('Gasto apagado.'); telaGastos(mes); });
+    }));
+  });
+}
+
+function formGasto(mes, depois) {
+  if (!podeEditar()) return aviso('Sua assinatura não está ativa.');
+  const h = hojeISO();
+  const dataPadrao = h.startsWith(mes) ? h : `${mes}-01`;
+  abrirPainel('Lançar gasto', `
+    <form class="coluna" novalidate>
+      <label class="campo">O que foi<input name="descricao" maxlength="120" placeholder="Ex.: balões, frete, peça nova" required></label>
+      <div class="grade-2">
+        <label class="campo">Valor (R$)<input name="valor" inputmode="decimal" placeholder="0,00" required></label>
+        <label class="campo">Data<input type="date" name="data" value="${dataPadrao}" required></label>
+      </div>
+      <div class="erro oculto" id="erro-gasto"></div>
+      <button class="btn principal cheio" type="submit">Salvar gasto</button>
+    </form>`, (p) => {
+    const form = $('form', p);
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const caixa = $('#erro-gasto', p);
+      const g = { descricao: form.descricao.value.trim(), valor: numero(form.valor.value), data: form.data.value };
+      let erro = '';
+      if (!g.descricao) erro = 'Diga o que foi o gasto.';
+      else if (!(g.valor > 0)) erro = 'Digite o valor do gasto.';
+      else if (!g.data) erro = 'Escolha a data.';
+      if (erro) { caixa.textContent = erro; caixa.classList.remove('oculto'); return; }
+      await acao($('button[type=submit]', form), async () => {
+        try {
+          await dados.criarGasto(g);
+          await recarregar();
+          aviso('Gasto lançado!');
+          if (depois) depois(); else fecharPainel();
+        } catch (err) { caixa.textContent = err.message; caixa.classList.remove('oculto'); }
+      });
+    };
+  }, depois || null);
 }
 
 // ---------------------------------------------------------------------
@@ -609,10 +874,10 @@ function abaMais(tela) {
     </section>
     <section class="coluna">
       <button class="cartao clicavel" id="meus-dados"><div class="nome" style="font-weight:800">Meus dados</div><div class="pequeno">Nome, link, WhatsApp, Pix e dias de retirada</div></button>
-      <div class="cartao"><div style="font-weight:800">Clientes e Financeiro</div><div class="pequeno">Chegam na próxima atualização do app.</div></div>
+      <div class="cartao"><div style="font-weight:800">Clientes</div><div class="pequeno">Chega na próxima atualização do app.</div></div>
       <a class="cartao clicavel" style="text-decoration:none" href="mailto:${esc(EMAIL_SUPORTE)}?subject=${encodeURIComponent('Ajuda no App Pegue e Monte')}"><div style="font-weight:800">Preciso de ajuda</div><div class="pequeno">Respondemos por e-mail</div></a>
     </section>
-    ${dados.MODO_DEMO ? '<button class="btn contorno cheio" id="demo-reset">Recomeçar a demonstração</button>' : ''}
+    ${dados.MODO_DEMO ? '<button class="btn contorno cheio" id="demo-falha">Simular: pagamento falhou</button><button class="btn contorno cheio" id="demo-reset">Recomeçar a demonstração</button>' : ''}
     <button class="btn perigo cheio" id="sair">Sair do app</button>
     <p class="pequeno centro">Dica: no celular, use "Adicionar à tela inicial" no menu do navegador para abrir como aplicativo.</p>`;
   $('#copiar', tela).onclick = async () => {
@@ -623,6 +888,8 @@ function abaMais(tela) {
   $('#sair', tela).onclick = async () => { await dados.sair(); location.hash = ''; telaLogin('entrar'); };
   const reset = $('#demo-reset', tela);
   if (reset) reset.onclick = async () => { dados.demoReiniciar(); await carregarTudo(); aviso('Demonstração reiniciada.'); };
+  const falha = $('#demo-falha', tela);
+  if (falha) falha.onclick = async () => { dados.demoSimularFalha(); await recarregar(); montarApp(); };
 }
 
 // =====================================================================
@@ -742,7 +1009,7 @@ function formReserva(pre, existente) {
         } catch (err) { caixa.textContent = err.message; caixa.classList.remove('oculto'); }
       });
     };
-  });
+  }, existente ? () => abrirReserva(existente.id) : null);
 }
 
 function abrirReserva(id) {
@@ -779,7 +1046,7 @@ function abrirReserva(id) {
   };
 
   abrirPainel(k.nome, `
-    <div class="linha-flex entre">${etiqueta(r.status)}${r.origem === 'link' ? '<span class="pequeno">Pedido pelo link</span>' : ''}</div>
+    <div class="linha-flex entre">${estaAtrasada(r) ? etiqueta('atrasada', 'Atrasada') : etiqueta(r.status)}${r.origem === 'link' ? '<span class="pequeno">Pedido pelo link</span>' : ''}</div>
     <div class="cartao coluna">
       <div class="linha-flex entre"><div><div style="font-weight:800">${esc(r.cliente_nome)}</div>
         <div class="pequeno">${esc(zapFormatado(r.cliente_whatsapp))}</div></div>
@@ -804,7 +1071,7 @@ function abrirReserva(id) {
       abrirPainel('Reserva confirmada!', `
         <p>Quer avisar ${esc(r.cliente_nome.split(' ')[0])} pelo WhatsApp? A mensagem já vai pronta.</p>
         <a class="btn verde cheio" href="${esc(linkZap(atual.cliente_whatsapp, mensagem('confirmacao', atual)))}" target="_blank" rel="noopener">${ICONE.zap} Enviar confirmação</a>
-        <button class="btn contorno cheio" id="ok">Agora não</button>`, (p2) => { $('#ok', p2).onclick = () => abrirReserva(r.id); });
+        <button class="btn contorno cheio" id="ok">Agora não</button>`, (p2) => { $('#ok', p2).onclick = () => abrirReserva(r.id); }, () => abrirReserva(r.id));
     }));
     ligar('retirar', () => telaChecklist(r, 'retirada'));
     ligar('devolver', () => telaChecklist(r, 'devolucao'));
@@ -867,7 +1134,7 @@ function telaChecklist(r, tipo) {
         abrirReserva(r.id);
       });
     };
-  });
+  }, () => abrirReserva(r.id));
 }
 
 iniciar();

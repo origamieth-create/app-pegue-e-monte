@@ -24,16 +24,28 @@ function aviso(msg) {
   const t = $('#toast'); t.textContent = msg; t.classList.remove('oculto');
   clearTimeout(aviso.t); aviso.t = setTimeout(() => t.classList.add('oculto'), 3500);
 }
+// Telas internas em tela cheia, com botão "Voltar". O voltar do celular
+// também fecha a tela em vez de sair da página.
+let painelAberto = false;
 function abrirPainel(titulo, corpo, aoMontar) {
   const p = $('#painel');
+  if (!painelAberto) { history.pushState({ painel: true }, ''); painelAberto = true; }
   p.innerHTML = `<div class="painel-fundo"><div class="painel" role="dialog" aria-modal="true" aria-label="${esc(titulo)}">
-    <div class="painel-topo"><h2>${esc(titulo)}</h2><button class="fechar" aria-label="Fechar">${FECHAR}</button></div>${corpo}</div></div>`;
-  $('.fechar', p).onclick = fechar;
-  $('.painel-fundo', p).addEventListener('click', (e) => { if (e.target.classList.contains('painel-fundo')) fechar(); });
+    <div class="painel-barra"><button class="btn-voltar" type="button">${ESQ} Voltar</button></div>
+    <h1 class="painel-titulo">${esc(titulo)}</h1>${corpo}</div></div>`;
+  $('.btn-voltar', p).onclick = () => fechar();
+  $('.painel-fundo', p).scrollTop = 0;
   document.body.style.overflow = 'hidden';
   aoMontar && aoMontar($('.painel', p));
 }
-function fechar() { $('#painel').innerHTML = ''; document.body.style.overflow = ''; }
+function fechar(vindoDoCelular) {
+  if (!painelAberto) return;
+  painelAberto = false;
+  $('#painel').innerHTML = '';
+  document.body.style.overflow = '';
+  if (!vindoDoCelular) history.back();
+}
+window.addEventListener('popstate', () => fechar(true));
 
 async function iniciar() {
   const raiz = $('#raiz');
@@ -59,7 +71,7 @@ async function iniciar() {
         <span class="btn principal mini">Ver datas livres</span>
       </button>`).join('')}</div>` : '<p class="vazio-txt centro">Nenhum kit disponível no momento.</p>'}
     <a class="btn contorno cheio" href="${esc(linkZap(loja.whatsapp, 'Oi! Vim pelo link de reservas e tenho uma dúvida.'))}" target="_blank" rel="noopener">Tirar dúvida no WhatsApp</a>
-    <p class="rodape">Reservas por App Pegue e Monte</p>`;
+    <p class="rodape"><img src="icone.svg" alt="">Reservas por App Pegue e Monte</p>`;
   $$('[data-kit]').forEach((b) => (b.onclick = () => escolherData(loja.kits.find((k) => k.id === b.dataset.kit))));
 }
 

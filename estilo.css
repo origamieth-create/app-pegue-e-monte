@@ -5,6 +5,8 @@
   --tinta: #2A1B3D;
   --texto2: #4E4459;
   --linha: #EDE3D8;
+  --coral: #E4505C;
+  --confete: #FFC94A;
   --destaque: #C73B48;
   --destaque-escuro: #A32D3A;
   --lilas: #F3ECFC;
@@ -70,13 +72,21 @@ label.campo { display: flex; flex-direction: column; gap: 6px; font-weight: 700;
 .cartao.clicavel { cursor: pointer; text-align: left; width: 100%; display: block; }
 .cartao.clicavel:active { transform: scale(.99); }
 .etiqueta { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; white-space: nowrap; }
-.et-aguardando_sinal { background: var(--amarelo); color: var(--amarelo-texto); }
-.et-confirmada { background: var(--lilas); color: var(--lilas-texto); }
-.et-retirada { background: #E7F0FB; color: #1E4D80; }
-.et-concluida { background: var(--verde-claro); color: var(--verde); }
+.et-aguardando_sinal { background: #9A5B00; color: #fff; }
+.et-confirmada { background: #5B3A99; color: #fff; }
+.et-retirada { background: #1E5FA8; color: #fff; }
+.et-concluida { background: #1F7A52; color: #fff; }
 .et-cancelada { background: #F1EFEF; color: #5E5757; }
 .et-livre { background: var(--verde-claro); color: var(--verde); }
-.et-atrasada { background: var(--destaque-escuro); color: #fff; }
+.et-atrasada { background: #B3202E; color: #fff; }
+
+/* Cartões de reserva coloridos pela situação */
+.res-aguardando_sinal { background: #FFF6E3; border-color: #F1D9A4; }
+.res-confirmada { background: #F3EEFC; border-color: #D9CCF4; }
+.res-retirada { background: #EAF2FC; border-color: #C3D9F3; }
+.res-concluida { background: #EAF7EF; border-color: #BFE3CE; }
+.res-atrasada { background: #FFE9EB; border-color: #F0A9B1; border-width: 2px; }
+.legenda { display: flex; flex-wrap: wrap; gap: 6px; }
 
 .foto-kit { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 14px; background: var(--lilas); }
 .foto-vazia { display: flex; align-items: center; justify-content: center; color: var(--lilas-texto); font-weight: 800; }
@@ -97,14 +107,16 @@ label.campo { display: flex; flex-direction: column; gap: 6px; font-weight: 700;
 .cal .ponto { width: 6px; height: 6px; border-radius: 99px; background: var(--destaque); }
 .cal button.sel .ponto { background: #fff; }
 
-/* Painel deslizante (detalhes e formulários) */
-.painel-fundo { position: fixed; inset: 0; background: rgba(42, 27, 61, .45); z-index: 50; display: flex; align-items: flex-end; justify-content: center; }
+/* Telas internas em tela cheia, com botão Voltar */
+.painel-fundo { position: fixed; inset: 0; background: var(--fundo); z-index: 50; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 .painel {
-  background: var(--fundo); width: 100%; max-width: 560px; max-height: 92vh; overflow-y: auto;
-  border-radius: 24px 24px 0 0; padding: 20px 18px calc(24px + env(safe-area-inset-bottom));
+  width: 100%; max-width: 600px; margin: 0 auto; min-height: 100%;
+  padding: 0 18px calc(32px + env(safe-area-inset-bottom));
   display: flex; flex-direction: column; gap: 16px;
 }
-.painel-topo { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.painel-barra { position: sticky; top: 0; z-index: 2; background: var(--fundo); padding: calc(10px + env(safe-area-inset-top)) 0 6px; margin: 0 -18px; padding-left: 10px; padding-right: 18px; border-bottom: 1px solid var(--linha); }
+.btn-voltar { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 8px 12px 8px 4px; border: 0; background: none; color: var(--lilas-texto); font-weight: 800; font-size: 17px; cursor: pointer; }
+.painel-titulo { font-size: 24px; }
 .fechar { width: 44px; height: 44px; border-radius: 999px; border: 0; background: var(--lilas); color: var(--lilas-texto); cursor: pointer; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
 
 /* Checklist */
@@ -114,8 +126,17 @@ label.campo { display: flex; flex-direction: column; gap: 6px; font-weight: 700;
 .check.faltando { border-color: #F6C9CE; background: var(--vermelho-claro); }
 
 /* Aviso flutuante */
-.toast { position: fixed; left: 50%; top: calc(16px + env(safe-area-inset-top)); transform: translateX(-50%); background: var(--tinta); color: #fff; padding: 12px 18px; border-radius: 14px; font-weight: 700; z-index: 80; max-width: calc(100% - 32px); box-shadow: var(--sombra); }
+.toast { position: fixed; left: 50%; top: calc(70px + env(safe-area-inset-top)); transform: translateX(-50%); background: var(--tinta); color: #fff; padding: 12px 18px; border-radius: 14px; font-weight: 700; z-index: 80; max-width: calc(100% - 32px); box-shadow: var(--sombra); }
 .faixa { padding: 12px 16px; font-weight: 700; font-size: 14px; text-align: center; }
 .faixa.demo { background: var(--amarelo); color: var(--amarelo-texto); }
 .faixa.leitura { background: var(--destaque-escuro); color: #fff; }
 .carregando { padding: 40px 0; text-align: center; color: var(--texto2); font-weight: 700; }
+
+/* Aviso de pagamento (carência e suspensão) */
+.faixa-pagamento { background: #B3202E; color: #fff; padding: calc(10px + env(safe-area-inset-top)) 16px 12px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; line-height: 1.4; }
+.faixa-pagamento .btn { background: #fff; color: #B3202E; align-self: flex-start; }
+.faixa-pagamento .btn.contorno-claro { background: transparent; color: #fff; box-shadow: inset 0 0 0 2px rgba(255,255,255,.7); }
+.faixa-pagamento.suspensa { background: #2A1B3D; }
+.faixa-pagamento.suspensa .btn { color: #2A1B3D; }
+.faixa-pagamento.suspensa .btn.contorno-claro { color: #fff; }
+#contagem { font-variant-numeric: tabular-nums; }

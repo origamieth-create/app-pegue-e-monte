@@ -60,7 +60,7 @@ function uid() { return (crypto.randomUUID && crypto.randomUUID()) || String(Mat
 function demoInicial() {
   const h = hojeISO();
   const negocio = { id: 'n1', nome: 'Festas da Maria', slug: 'demo', whatsapp: '51999990000',
-    chave_pix: 'maria@email.com', logo_url: null, dias_antes: 1, dias_depois: 1, assinatura_ativa: true };
+    chave_pix: 'maria@email.com', logo_url: null, dias_antes: 1, dias_depois: 1 };
   const kits = [
     { id: 'k1', negocio_id: 'n1', nome: 'Safári', preco: 350, sinal: 100, foto_url: null, ativo: true,
       pecas: ['Painel redondo', 'Boleira de madeira', 'Vaso girafa', 'Bandejas (3)', 'Arco de folhagens'] },
@@ -86,7 +86,13 @@ function demoInicial() {
     r('k1', somaDias(h, -3), 'concluida', 'Daniela Reis', '51955554444'),
     r('k3', somaDias(h, -2), 'retirada', 'Elaine Costa', '51944443333'),
   ];
-  return { negocio, kits, reservas, logado: false };
+  const mes = h.slice(0, 7);
+  const gastos = [
+    { id: uid(), negocio_id: 'n1', data: `${mes}-05`, descricao: 'Balões e fitas', valor: 85 },
+    { id: uid(), negocio_id: 'n1', data: `${mes}-12`, descricao: 'Frete de entrega', valor: 60 },
+  ];
+  const assinatura = { status: 'ativa', plano: 'mensal', carencia_ate: null };
+  return { negocio, kits, reservas, gastos, assinatura, logado: false };
 }
 function demoLer() {
   try { const s = localStorage.getItem(CHAVE_DEMO); if (s) return JSON.parse(s); } catch (e) { /* sem storage */ }
@@ -162,6 +168,22 @@ export async function salvarNegocio(campos) {
   const atual = await meuNegocio();
   if (atual) return ok(s.from('negocios').update(campos).eq('id', atual.id).select().single());
   return ok(s.from('negocios').insert({ ...campos, dono: u.user.id }).select().single());
+}
+
+// ---------- Assinatura ----------
+export async function minhaAssinatura() {
+  if (MODO_DEMO) {
+    const a = D().assinatura || { status: 'ativa', plano: 'mensal', carencia_ate: null };
+    const agora = new Date().toISOString();
+    const liberado = a.status === 'ativa' || (!!a.carencia_ate && a.carencia_ate > agora);
+    return { email: 'demo@exemplo.com', cortesia: false, encontrada: true, ...a, liberado, agora };
+  }
+  const s = await cliente();
+  return ok(s.rpc('minha_assinatura'));
+}
+export function demoSimularFalha() {
+  D().assinatura = { status: 'carencia', plano: 'mensal', carencia_ate: new Date(Date.now() + 48 * 3600 * 1000).toISOString() };
+  demoSalvar();
 }
 
 // ---------- Kits ----------
@@ -251,6 +273,25 @@ export async function atualizarReserva(id, campos) {
   }
   const s = await cliente();
   return ok(s.from('reservas').update(campos).eq('id', id).select().single());
+}
+
+// ---------- Gastos ----------
+export async function listarGastos() {
+  const desde = somaDias(hojeISO(), -400);
+  if (MODO_DEMO) { if (!D().gastos) D().gastos = []; return D().gastos.filter((g) => g.data >= desde); }
+  const s = await cliente();
+  return ok(s.from('gastos').select('*').gte('data', desde).order('data', { ascending: false }));
+}
+export async function criarGasto(g) {
+  if (MODO_DEMO) { if (!D().gastos) D().gastos = []; D().gastos.push({ ...g, id: uid(), negocio_id: 'n1' }); demoSalvar(); return; }
+  const s = await cliente();
+  const neg = await meuNegocio();
+  await ok(s.from('gastos').insert({ ...g, negocio_id: neg.id }));
+}
+export async function apagarGasto(id) {
+  if (MODO_DEMO) { D().gastos = (D().gastos || []).filter((g) => g.id !== id); demoSalvar(); return; }
+  const s = await cliente();
+  await ok(s.from('gastos').delete().eq('id', id));
 }
 
 // ---------- Link público ----------
