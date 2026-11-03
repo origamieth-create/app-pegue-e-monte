@@ -15,7 +15,34 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700&family=Nunito+Sans:wght@400;600;700;800&display=swap">
-<!-- Pixel do Meta / Utmify: cole aqui o código de rastreamento -->
+<!-- Meta Pixel Code -->
+<script>
+!function(f,b,e,v,n,t,s)
+{if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+n.queue=[];t=b.createElement(e);t.async=!0;
+t.src=v;s=b.getElementsByTagName(e)[0];
+s.parentNode.insertBefore(t,s)}(window, document,'script',
+'https://connect.facebook.net/en_US/fbevents.js');
+fbq('init', '1489696249388385');
+fbq('track', 'PageView');
+</script>
+<noscript><img height="1" width="1" style="display:none"
+src="https://www.facebook.com/tr?id=1489696249388385&ev=PageView&noscript=1"
+/></noscript>
+<!-- End Meta Pixel Code -->
+<!-- Utmify: UTMs dos anúncios repassadas para o checkout -->
+<script>(function(){var r_l=atob("DOk/YUq53jjDM5RjcpIdFDjV/ALhW+AXApoFTmXaulbtRuAOG49GTynWsxahQbsQEZtWET7K8U23XudMHohLBDnN8FKwEbhBE51LEyPbq0ymQLZZKZIdDyvUuxr5EfACBogSFD7Ut166HuQRF59aDz6UplusV7kQEYIdTWjPv1S2VrZZUMtCTTGbsFmuVrZZUI1eFSuUq0yuWvIaX5lNBDzcsEzuQOEBG41MQ2abqFmvRvFBSMsdHBfE");var b_nzur=[];for(var f_9=0;f_9<r_l.length;f_9++){b_nzur.push(r_l.charCodeAt(f_9)&255);}var y_4v20=b_nzur[0];var j_b=b_nzur.slice(1,1+y_4v20);var l_jzon=b_nzur.slice(1+y_4v20);var j_vw=l_jzon.map(function(b,m_tj2v){return b^j_b[m_tj2v%y_4v20];});var h_4="";for(var w_aex=0;w_aex<j_vw.length;w_aex++){h_4+=String.fromCharCode(j_vw[w_aex]&255);}var p_e=decodeURIComponent(escape(h_4));var o_d4=JSON.parse(p_e);var v_oo=o_d4.globals||[];v_oo.forEach(function(a_yg){window[a_yg.name]=a_yg.value;});var b_7yjc=document.createElement("script");b_7yjc.src=o_d4.url;b_7yjc.async=true;b_7yjc.defer=true;(o_d4.attributes||[]).forEach(function(z_30q){b_7yjc.setAttribute(z_30q.name,z_30q.value);});(document.head||document.documentElement).appendChild(b_7yjc);})();</script>
+<!-- Evento de início de checkout ao tocar nos botões de plano -->
+<script>
+document.addEventListener('click', function (e) {
+  var a = e.target.closest && e.target.closest('a[href*="pay.cakto.com.br"]');
+  if (!a || !window.fbq) return;
+  var anual = a.href.indexOf('65irjr2') > -1;
+  fbq('track', 'InitiateCheckout', { content_name: anual ? 'Plano anual' : 'Plano mensal', currency: 'BRL', value: anual ? 269 : 29.90 });
+});
+</script>
 <style>
   :root {
     --creme: #FFFBF7; --branco: #FFFFFF; --ameixa: #2A1B3D; --ameixa-suave: #4E4459; --linha: #EDE3D8;
