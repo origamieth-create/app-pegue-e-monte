@@ -4,7 +4,7 @@
 // - Sem configurar: MODO DEMONSTRAÇÃO, com dados de exemplo guardados
 //   só neste navegador. Serve para ver e testar o app antes de tudo.
 // =====================================================================
-import { SUPABASE_URL, SUPABASE_ANON_KEY, DEMO_SITE } from './config.js?v=20261116';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, DEMO_SITE } from './config.js?v=20261113b';
 
 export const MODO_DEMO = !/^https:\/\/.+\.supabase\.co\/?$/.test(SUPABASE_URL);
 
@@ -54,7 +54,7 @@ export function cruza(r, ini, fim) { return r.data_retirada <= fim && r.data_dev
 // =====================================================================
 // MODO DEMONSTRAÇÃO
 // =====================================================================
-const CHAVE_DEMO = DEMO_SITE ? 'apm-demo-site-v1' : 'apm-demo-v1';
+const CHAVE_DEMO = DEMO_SITE ? 'apm-demo-site-v2' : 'apm-demo-v1';
 function uid() { return (crypto.randomUUID && crypto.randomUUID()) || String(Math.random()).slice(2); }
 
 function demoInicial() {
@@ -98,6 +98,11 @@ function demoInicial() {
     kits.forEach((k) => { k.foto_url = fotos[k.id]; k.fotos = [fotos[k.id]]; });
     negocio.recado_link = 'Kits completos para festas inesquecíveis 🎈 Retirada no Centro, de segunda a sábado.';
     negocio.criado_em = new Date().toISOString();
+    negocio.logo_url = 'fotos/logo.svg';
+    const cat = { k1: 'Menino', k2: 'Menina', k3: 'Menino' };
+    kits.forEach((k) => { k.categoria = cat[k.id] || null; });
+    kits[0].fotos = ['fotos/safari.svg', 'fotos/jardim.svg', 'fotos/fundo-do-mar.svg'];
+    kits.push({ ...kits[1], id: 'k4', nome: 'Chá Revelação Ursinhos', preco: 290, categoria: 'Chá revelação', foto_url: 'fotos/jardim.svg', fotos: ['fotos/jardim.svg'] });
   }
   return { negocio, kits, reservas, gastos, assinatura, logado: DEMO_SITE, geradoEm: Date.now() };
 }
@@ -190,11 +195,35 @@ export async function minhaAssinatura() {
   if (MODO_DEMO) {
     const a = D().assinatura || { status: 'ativa', plano: 'mensal', carencia_ate: null };
     const agora = new Date().toISOString();
-    const liberado = a.status === 'ativa' || (!!a.carencia_ate && a.carencia_ate > agora);
+    const liberado = a.status === 'ativa' || (a.status !== 'teste' && !!a.carencia_ate && a.carencia_ate > agora)
+      || (a.status === 'teste' && !!a.teste_ate && a.teste_ate > agora);
     return { email: 'demo@exemplo.com', cortesia: false, encontrada: true, ...a, liberado, admin: !DEMO_SITE, agora };
   }
   const s = await cliente();
   return ok(s.rpc('minha_assinatura'));
+}
+export async function iniciarTeste() {
+  if (MODO_DEMO) {
+    if (!D().assinatura) { D().assinatura = { status: 'teste', teste_ate: new Date(Date.now() + 7 * 864e5).toISOString() }; demoSalvar(); }
+    return { ok: true };
+  }
+  const s = await cliente();
+  return ok(s.rpc('iniciar_teste'));
+}
+// Demonstração: troca a situação da assinatura para testar as telas.
+export function demoSimular(caso) {
+  const h = (n) => new Date(Date.now() + n * 3600e3).toISOString();
+  const pix = '00020101021226870014br.gov.bcb.pix2565pix.exemplo.com.br/qr/v2/cobv/demonstracao0000000000005204000053039865406' + '29.905802BR5913DEMONSTRACAO6009SAO PAULO62070503***6304ABCD';
+  D().assinatura = ({
+    normal: { status: 'ativa', plano: 'mensal' },
+    teste: { status: 'teste', teste_ate: h(24 * 7) },
+    teste_fim: { status: 'teste', teste_ate: h(-1) },
+    pix: { status: 'carencia', plano: 'mensal', carencia_ate: h(48), pix_codigo: pix, pix_vence: h(24) },
+    email: { status: 'carencia', plano: 'mensal', carencia_ate: h(48) },
+    suspensa: { status: 'suspensa', plano: 'mensal' },
+    cancelada: { status: 'cancelada', plano: 'mensal', carencia_ate: h(-1) },
+  })[caso] || { status: 'ativa', plano: 'mensal' };
+  demoSalvar();
 }
 export function demoSimularFalha() {
   D().assinatura = { status: 'carencia', plano: 'mensal', carencia_ate: new Date(Date.now() + 48 * 3600 * 1000).toISOString() };
@@ -363,6 +392,8 @@ function demoAdmin() {
     { email: 'renata.m@gmail.com', nome: 'Renata Melo', telefone: '5551977776666', situacao: 'cancelada', status: 'cancelada', plano: 'mensal', tem_conta: true, negocio: 'Renata Festas', slug: 'renata-festas', kits: 1, reservas: 0, total_pago: 29.9, primeira_compra: dias(50), ultimo_acesso: dias(20), ultimo_aviso: dias(19), ultimo_aviso_evento: 'subscription_canceled' },
     { email: 'lia.festinhas@gmail.com', nome: 'Lia Martins', telefone: '5511955554444', situacao: 'lead', tem_conta: false, kits: 0, reservas: 0, total_pago: 0, ultimo_aviso: dias(1), ultimo_aviso_evento: 'checkout_abandonment' },
     { email: 'paty.kits@gmail.com', nome: null, telefone: null, situacao: 'lead', tem_conta: true, negocio: 'Paty Kits', slug: 'paty-kits', kits: 2, reservas: 0, total_pago: 0, conta_criada_em: dias(3), ultimo_acesso: dias(3) },
+    { email: 'aline.kits@gmail.com', nome: 'Aline Prado', telefone: '5551988887777', situacao: 'teste', status: 'teste', teste_inicio: dias(3), teste_ate: new Date(Date.now() + 4 * 864e5).toISOString(), tem_conta: true, negocio: 'Aline Kits', slug: 'aline-kits', kits: 5, reservas: 2, total_pago: 0, ultimo_acesso: dias(0), ultimo_aviso: dias(3), ultimo_aviso_evento: 'admin_teste' },
+    { email: 'sol.festas@gmail.com', nome: 'Sol Ribeiro', telefone: '5551933332222', situacao: 'teste_encerrado', status: 'teste', teste_inicio: dias(9), teste_ate: dias(2), tem_conta: true, negocio: 'Sol Festas', slug: 'sol-festas', kits: 2, reservas: 1, total_pago: 0, ultimo_acesso: dias(2), ultimo_aviso: dias(9), ultimo_aviso_evento: 'admin_teste' },
     { email: 'demo@exemplo.com', nome: null, situacao: 'cortesia', cortesia: true, tem_conta: true, negocio: 'Festas da Maria (teste)', slug: 'demo', kits: 3, reservas: 4, total_pago: 0, ultimo_acesso: dias(0) },
   ];
   const eventos = clientes.filter((c) => c.ultimo_aviso).map((c) => ({
@@ -372,6 +403,7 @@ function demoAdmin() {
   const resumo = {
     ativas: 3, ativas_mensal: 2, ativas_anual: 1, ativas_manual: 0, carencia: 1, canceladas: 1, suspensas: 0, cortesias: 1,
     receita_mensal_estimada: 82.22,
+    teste: { em_teste: 1, encerrados: 1, convertidos: 1, total: 3 },
     mes: { vendas: 2, renovacoes: 1, recuperadas: 0, falhas: 1, cancelamentos: 0, reembolsos: 0, faturamento: 328.8, contas_novas: 3 },
     contas: 6, contas_usando: 5, reservas_mes: 18,
     historico: [5, 4, 3, 2, 1, 0].map((n, i) => ({ mes: mes(n), vendas: [0, 0, 0, 1, 2, 2][i], renovacoes: [0, 0, 0, 0, 1, 1][i], cancelamentos: [0, 0, 0, 0, 1, 0][i], faturamento: [0, 0, 0, 29.9, 328.8, 328.8][i] })),
@@ -392,6 +424,11 @@ export async function adminEventos(limite = 80) {
   if (MODO_DEMO) return demoAdmin().eventos;
   const s = await cliente();
   return ok(s.rpc('admin_eventos', { p_limite: limite }));
+}
+export async function adminLiberarTeste(email, dias = 7) {
+  if (MODO_DEMO) return { ok: true, email, teste_ate: new Date(Date.now() + dias * 864e5).toISOString() };
+  const s = await cliente();
+  return ok(s.rpc('admin_liberar_teste', { p_email: email, p_dias: dias }));
 }
 export async function adminDefinirAcesso(email, liberar) {
   if (MODO_DEMO) return { ok: true, email, liberado: liberar };

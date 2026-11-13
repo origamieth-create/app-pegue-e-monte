@@ -208,3 +208,31 @@ label.campo { display: flex; flex-direction: column; gap: 6px; font-weight: 700;
 /* Faixa da demonstração do site */
 .faixa-site { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; padding: 10px 14px; }
 .faixa-site .btn { min-height: 36px; }
+
+/* Teste grátis, pagamento pendente e Pix */
+.faixa-pagamento.teste { background: #1F7A52; }
+.faixa-pagamento.teste .btn { color: #1F7A52; }
+.zap-pequeno { display: inline-flex; align-items: center; gap: 6px; align-self: center; font-size: 13px; font-weight: 800; color: var(--verde); text-decoration: none; padding: 6px 4px; min-height: 36px; }
+.zap-pequeno svg { width: 16px; height: 16px; }
+.faixa-pagamento .zap-pequeno { color: #fff; opacity: .92; align-self: flex-start; padding: 0; min-height: 28px; }
+.pix-qr { width: 220px; max-width: 70vw; aspect-ratio: 1; margin: 0 auto; background: #fff; border-radius: 16px; padding: 8px; box-shadow: inset 0 0 0 2px var(--linha); }
+.pix-qr svg { width: 100%; height: 100%; display: block; }
+.passos-pix { margin: 0; padding: 12px 14px 12px 32px; background: #fff; border-radius: 14px; box-shadow: inset 0 0 0 1px var(--linha); display: flex; flex-direction: column; gap: 4px; }
+.email-destaque { font-weight: 800; font-size: 17px; background: #fff; border-radius: 12px; padding: 10px; box-shadow: inset 0 0 0 1px var(--linha); overflow-wrap: anywhere; }
+.nota-amarela { background: #FFF6E3; border: 1px solid #F1D9A4; color: #6B4A00; border-radius: 14px; padding: 12px 14px; line-height: 1.45; }
+.popup-fundo.bloqueio { z-index: 90; background: rgba(42,27,61,.82); }
+.btn-conheca { display: block; text-align: center; text-decoration: none; color: var(--tinta); background: #FFF6E3; border: 1px solid #F1D9A4; border-radius: 14px; padding: 12px 14px; font-size: 14px; line-height: 1.4; }
+.btn-conheca b { color: var(--coral); }
+
+/* Ajuste da logo: fundo branco e círculo igual ao do link de reservas */
+.recorte-area.logo { background: #fff; }
+.recorte-area.logo .recorte-grade { background-image: none; border-radius: 999px; box-shadow: 0 0 0 999px rgba(42,27,61,.45), inset 0 0 0 3px var(--coral); }
+/* Peças do kit em linhas */
+.lista-pecas { display: flex; flex-direction: column; gap: 8px; }
+.linha-peca { display: flex; align-items: center; gap: 8px; }
+.linha-peca .num-peca { width: 26px; flex: 0 0 auto; text-align: right; font-weight: 800; color: var(--texto2); font-size: 14px; }
+.linha-peca input { flex: 1; min-width: 0; }
+.tirar-peca { flex: 0 0 auto; width: 40px; height: 40px; border: 0; border-radius: 12px; background: #FFE9EB; color: #B3202E; font-size: 22px; font-weight: 800; cursor: pointer; }
+/* Observação da reserva */
+.anotacao { background: #FFFBEA; border-color: #F1D9A4; }
+.anotacao textarea { background: #fff; }

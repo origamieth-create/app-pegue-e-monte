@@ -2,7 +2,7 @@
 // App Pegue e Monte — link público de reservas (a cliente final usa)
 // Endereço: reservar.html?l=<link-do-negocio>
 // =====================================================================
-import * as dados from './dados.js?v=20261116';
+import * as dados from './dados.js?v=20261113b';
 
 // Demonstração do site: botões de WhatsApp mostram um aviso em vez de abrir conversa.
 if (dados.DEMONSTRACAO_SITE) {

@@ -2,8 +2,8 @@
 // App Pegue e Monte — app da dona
 // Abas: Hoje, Agenda, Kits, Mais
 // =====================================================================
-import * as dados from './dados.js?v=20261116';
-import { PERMITIR_CADASTRO, EMAIL_SUPORTE, WHATSAPP_SUPORTE, LINK_MENSAL, LINK_ANUAL, DEMO_SITE, LINK_PLANOS } from './config.js?v=20261116';
+import * as dados from './dados.js?v=20261113b';
+import { PERMITIR_CADASTRO, EMAIL_SUPORTE, WHATSAPP_SUPORTE, LINK_MENSAL, LINK_ANUAL, DEMO_SITE, LINK_PLANOS } from './config.js?v=20261113b';
 
 const { hojeISO, somaDias, cruza } = dados;
 
@@ -150,6 +150,7 @@ const NOVIDADES = {
     ['📷', 'Até 5 fotos por kit, sem cortes', 'Em Kits, toque no kit e em "Adicionar fotos". Você ajusta o recorte antes de enviar (ou usa a foto inteira), e no seu link a cliente passa as fotos com o dedo.'],
     ['💬', 'Suas mensagens do WhatsApp', 'Em Mais > Mensagens do WhatsApp, escreva do seu jeito os textos de sinal, confirmação, retirada e devolução.'],
     ['🎨', 'Sua logo e um recado no link', 'Em Mais > Meus dados, coloque a sua logo e um recado que aparece no topo do seu link de reservas.'],
+    ['🗂️', 'Categorias, peças e observações', 'Escolha a categoria de cada kit (a cliente filtra no seu link), cadastre as peças uma em cada linha e anote o que precisar em cada reserva.'],
     ['🙋', 'Suporte pelo WhatsApp', 'Ficou com dúvida? Em Mais > Precisa de ajuda, fale com a gente direto no WhatsApp.'],
   ],
 };
@@ -243,7 +244,11 @@ async function carregarTudo() {
   [estado.negocio, estado.assinatura] = await Promise.all([dados.meuNegocio(), dados.minhaAssinatura()]);
   marcarRelogio();
   const a = estado.assinatura || {};
-  if (!a.cortesia && !a.encontrada) return telaSemAssinatura();
+  if (!a.cortesia && !a.encontrada) {
+    // Conta nova sem compra: ganha 7 dias de teste grátis (uma vez por e-mail).
+    try { await dados.iniciarTeste(); estado.assinatura = await dados.minhaAssinatura(); marcarRelogio(); } catch (e) { /* segue para a tela de assinatura */ }
+    if (!estado.assinatura.encontrada) return telaSemAssinatura();
+  }
   if (!estado.negocio) return telaConfiguracaoInicial();
   [estado.kits, estado.reservas, estado.gastos] = await Promise.all([dados.listarKits(), dados.listarReservas(), dados.listarGastos().catch(() => [])]);
   estado.carregadoEm = Date.now();
@@ -270,22 +275,107 @@ function marcarRelogio() {
   if (a && a.agora) diferencaRelogio = new Date(a.agora).getTime() - Date.now();
 }
 function agoraServidor() { return Date.now() + diferencaRelogio; }
-function linkPagamento() { return (estado.assinatura && estado.assinatura.plano === 'anual') ? LINK_ANUAL : LINK_MENSAL; }
 function tempoRestante(ms) {
   const min = Math.max(0, Math.floor(ms / 60000));
   const d = Math.floor(min / 1440); const h = Math.floor((min % 1440) / 60); const m = min % 60;
   return `${d ? d + 'd ' : ''}${h}h ${String(m).padStart(2, '0')}min`;
 }
 
-// Situação para a faixa: null (tudo certo), 'carencia' ou 'suspensa'
+// Situação para a faixa: null (tudo certo), 'teste', 'teste_fim', 'carencia', 'cancelada' ou 'suspensa'
 function situacaoAssinatura() {
   const a = estado.assinatura || {};
   if (a.cortesia || a.status === 'ativa') return null;
+  if (a.status === 'teste') return a.liberado ? 'teste' : 'teste_fim';
+  if (a.status === 'cancelada') return 'cancelada';
   if (a.liberado && a.carencia_ate) return 'carencia';
   return 'suspensa';
 }
 
+function dataHora(iso) {
+  const d = new Date(iso);
+  return `${d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} às ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+}
+function botaoZapSuporte(texto) {
+  if (!WHATSAPP_SUPORTE) return '';
+  return `<a class="zap-pequeno" href="${esc(linkZap(WHATSAPP_SUPORTE, texto))}" target="_blank" rel="noopener">${ICONE.zap} Problema ou dúvida? Fale no WhatsApp</a>`;
+}
+const ZAP_PAGAMENTO = 'Oi! Sou cliente do App Pegue e Monte e preciso de ajuda com o pagamento da minha assinatura.';
+
+// Pagamento pendente: Pix pronto (cenário A) ou cobrança enviada por e-mail (cenário B).
+// Quem já é assinante NÃO faz compra nova: paga a cobrança que já foi gerada.
+function popupPagamento() {
+  const a = estado.assinatura || {};
+  const temPix = !!(a.pix_codigo && a.pix_vence && new Date(a.pix_vence).getTime() > agoraServidor());
+  const corpo = temPix ? `
+    <h2 class="centro" style="font-size:24px">Renove com Pix</h2>
+    <p class="centro pequeno">A cobrança da sua assinatura já está pronta. Pague aqui mesmo, sem sair do app:</p>
+    <div class="pix-qr" id="pix-qr" aria-label="QR Code do Pix"></div>
+    <button class="btn principal cheio" id="pix-copiar">Copiar código Pix</button>
+    <p class="centro pequeno"><b>Vale até ${esc(dataHora(a.pix_vence))}</b></p>
+    <ol class="passos-pix pequeno">
+      <li>Toque em <b>Copiar código Pix</b>.</li>
+      <li>Abra o app do seu banco e escolha <b>Pix Copia e Cola</b>.</li>
+      <li>Cole o código e confirme. Pronto!</li>
+    </ol>
+    <button class="btn verde cheio" id="pix-paguei">Já paguei, verificar</button>
+    ${botaoZapSuporte(ZAP_PAGAMENTO)}` : `
+    <h2 class="centro" style="font-size:24px">Pagamento pendente</h2>
+    <p class="centro">Para continuar usando o app, pague a <b>cobrança da sua assinatura</b> que a Cakto enviou para o seu e-mail:</p>
+    <p class="centro email-destaque">${esc(a.email || '')}</p>
+    <p class="centro pequeno">Não achou? Procure por <b>"Cakto"</b> e confira também a caixa de <b>spam</b> e de <b>promoções</b>.</p>
+    <div class="nota-amarela pequeno">Não é preciso fazer uma compra nova: é só pagar a cobrança que já foi enviada.</div>
+    <button class="btn verde cheio" id="pix-paguei">Já paguei, verificar</button>
+    ${botaoZapSuporte(ZAP_PAGAMENTO)}`;
+  abrirPopup(corpo + '<button class="link-btn" id="pix-fechar">Fechar</button>', async (p) => {
+    $('#pix-fechar', p).onclick = () => fecharPainel();
+    $('#pix-paguei', p).onclick = (e) => acao(e.currentTarget, async () => {
+      await recarregar();
+      const ok = estado.assinatura.status === 'ativa' || estado.assinatura.cortesia;
+      if (ok) fecharPainel();
+      aviso(ok ? 'Pagamento confirmado! Obrigada 💛' : 'Ainda não recebemos a confirmação. Pode levar alguns minutos.');
+    });
+    if (!temPix) return;
+    $('#pix-copiar', p).onclick = async () => {
+      try { await navigator.clipboard.writeText(a.pix_codigo); aviso('Código Pix copiado! Agora cole no app do banco.'); }
+      catch (e) { prompt('Copie o código Pix:', a.pix_codigo); }
+    };
+    try {
+      const { default: qrcode } = await import('./qrcode.mjs?v=20261113b');
+      const q = qrcode(0, 'M'); q.addData(a.pix_codigo); q.make();
+      $('#pix-qr', p).innerHTML = q.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
+    } catch (e) { $('#pix-qr', p).remove(); }
+  });
+}
+
+// Fim do teste grátis: aviso na frente de tudo, sem fechar. Os dados ficam guardados.
+function bloqueioFimDoTeste() {
+  const a = estado.assinatura || {};
+  let caixa = $('#bloqueio');
+  if (!caixa) { caixa = document.createElement('div'); caixa.id = 'bloqueio'; document.body.appendChild(caixa); }
+  caixa.innerHTML = `<div class="popup-fundo bloqueio"><div class="popup" role="dialog" aria-modal="true">
+    ${BANDEIRINHAS}
+    <h2 class="centro" style="font-size:25px">Seu teste grátis terminou</h2>
+    <p class="centro">Gostou de organizar seus kits no app? Assine para continuar de onde parou.</p>
+    <div class="nota-amarela">Assine com o <b>mesmo e-mail do teste</b> (<b>${esc(a.email || '')}</b>) para não perder seus kits, fotos e reservas já cadastrados.</div>
+    <a class="btn verde cheio" href="${esc(LINK_MENSAL)}" target="_blank" rel="noopener">Assinar e continuar usando</a>
+    <button class="btn contorno cheio" id="teste-verificar">Já assinei, verificar</button>
+    ${botaoZapSuporte('Oi! Meu teste do App Pegue e Monte terminou e tenho uma dúvida.')}
+    <button class="link-btn" id="teste-sair">Sair do app</button>
+    ${dados.MODO_DEMO && !DEMO_SITE ? '<button class="btn contorno cheio" id="demo-normal">Demonstração: voltar ao normal</button>' : ''}
+  </div></div>`;
+  document.body.style.overflow = 'hidden';
+  $('#teste-verificar', caixa).onclick = (e) => acao(e.currentTarget, async () => {
+    await recarregar();
+    if (situacaoAssinatura() !== 'teste_fim') { caixa.remove(); document.body.style.overflow = ''; aviso('Assinatura confirmada! Bem-vinda 💛'); }
+    else aviso('Ainda não recebemos a confirmação. Pode levar alguns minutos.');
+  });
+  const normal = $('#demo-normal', caixa);
+  if (normal) normal.onclick = async () => { dados.demoSimular('normal'); caixa.remove(); document.body.style.overflow = ''; await recarregar(); montarApp(); };
+  $('#teste-sair', caixa).onclick = async () => { await dados.sair(); caixa.remove(); document.body.style.overflow = ''; telaLogin('entrar'); };
+}
+
 let relogioFaixa = null;
+let popupPagamentoMostrado = false;
 function ajustarAlturaFaixa() {
   const f = $('#faixa');
   document.documentElement.style.setProperty('--altura-faixa', (f ? f.offsetHeight : 0) + 'px');
@@ -296,35 +386,66 @@ function desenharFaixaAssinatura() {
   const faixa = $('#faixa');
   const base = dados.MODO_DEMO ? faixaDemo() : '';
   const sit = situacaoAssinatura();
+  if (sit !== 'teste_fim' && $('#bloqueio')) { $('#bloqueio').remove(); document.body.style.overflow = ''; }
   if (!sit) { faixa.innerHTML = base; return; }
   const a = estado.assinatura;
-  const cancelada = a.status === 'cancelada';
-  if (sit === 'carencia') {
+
+  if (sit === 'teste') {
+    const dias = Math.max(1, Math.ceil((new Date(a.teste_ate).getTime() - agoraServidor()) / 864e5));
     faixa.innerHTML = base + `
-      <div class="faixa-pagamento" role="alert">
-        <div><b>${cancelada ? 'Sua assinatura foi cancelada.' : 'Pagamento não confirmado.'}</b>
-        ${cancelada ? 'Reative' : 'Regularize'} em <b id="contagem">${tempoRestante(new Date(a.carencia_ate).getTime() - agoraServidor())}</b> para não perder o acesso.</div>
-        <a class="btn mini" href="${esc(linkPagamento())}" target="_blank" rel="noopener">${cancelada ? 'Reativar assinatura' : 'Regularizar pagamento'}</a>
+      <div class="faixa-pagamento teste" role="status">
+        <div>🎁 <b>Seu teste grátis termina ${dias === 1 ? 'amanhã' : `em ${dias} dias`}.</b> Assine com este mesmo e-mail e continue com tudo que cadastrou.</div>
+        <a class="btn mini" href="${esc(LINK_MENSAL)}" target="_blank" rel="noopener">Assinar agora</a>
       </div>`;
+    return;
+  }
+  if (sit === 'teste_fim') { faixa.innerHTML = base; bloqueioFimDoTeste(); return; }
+
+  if (sit === 'cancelada') {
+    const ainda = a.liberado && a.carencia_ate;
+    faixa.innerHTML = base + `
+      <div class="faixa-pagamento ${ainda ? '' : 'suspensa'}" role="alert">
+        <div><b>Sua assinatura foi cancelada.</b> ${ainda
+          ? `Seu acesso termina em <b id="contagem">${tempoRestante(new Date(a.carencia_ate).getTime() - agoraServidor())}</b>.`
+          : 'Você ainda vê suas reservas, mas não pode criar ou alterar nada, e seu link de reservas está fora do ar.'}
+        Assine de novo com o <b>mesmo e-mail</b> (${esc(a.email || '')}) para recuperar seus kits, fotos e reservas.</div>
+        <div class="linha-flex" style="flex-wrap:wrap">
+          <a class="btn mini" href="${esc(LINK_MENSAL)}" target="_blank" rel="noopener">Assinar de novo</a>
+          ${ainda ? '' : '<button class="btn mini contorno-claro" id="ja-paguei">Já assinei</button>'}
+        </div>
+        ${botaoZapSuporte(ZAP_PAGAMENTO)}
+      </div>`;
+  } else {
+    const temPix = !!(a.pix_codigo && a.pix_vence);
+    const emCarencia = sit === 'carencia';
+    faixa.innerHTML = base + `
+      <div class="faixa-pagamento ${emCarencia ? '' : 'suspensa'}" role="alert">
+        <div>${emCarencia
+          ? `<b>Pagamento da assinatura pendente.</b> Pague em <b id="contagem">${tempoRestante(new Date(a.carencia_ate).getTime() - agoraServidor())}</b> para não perder o acesso.`
+          : '<b>Assinatura suspensa.</b> Você ainda vê suas reservas, mas não pode criar ou alterar nada, e seu link de reservas está fora do ar.'}</div>
+        <div class="linha-flex" style="flex-wrap:wrap">
+          <button class="btn mini" id="como-pagar">${temPix ? 'Pagar com Pix' : 'Como pagar'}</button>
+          ${emCarencia ? '' : '<button class="btn mini contorno-claro" id="ja-paguei">Já paguei</button>'}
+        </div>
+        ${botaoZapSuporte(ZAP_PAGAMENTO)}
+      </div>`;
+    $('#como-pagar').onclick = popupPagamento;
+    // Abre o aviso de pagamento sozinho uma vez ao entrar.
+    if (!popupPagamentoMostrado && !$('#painel').innerHTML) { popupPagamentoMostrado = true; setTimeout(popupPagamento, 300); }
+  }
+
+  const jaPaguei = $('#ja-paguei');
+  if (jaPaguei) jaPaguei.onclick = (e) => acao(e.currentTarget, async () => {
+    await recarregar();
+    aviso(estado.assinatura.liberado ? 'Pagamento confirmado!' : 'Ainda não recebemos a confirmação. Pode levar alguns minutos.');
+  });
+  if ($('#contagem')) {
     relogioFaixa = setInterval(() => {
       const resta = new Date(a.carencia_ate).getTime() - agoraServidor();
       const c = $('#contagem');
       if (c) c.textContent = tempoRestante(resta);
       if (resta <= 0) { clearInterval(relogioFaixa); recarregar().catch(() => {}); }
     }, 30000);
-  } else {
-    faixa.innerHTML = base + `
-      <div class="faixa-pagamento suspensa" role="alert">
-        <div><b>Assinatura suspensa.</b> Você ainda vê suas reservas, mas não pode criar ou alterar nada, e seu link de reservas está fora do ar.</div>
-        <div class="linha-flex" style="flex-wrap:wrap">
-          <a class="btn mini" href="${esc(linkPagamento())}" target="_blank" rel="noopener">Regularizar pagamento</a>
-          <button class="btn mini contorno-claro" id="ja-paguei">Já paguei</button>
-        </div>
-      </div>`;
-    $('#ja-paguei').onclick = (e) => acao(e.currentTarget, async () => {
-      await recarregar();
-      aviso(estado.assinatura.liberado ? 'Pagamento confirmado!' : 'Ainda não recebemos a confirmação. Pode levar alguns minutos.');
-    });
   }
 }
 
@@ -364,15 +485,24 @@ function atualizarAoVoltar() {
   });
 }
 
-// Número vermelho na aba Hoje com os pedidos aguardando sinal.
+// Número vermelho no Início = total de alertas da tela
+// (atrasadas + aguardando sinal + retiradas de hoje + devoluções de hoje).
+function contarAlertas() {
+  const h = hojeISO();
+  const ativas = estado.reservas.filter((r) => r.status !== 'cancelada');
+  return ativas.filter(estaAtrasada).length
+    + ativas.filter((r) => r.status === 'aguardando_sinal').length
+    + ativas.filter((r) => r.status === 'confirmada' && r.data_retirada === h).length
+    + ativas.filter((r) => r.status === 'retirada' && r.data_devolucao === h).length;
+}
 function atualizarContador() {
   const c = $('#cont-hoje');
   if (!c) return;
-  const n = estado.reservas.filter((r) => r.status === 'aguardando_sinal').length;
+  const n = contarAlertas();
   c.textContent = n > 9 ? '9+' : String(n);
   c.classList.toggle('oculto', n === 0);
   const b = c.closest('button');
-  if (b) b.setAttribute('aria-label', n ? `Início, ${n} pedido(s) aguardando sinal` : 'Início');
+  if (b) b.setAttribute('aria-label', n ? `Início, ${n} alerta(s)` : 'Início');
 }
 
 // =====================================================================
@@ -384,7 +514,7 @@ function telaLogin(modo) {
     <div class="entrada"><form class="caixa" novalidate>
       ${BANDEIRINHAS}<div class="logo-app">${ICONE.logo}</div>
       <h1 class="centro">App Pegue e Monte</h1>
-      <p class="centro pequeno">${modo === 'esqueci' ? 'Enviaremos um link para você criar uma nova senha.' : modo === 'criar' ? 'Crie sua senha usando o <b>mesmo e-mail da compra</b>.' : 'Sua agenda de kits no celular.'}</p>
+      <p class="centro pequeno">${modo === 'esqueci' ? 'Enviaremos um link para você criar uma nova senha.' : modo === 'criar' ? 'Crie sua conta com seu e-mail e uma senha. Já comprou? Use o <b>mesmo e-mail da compra</b>.' : 'Sua agenda de kits no celular.'}</p>
       <label class="campo">E-mail<input type="email" name="email" autocomplete="email" inputmode="email" required></label>
       ${modo !== 'esqueci' ? `<label class="campo">Senha<input type="password" name="senha" autocomplete="${modo === 'criar' ? 'new-password' : 'current-password'}" minlength="6" required></label>` : ''}
       <div class="erro oculto" id="erro-login"></div>
@@ -392,10 +522,10 @@ function telaLogin(modo) {
       ${modo === 'entrar' ? `<button type="button" class="link-btn" data-modo="esqueci">Esqueci minha senha</button>` : ''}
       ${modo === 'entrar' && PERMITIR_CADASTRO ? `<button type="button" class="link-btn" data-modo="criar">Ainda não tenho conta</button>` : ''}
       ${modo !== 'entrar' ? `<button type="button" class="link-btn" data-modo="entrar">Voltar para entrar</button>` : ''}
+      ${modo === 'entrar' && !DEMO_SITE ? `<a class="btn-conheca" href="https://pegueemonte.com" target="_blank" rel="noopener">Ainda não é assinante? <b>Conheça o App Pegue e Monte</b></a>` : ''}
       <div class="ajuda-login">
         <span class="pequeno">Precisa de ajuda?</span>
         ${WHATSAPP_SUPORTE ? `<a class="btn verde mini" href="${esc(linkZap(WHATSAPP_SUPORTE, 'Oi! Preciso de ajuda para entrar no App Pegue e Monte.'))}" target="_blank" rel="noopener">${ICONE.zap} WhatsApp</a>` : ''}
-        <a class="btn contorno mini" href="mailto:${esc(EMAIL_SUPORTE)}?subject=${encodeURIComponent('Ajuda para entrar no App Pegue e Monte')}">E-mail</a>
       </div>
     </form></div>`;
   $$('[data-modo]').forEach((b) => (b.onclick = () => telaLogin(b.dataset.modo)));
@@ -577,7 +707,9 @@ function painelNegocio() {
       form.logo.value = '';
       if (!arq) return;
       desenharLogo('Enviando…');
-      try { logo = await dados.enviarFoto(arq, 500); } catch (e) { aviso(e.message); }
+      const ajustada = await recortarFoto(arq, '', { logo: true });
+      if (!ajustada) { desenharLogo(); return; }
+      try { logo = await dados.enviarFoto(ajustada, 500); } catch (e) { aviso(e.message); }
       desenharLogo();
     };
     const conta = () => { $('#recado-conta', p).textContent = `${form.recado_link.value.length}/300 caracteres`; };
@@ -925,19 +1057,22 @@ function fotoCaixa(url, alt = '', lazy = false) {
 // Devolve: a foto recortada (quadrada), o arquivo original (foto inteira)
 // ou null (cancelou).
 // ---------------------------------------------------------------------
-function recortarFoto(arquivo, posicao) {
+function recortarFoto(arquivo, posicao, opcoes = {}) {
+  const logo = !!opcoes.logo;
   return new Promise((resolver) => {
     const url = URL.createObjectURL(arquivo);
     const fundo = document.createElement('div');
     fundo.className = 'recorte-fundo';
     fundo.innerHTML = `
       <div class="recorte" role="dialog" aria-modal="true" aria-label="Ajustar foto">
-        <h2 class="centro">Ajuste a foto${posicao ? ` <span class="pequeno">(${posicao})</span>` : ''}</h2>
-        <p class="centro pequeno">Arraste para posicionar e aproxime com dois dedos ou com a barrinha. O que estiver no quadrado é o que vai aparecer.</p>
-        <div class="recorte-area"><img alt="Foto para ajustar" draggable="false"><span class="recorte-grade" aria-hidden="true"></span></div>
-        <label class="recorte-zoom"><span aria-hidden="true">－</span><input type="range" min="1" max="4" step="0.01" value="1" aria-label="Aproximar"><span aria-hidden="true">＋</span></label>
-        <button class="btn principal cheio" type="button" data-r="ok">Usar este recorte</button>
-        <button class="btn contorno cheio" type="button" data-r="inteira">Usar foto inteira</button>
+        <h2 class="centro">${logo ? 'Ajuste sua logo' : 'Ajuste a foto'}${posicao ? ` <span class="pequeno">(${posicao})</span>` : ''}</h2>
+        <p class="centro pequeno">${logo
+          ? 'A logo já começa inteira dentro do círculo. Aumente ou diminua com a barrinha (ou com dois dedos) e arraste para centralizar.'
+          : 'Arraste para posicionar e aproxime com dois dedos ou com a barrinha. O que estiver no quadrado é o que vai aparecer.'}</p>
+        <div class="recorte-area ${logo ? 'logo' : ''}"><img alt="Imagem para ajustar" draggable="false"><span class="recorte-grade" aria-hidden="true"></span></div>
+        <label class="recorte-zoom"><span aria-hidden="true">－</span><input type="range" min="${logo ? '0.4' : '1'}" max="4" step="0.01" value="1" aria-label="Aumentar ou diminuir"><span aria-hidden="true">＋</span></label>
+        <button class="btn principal cheio" type="button" data-r="ok">${logo ? 'Usar esta logo' : 'Usar este recorte'}</button>
+        ${logo ? '' : '<button class="btn contorno cheio" type="button" data-r="inteira">Usar foto inteira</button>'}
         <button class="link-btn" type="button" data-r="cancelar" style="align-self:center">Cancelar</button>
       </div>`;
     document.body.appendChild(fundo);
@@ -948,13 +1083,13 @@ function recortarFoto(arquivo, posicao) {
     const lado = () => area.clientWidth;
     const limitar = () => {
       const L = lado(), w = nw * escala, h = nh * escala;
-      x = Math.min(0, Math.max(L - w, x));
-      y = Math.min(0, Math.max(L - h, y));
+      x = Math.min(Math.max(0, L - w), Math.max(Math.min(0, L - w), x));
+      y = Math.min(Math.max(0, L - h), Math.max(Math.min(0, L - h), y));
     };
     const aplicar = () => { limitar(); img.style.transform = `translate(${x}px, ${y}px) scale(${escala})`; };
     const mudarZoom = (novo, cx, cy) => {
       const L = lado();
-      const z = Math.min(4, Math.max(1, novo));
+      const z = Math.min(4, Math.max(logo ? 0.4 : 1, novo));
       const nova = base * z;
       const px = cx ?? L / 2, py = cy ?? L / 2;
       x = px - (px - x) * (nova / escala);
@@ -964,7 +1099,8 @@ function recortarFoto(arquivo, posicao) {
     img.onload = () => {
       nw = img.naturalWidth; nh = img.naturalHeight;
       const L = lado();
-      base = Math.max(L / nw, L / nh); // preenche o quadrado
+      // Foto preenche o quadrado; logo começa inteira dentro do círculo (com uma folga).
+      base = logo ? (0.96 * L) / Math.hypot(nw, nh) : Math.max(L / nw, L / nh);
       escala = base;
       x = (L - nw * escala) / 2; y = (L - nh * escala) / 2;
       img.style.width = nw + 'px'; img.style.height = nh + 'px';
@@ -1014,8 +1150,20 @@ function recortarFoto(arquivo, posicao) {
     }
     fecharRecorteAberto = () => fechar(null);
     $('[data-r="cancelar"]', fundo).onclick = () => fechar(null);
-    $('[data-r="inteira"]', fundo).onclick = () => fechar(arquivo);
+    const inteira = $('[data-r="inteira"]', fundo);
+    if (inteira) inteira.onclick = () => fechar(arquivo);
     $('[data-r="ok"]', fundo).onclick = () => {
+      if (logo) {
+        // Fundo branco (igual ao círculo do link) e a logo do tamanho que ela escolheu, sem cortes.
+        const L = lado(), saida = 500, k = saida / L;
+        const c = document.createElement('canvas');
+        c.width = saida; c.height = saida;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, saida, saida);
+        ctx.drawImage(img, x * k, y * k, nw * escala * k, nh * escala * k);
+        c.toBlob((b) => fechar(b || arquivo), 'image/jpeg', 0.92);
+        return;
+      }
       const L = lado();
       const sx = -x / escala, sy = -y / escala, sl = L / escala;
       const saida = Math.round(Math.min(1200, sl));
@@ -1028,6 +1176,13 @@ function recortarFoto(arquivo, posicao) {
 }
 
 const MAX_FOTOS = 5;
+const CATEGORIAS_PADRAO = ['Menino', 'Menina', 'Unissex', 'Chá revelação', 'Chá de bebê', 'Batizado', 'Adulto', 'Casamento', 'Formatura', 'Datas comemorativas'];
+function opcoesCategoria(atual) {
+  const proprias = estado.kits.map((x) => x.categoria).filter(Boolean);
+  const todas = [...new Set([...CATEGORIAS_PADRAO, ...proprias, ...(atual ? [atual] : [])])];
+  const extras = todas.filter((c) => !CATEGORIAS_PADRAO.includes(c)).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  return [...CATEGORIAS_PADRAO, ...extras];
+}
 function fotosDoKit(k) {
   if (Array.isArray(k.fotos) && k.fotos.length) return [...k.fotos];
   return k.foto_url ? [k.foto_url] : [];
@@ -1045,18 +1200,25 @@ function formKit(kit) {
       <span class="dica" style="margin-top:-6px">Até ${MAX_FOTOS} fotos. A primeira é a foto principal: toque numa miniatura para torná-la principal.</span>`}
       <label class="campo">Nome do kit<input name="nome" maxlength="80" value="${esc(k.nome)}" placeholder="Ex.: Safári" required></label>
       <label class="campo">Categoria (opcional)
-        <input name="categoria" maxlength="40" list="lista-categorias" value="${esc(k.categoria || '')}" placeholder="Ex.: Infantil, Chá revelação, Adulto" autocomplete="off">
-        <datalist id="lista-categorias">${[...new Set(estado.kits.map((x) => x.categoria).filter(Boolean))].sort().map((c) => `<option value="${esc(c)}">`).join('')}</datalist>
-        <span class="dica">No seu link de reservas, a cliente filtra os kits por categoria.</span>
+        <select name="categoria">
+          <option value="">Sem categoria</option>
+          ${opcoesCategoria(k.categoria).map((c) => `<option value="${esc(c)}" ${c === k.categoria ? 'selected' : ''}>${esc(c)}</option>`).join('')}
+          <option value="__nova">➕ Criar nova categoria…</option>
+        </select>
       </label>
+      <label class="campo oculto" id="campo-nova-cat">Nome da nova categoria
+        <input name="nova_categoria" maxlength="40" placeholder="Ex.: Super-heróis" autocomplete="off">
+      </label>
+      <span class="dica" style="margin-top:-6px">No seu link de reservas, a cliente filtra os kits por categoria.</span>
       <div class="grade-2">
         <label class="campo">Preço (R$)<input name="preco" inputmode="decimal" value="${esc(k.preco === '' ? '' : String(k.preco).replace('.', ','))}" placeholder="350"></label>
         <label class="campo">Sinal (R$)<input name="sinal" inputmode="decimal" value="${esc(k.sinal === '' ? '' : String(k.sinal).replace('.', ','))}" placeholder="100"></label>
       </div>
-      <label class="campo">Peças do kit (uma por linha)
-        <textarea name="pecas" placeholder="Painel redondo&#10;Boleira&#10;Vaso girafa">${esc(k.pecas.join('\n'))}</textarea>
+      <div class="campo">Peças do kit
+        <div class="lista-pecas" id="lista-pecas"></div>
+        ${so ? '' : '<button type="button" class="btn claro cheio" id="add-peca">＋ Adicionar mais uma peça</button>'}
         <span class="dica">Essa lista vira o checklist de cada retirada e devolução.</span>
-      </label>
+      </div>
       <label class="check ${k.ativo ? 'marcado' : ''}"><input type="checkbox" name="ativo" ${k.ativo ? 'checked' : ''}> Mostrar no link de reservas</label>
       <div class="erro oculto" id="erro-kit"></div>
       ${so ? '' : `<button class="btn principal cheio" type="submit">Salvar kit</button>`}
@@ -1093,6 +1255,38 @@ function formKit(kit) {
     };
     desenharFotos();
     form.ativo.onchange = () => form.ativo.closest('.check').classList.toggle('marcado', form.ativo.checked);
+    form.categoria.onchange = () => {
+      const nova = form.categoria.value === '__nova';
+      $('#campo-nova-cat', p).classList.toggle('oculto', !nova);
+      if (nova) form.nova_categoria.focus();
+    };
+    // Peças: uma linha para cada peça, com botão para adicionar mais
+    const listaPecas = $('#lista-pecas', p);
+    const linhaPeca = (v = '') => `<div class="linha-peca"><span class="num-peca"></span><input class="peca" maxlength="80" value="${esc(v)}" placeholder="Ex.: Painel redondo" ${so ? 'disabled' : ''}>${so ? '' : '<button type="button" class="tirar-peca" aria-label="Tirar esta peça">×</button>'}</div>`;
+    const numerar = () => $$('.num-peca', listaPecas).forEach((el, i) => (el.textContent = `${i + 1}.`));
+    const addPeca = (v = '', focar = true) => {
+      listaPecas.insertAdjacentHTML('beforeend', linhaPeca(v));
+      numerar();
+      const inp = listaPecas.lastElementChild.querySelector('input');
+      if (focar) inp.focus();
+    };
+    const pecasIniciais = k.pecas.length ? k.pecas : ['', '', ''];
+    pecasIniciais.forEach((v) => addPeca(v, false));
+    listaPecas.addEventListener('click', (e) => {
+      const b = e.target.closest('.tirar-peca'); if (!b) return;
+      b.closest('.linha-peca').remove();
+      if (!listaPecas.children.length) addPeca('', false);
+      numerar();
+    });
+    // Enter numa peça já abre a próxima linha
+    listaPecas.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' || !e.target.classList.contains('peca')) return;
+      e.preventDefault();
+      const prox = e.target.closest('.linha-peca').nextElementSibling;
+      if (prox) prox.querySelector('input').focus(); else if ($$('.peca', listaPecas).length < 100) addPeca();
+    });
+    const botaoAdd = $('#add-peca', p);
+    if (botaoAdd) botaoAdd.onclick = () => { if ($$('.peca', listaPecas).length < 100) addPeca(); };
     if (form.arquivo) {
       form.arquivo.onchange = async () => {
         const vagas = MAX_FOTOS - fotos.length - enviando;
@@ -1118,13 +1312,14 @@ function formKit(kit) {
         nome: form.nome.value.trim(),
         preco: numero(form.preco.value),
         sinal: numero(form.sinal.value),
-        pecas: form.pecas.value.split('\n').map((s) => s.trim()).filter(Boolean).slice(0, 100),
-        categoria: (form.categoria.value.trim().replace(/\s+/g, ' ').slice(0, 40)) || null,
+        pecas: $$('.peca', p).map((i) => i.value.trim()).filter(Boolean).slice(0, 100),
+        categoria: ((form.categoria.value === '__nova' ? form.nova_categoria.value : form.categoria.value).trim().replace(/\s+/g, ' ').slice(0, 40)) || null,
         fotos: fotos.slice(0, MAX_FOTOS),
         foto_url: fotos[0] || null,
         ativo: form.ativo.checked,
       };
       if (!novo.nome) { caixa.textContent = 'Dê um nome ao kit.'; caixa.classList.remove('oculto'); return; }
+      if (form.categoria.value === '__nova' && !novo.categoria) { caixa.textContent = 'Escreva o nome da nova categoria.'; caixa.classList.remove('oculto'); return; }
       if (enviando) { caixa.textContent = 'Espere as fotos terminarem de enviar.'; caixa.classList.remove('oculto'); return; }
       if (kit) novo.id = kit.id;
       await acao($('button[type=submit]', form), async () => {
@@ -1170,7 +1365,10 @@ function abaMais(tela) {
       <p class="dica centro">${esc(EMAIL_SUPORTE)}</p>
     </section>
     ${DEMO_SITE ? `<a class="btn verde cheio" href="${esc(LINK_PLANOS)}" target="_top">Gostei! Quero usar com meus kits</a><button class="btn contorno cheio" id="demo-reset">Recomeçar a demonstração</button>`
-      : dados.MODO_DEMO ? '<button class="btn contorno cheio" id="demo-falha">Simular: pagamento falhou</button><button class="btn contorno cheio" id="demo-reset">Recomeçar a demonstração</button>' : ''}
+      : dados.MODO_DEMO ? `<section class="cartao coluna"><h2>Testar situações (só na demonstração)</h2>
+          ${[['normal', 'Assinatura ativa (normal)'], ['teste', 'Conta nova em teste de 7 dias'], ['teste_fim', 'Teste de 7 dias acabou'], ['pix', 'Pagamento pendente com Pix'], ['email', 'Pagamento pendente sem Pix'], ['suspensa', 'Assinatura suspensa'], ['cancelada', 'Cliente cancelou']]
+            .map(([k, t]) => `<button class="btn contorno cheio" data-simular="${k}">${t}</button>`).join('')}
+          <button class="btn contorno cheio" id="demo-reset">Recomeçar a demonstração</button></section>` : ''}
     ${DEMO_SITE ? '' : '<button class="btn perigo cheio" id="sair">Sair do app</button>'}
     <p class="pequeno centro">Dica: no celular, use "Adicionar à tela inicial" no menu do navegador para abrir como aplicativo.</p>`;
   $('#copiar', tela).onclick = async () => {
@@ -1183,8 +1381,10 @@ function abaMais(tela) {
   if (sairBtn) sairBtn.onclick = async () => { await dados.sair(); location.hash = ''; telaLogin('entrar'); };
   const reset = $('#demo-reset', tela);
   if (reset) reset.onclick = async () => { dados.demoReiniciar(); await carregarTudo(); aviso('Demonstração reiniciada.'); };
-  const falha = $('#demo-falha', tela);
-  if (falha) falha.onclick = async () => { dados.demoSimularFalha(); await recarregar(); montarApp(); };
+  $$('[data-simular]', tela).forEach((b) => (b.onclick = async () => {
+    dados.demoSimular(b.dataset.simular); popupPagamentoMostrado = false;
+    await recarregar(); montarApp(); window.scrollTo(0, 0);
+  }));
 }
 
 // =====================================================================
@@ -1318,7 +1518,7 @@ function formReserva(pre, existente) {
         <label class="campo">Sinal (R$)<input name="sinal" inputmode="decimal" value="${esc(String(r.valor_sinal ?? kit0.sinal).replace('.', ','))}"></label>
       </div>
       ${existente ? '' : `<label class="check"><input type="checkbox" name="pago"> O sinal já foi pago</label>`}
-      <label class="campo">Observação (opcional)<input name="obs" maxlength="500" value="${esc(r.obs || '')}"></label>
+      <label class="campo">Observação (opcional)<textarea name="obs" maxlength="500" rows="3" placeholder="Ex.: entregar no salão às 14h, cliente pediu balões extras">${esc(r.obs || '')}</textarea></label>
       <div class="erro oculto" id="erro-res"></div>
       <button class="btn principal cheio" type="submit">${existente ? 'Salvar alterações' : 'Criar reserva'}</button>
     </form>`, (p) => {
@@ -1434,12 +1634,28 @@ function abrirReserva(id) {
         <div><div class="pequeno">Valor total</div><b>${reais(r.valor_total)}</b></div>
         <div><div class="pequeno">Sinal</div><b>${reais(r.valor_sinal)}</b> ${r.sinal_recebido ? '<span class="etiqueta et-concluida">pago</span>' : ''}</div>
       </div>
-      ${r.obs ? `<div class="pequeno"><b>Obs.:</b> ${esc(r.obs)}</div>` : ''}
       ${['retirada', 'concluida'].includes(r.status) ? resumoChecklist('Retirada', r.checklist_retirada) : ''}
       ${r.status === 'concluida' ? resumoChecklist('Devolução', r.checklist_devolucao) : ''}
       ${r.avaria_obs || Number(r.avaria_valor) > 0 ? `<div class="pequeno" style="color: var(--destaque-escuro)"><b>Avaria:</b> ${esc(r.avaria_obs || '')} ${Number(r.avaria_valor) > 0 ? `(${reais(r.avaria_valor)})` : ''}</div>` : ''}
     </div>
+    <div class="cartao coluna anotacao">
+      <label class="campo" style="margin:0">📝 Observação
+        <textarea id="obs-reserva" maxlength="500" rows="3" placeholder="Anote o que precisar: horário de entrega, pedido especial, endereço do salão…" ${ed ? '' : 'disabled'}>${esc(r.obs || '')}</textarea>
+      </label>
+      ${ed ? '<button class="btn claro mini oculto" id="salvar-obs" style="align-self:flex-end">Salvar observação</button>' : ''}
+    </div>
     <div class="coluna">${botoes.join('')}</div>`, (p) => {
+    const obs = $('#obs-reserva', p), salvarObs = $('#salvar-obs', p);
+    if (salvarObs) {
+      obs.oninput = () => salvarObs.classList.toggle('oculto', obs.value.trim() === (r.obs || ''));
+      salvarObs.onclick = () => acao(salvarObs, async () => {
+        await dados.atualizarReserva(r.id, { obs: obs.value.trim().slice(0, 500) || null });
+        r.obs = obs.value.trim() || null;
+        salvarObs.classList.add('oculto');
+        aviso('Observação salva!');
+        recarregar().catch(() => {});
+      });
+    }
     const ligar = (nome, fn) => { const b = $(`[data-acao="${nome}"]`, p); if (b) b.addEventListener(b.type === 'checkbox' ? 'change' : 'click', () => fn(b)); };
     ligar('confirmar', (b) => acao(b, async () => {
       await dados.atualizarReserva(r.id, { status: 'confirmada', sinal_recebido: true });
