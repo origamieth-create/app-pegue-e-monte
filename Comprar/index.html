@@ -73,11 +73,6 @@ document.addEventListener('click', function (e) {
   .botao.ameixa { background: var(--ameixa); color: #fff; }
   .botao.confete { background: var(--confete); color: var(--ameixa); }
   .botao.cheio { width: 100%; }
-  .botao.contorno { background: #fff; color: var(--ameixa); box-shadow: inset 0 0 0 2px var(--ameixa); }
-  .ctas-hero { display: flex; flex-wrap: wrap; gap: 12px; }
-  .demo-convite { max-width: 640px; margin: 22px auto 0; background: #fff; border: 2px dashed var(--coral); border-radius: 22px; padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
-  .demo-convite p { font-weight: 700; color: var(--ameixa-suave); }
-  .demo-convite b { color: var(--ameixa); }
 
   /* Topo */
   .topo { position: sticky; top: 0; z-index: 30; background: rgba(255, 251, 247, .96); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-bottom: 1px solid var(--linha); }
@@ -252,10 +247,7 @@ document.addEventListener('click', function (e) {
       <span class="selo">Para quem aluga kits de festa pegue e monte</span>
       <h1>Nunca mais alugue o mesmo kit <em>duas vezes</em></h1>
       <p class="lead">Sua agenda de kits no celular, com um link onde a cliente escolhe o kit e a data livre sozinha. E você para de responder "tem disponível?" o dia inteiro.</p>
-      <div class="ctas-hero">
-        <a class="botao coral" href="#precos" id="cta-topo">Quero organizar minha agenda</a>
-        <a class="botao contorno" href="demo/" data-demo>▶ Experimente agora, sem cadastro</a>
-      </div>
+      <a class="botao coral" href="#precos" id="cta-topo">Quero organizar minha agenda</a>
       <div class="garantias">
         <span><svg viewBox="0 0 24 24" fill="none" stroke="#1F7A52" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>Pronto em 5 minutos</span>
         <span><svg viewBox="0 0 24 24" fill="none" stroke="#1F7A52" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>Feito para o celular</span>
@@ -293,10 +285,6 @@ document.addEventListener('click', function (e) {
     <div class="video" id="video">
       <video src="video-vendas.mp4" poster="capa-video.jpg" preload="none" playsinline controls aria-label="Vídeo: como funciona o App Pegue e Monte"></video>
       <button class="play" type="button" aria-label="Assistir ao vídeo"><svg viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></button>
-    </div>
-    <div class="demo-convite">
-      <p><b>Prefere mexer você mesma?</b> Abra a demonstração do app com kits e reservas de exemplo. Sem cadastro, direto no celular.</p>
-      <a class="botao coral" href="demo/" data-demo>Abrir a demonstração</a>
     </div>
   </div>
 </section>
@@ -415,7 +403,6 @@ document.addEventListener('click', function (e) {
     <h2>Sua próxima festa organizada, sem reserva dupla</h2>
     <p>Comece hoje e coloque seu link na bio ainda nesta semana.</p>
     <a class="botao confete" href="#precos">Quero organizar minha agenda</a>
-    <p style="margin-top:14px"><a href="demo/" data-demo style="color:inherit;font-weight:800">Ainda com dúvida? Experimente a demonstração</a></p>
   </div>
 </section>
 </main>
