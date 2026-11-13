@@ -114,12 +114,12 @@ document.addEventListener('click', function (e) {
   /* Vídeo */
   .video { position: relative; width: 100%; max-width: 440px; margin: 22px auto 0; aspect-ratio: 4 / 5; border-radius: 24px; background: var(--ameixa); overflow: hidden; box-shadow: 0 18px 40px rgba(42, 27, 61, .16); }
   .video video { display: block; width: 100%; height: 100%; object-fit: cover; }
-  .video .som { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 10px; border: 0; border-radius: 999px; padding: 14px 22px 14px 16px; background: var(--coral-forte); color: #fff; font: inherit; font-weight: 800; font-size: 17px; white-space: nowrap; cursor: pointer; box-shadow: 0 10px 28px rgba(42, 27, 61, .35); animation: pulsar 1.8s ease-in-out infinite; }
-  .video .som .ic { width: 34px; height: 34px; border-radius: 999px; background: #fff; display: inline-flex; align-items: center; justify-content: center; }
-  .video .som .ic svg { width: 16px; height: 16px; margin-left: 3px; }
-  .video .selo-mudo { position: absolute; left: 14px; top: 14px; display: inline-flex; align-items: center; gap: 6px; background: rgba(42, 27, 61, .78); color: #fff; font-size: 13px; font-weight: 800; padding: 6px 12px; border-radius: 999px; }
-  .video.com-som .som, .video.com-som .selo-mudo { display: none; }
-  @keyframes pulsar { 0%, 100% { transform: translateX(-50%) scale(1); } 50% { transform: translateX(-50%) scale(1.05); } }
+  .video .som { position: absolute; left: 50%; top: 45%; transform: translate(-50%, -50%); width: min(80%, 300px); display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 18px 16px 20px; border: 3px solid rgba(255, 255, 255, .9); border-radius: 22px; background: rgba(199, 59, 72, .9); color: #fff; font: inherit; cursor: pointer; box-shadow: 0 16px 40px rgba(42, 27, 61, .45); animation: pulsar 1.8s ease-in-out infinite; }
+  .video .som .linha1, .video .som .linha2 { font-family: 'Fredoka', 'Nunito Sans', sans-serif; font-weight: 700; font-size: 22px; line-height: 1.1; }
+  .video .som svg { width: 64px; height: 64px; }
+  .video.com-som .som { display: none; }
+  @keyframes pulsar { 0%, 100% { transform: translate(-50%, -50%) scale(1); } 50% { transform: translate(-50%, -50%) scale(1.05); } }
+  .subtitulo-video { text-align: center; color: var(--ameixa-suave); font-weight: 700; font-size: 17px; margin-top: 6px; }
   @media (prefers-reduced-motion: reduce) { .video .som { animation: none; } }
 
   /* Grades de cartões */
@@ -290,10 +290,14 @@ document.addEventListener('click', function (e) {
 <section class="secao" style="padding-top: 0">
   <div class="conteudo">
     <h2 class="titulo-secao">Veja como funciona</h2>
+    <p class="subtitulo-video">Neste vídeo rápido de 1 minuto</p>
     <div class="video" id="video">
       <video src="video-vendas.mp4" poster="capa-video.jpg" muted loop playsinline preload="metadata" aria-label="Vídeo: como funciona o App Pegue e Monte"></video>
-      <span class="selo-mudo" aria-hidden="true">🔇 Vídeo sem som</span>
-      <button class="som" type="button"><span class="ic"><svg viewBox="0 0 24 24" fill="#C73B48" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>Assistir com som · 1 min</button>
+      <button class="som" type="button" aria-label="Seu vídeo já começou. Toque para ouvir">
+        <span class="linha1">Seu vídeo já começou</span>
+        <svg viewBox="0 0 64 64" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 25h10l13-11v36L20 39H10z" fill="#fff"/><path d="M42 24c3 2 5 5 5 8s-2 6-5 8"/><path d="M48 18c5 4 8 9 8 14s-3 10-8 14"/><path d="M8 8l48 48" stroke-width="5"/></svg>
+        <span class="linha2">Toque para ouvir</span>
+      </button>
     </div>
   </div>
 </section>
