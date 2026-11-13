@@ -211,7 +211,7 @@ window.addEventListener('popstate', () => {
 // Demonstração do site: os botões de WhatsApp das clientes de exemplo não
 // abrem conversa de verdade (os números são fictícios). O suporte continua normal.
 function faixaDemo() {
-  if (DEMO_SITE) return `<div class="faixa demo faixa-site"><span>Você está na <b>demonstração</b>: mexa à vontade, os dados são de exemplo.</span><a class="btn principal mini" href="${esc(LINK_PLANOS)}" target="_top">Quero assinar</a></div>`;
+  if (DEMO_SITE) return `<div class="faixa demo faixa-site"><span>Você está na <b>demonstração</b>: mexa à vontade, os dados são de exemplo.</span><a class="btn verde mini" href="${esc(LINK_PLANOS)}" target="_top">Quero usar com meus kits</a></div>`;
   return '<div class="faixa demo">Modo demonstração: os dados são de exemplo e ficam só neste aparelho.</div>';
 }
 function ligarDemoSite() {
@@ -1169,7 +1169,7 @@ function abaMais(tela) {
       <a class="btn contorno cheio" href="mailto:${esc(EMAIL_SUPORTE)}?subject=${encodeURIComponent('Ajuda no App Pegue e Monte')}">Enviar e-mail para o suporte</a>
       <p class="dica centro">${esc(EMAIL_SUPORTE)}</p>
     </section>
-    ${DEMO_SITE ? `<a class="btn principal cheio" href="${esc(LINK_PLANOS)}" target="_top">Gostei, quero assinar</a><button class="btn contorno cheio" id="demo-reset">Recomeçar a demonstração</button>`
+    ${DEMO_SITE ? `<a class="btn verde cheio" href="${esc(LINK_PLANOS)}" target="_top">Gostei! Quero usar com meus kits</a><button class="btn contorno cheio" id="demo-reset">Recomeçar a demonstração</button>`
       : dados.MODO_DEMO ? '<button class="btn contorno cheio" id="demo-falha">Simular: pagamento falhou</button><button class="btn contorno cheio" id="demo-reset">Recomeçar a demonstração</button>' : ''}
     ${DEMO_SITE ? '' : '<button class="btn perigo cheio" id="sair">Sair do app</button>'}
     <p class="pequeno centro">Dica: no celular, use "Adicionar à tela inicial" no menu do navegador para abrir como aplicativo.</p>`;

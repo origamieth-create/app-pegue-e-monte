@@ -27,4 +27,4 @@ export const LINK_ANUAL = 'https://pay.cakto.com.br/65irjr2';
 // Demonstração pública no site (pegueemonte.com/demo). Deixe false no app de verdade.
 export const DEMO_SITE = true;
 // Para onde vai o botão "Quero assinar" da demonstração.
-export const LINK_PLANOS = 'https://pegueemonte.com/#precos';
+export const LINK_PLANOS = LINK_MENSAL;
