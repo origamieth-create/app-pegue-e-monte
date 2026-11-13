@@ -522,7 +522,7 @@ function telaLogin(modo) {
       ${modo === 'entrar' ? `<button type="button" class="link-btn" data-modo="esqueci">Esqueci minha senha</button>` : ''}
       ${modo === 'entrar' && PERMITIR_CADASTRO ? `<button type="button" class="link-btn" data-modo="criar">Ainda não tenho conta</button>` : ''}
       ${modo !== 'entrar' ? `<button type="button" class="link-btn" data-modo="entrar">Voltar para entrar</button>` : ''}
-      ${modo === 'entrar' && !DEMO_SITE ? `<a class="btn-conheca" href="https://pegueemonte.com" target="_blank" rel="noopener">Ainda não é assinante? <b>Conheça o App Pegue e Monte</b></a>` : ''}
+      ${modo === 'entrar' && !DEMO_SITE ? `<a class="btn-conheca" href="https://app.pegueemonte.com/Comprar/" target="_blank" rel="noopener">Ainda não é assinante? <b>Conheça o App Pegue e Monte</b></a>` : ''}
       <div class="ajuda-login">
         <span class="pequeno">Precisa de ajuda?</span>
         ${WHATSAPP_SUPORTE ? `<a class="btn verde mini" href="${esc(linkZap(WHATSAPP_SUPORTE, 'Oi! Preciso de ajuda para entrar no App Pegue e Monte.'))}" target="_blank" rel="noopener">${ICONE.zap} WhatsApp</a>` : ''}
