@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Teste grátis por 7 dias · App Pegue e Monte</title>
+<meta name="description" content="Organize seus kits pegue e monte e suas reservas pelo celular. Teste grátis por 7 dias, sem cartão.">
+<meta name="theme-color" content="#2A1B3D">
+<link rel="icon" href="../icone.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icone-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito+Sans:wght@400;600;700;800&display=swap">
+<link rel="stylesheet" href="../estilo.css?v=20261113b">
+<style>
+  body { background: #FFFBF7; margin: 0; padding-bottom: calc(90px + env(safe-area-inset-bottom)); }
+  .lp { max-width: 480px; margin: 0 auto; padding: 0 18px 30px; display: flex; flex-direction: column; gap: 22px; }
+  .topo { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; padding-top: 6px; }
+  .topo .bandeirinhas { max-width: 420px; margin: 0 auto; }
+  .marca { display: flex; align-items: center; gap: 10px; font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 20px; color: var(--tinta); }
+  .marca svg { width: 40px; height: 40px; }
+  .publico { background: #2A1B3D; color: #FFC94A; font-weight: 800; font-size: 13px; border-radius: 999px; padding: 7px 14px; }
+  .lp h1 { font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 31px; line-height: 1.1; color: var(--tinta); margin: 0; }
+  .lp h1 em { font-style: normal; color: var(--coral); }
+  .sub { font-size: 17px; font-weight: 700; color: #1F7A52; margin: 0; }
+  .video { position: relative; width: 100%; aspect-ratio: 4 / 5; border-radius: 22px; background: #2A1B3D; overflow: hidden; box-shadow: 0 18px 40px rgba(42, 27, 61, .16); }
+  .video video { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .video .som { position: absolute; left: 50%; top: 45%; transform: translate(-50%, -50%); width: min(80%, 300px); display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 18px 16px 20px; border: 3px solid rgba(255,255,255,.9); border-radius: 22px; background: rgba(199,59,72,.9); color: #fff; font: inherit; cursor: pointer; box-shadow: 0 16px 40px rgba(42,27,61,.45); animation: pulsar 1.8s ease-in-out infinite; }
+  .video .som b { font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 22px; line-height: 1.1; }
+  .video .som svg { width: 60px; height: 60px; }
+  .video.com-som .som { display: none; }
+  @keyframes pulsar { 0%, 100% { transform: translate(-50%, -50%) scale(1); } 50% { transform: translate(-50%, -50%) scale(1.05); } }
+  @media (prefers-reduced-motion: reduce) { .video .som { animation: none; } }
+  .chamada { text-align: center; margin: -6px 0 0; font-weight: 800; color: var(--tinta); }
+  .form { background: #fff; border-radius: 22px; padding: 18px; box-shadow: 0 10px 30px rgba(42,27,61,.12); display: flex; flex-direction: column; gap: 12px; border: 2px solid #1F7A52; scroll-margin-top: 16px; }
+  .form .campo input { font-size: 16px; }
+  .btn-grande { font-size: 18px; min-height: 56px; }
+  .garantias { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; font-weight: 800; color: var(--texto2); }
+  .garantias span::before { content: '✓ '; color: #1F7A52; }
+  .lp h2 { font-family: 'Fredoka', sans-serif; font-size: 24px; text-align: center; margin: 6px 0 0; color: var(--tinta); }
+  .func { display: flex; flex-direction: column; gap: 12px; align-items: center; text-align: center; background: #fff; border-radius: 20px; padding: 16px 16px 0; border: 1px solid var(--linha); overflow: hidden; }
+  .func b { font-family: 'Fredoka', sans-serif; font-size: 19px; display: block; margin-bottom: 4px; color: var(--tinta); }
+  .func p { margin: 0; font-size: 14px; color: var(--texto2); line-height: 1.4; }
+  .func img { width: 72%; aspect-ratio: 3 / 4; object-fit: cover; object-position: top; border: 4px solid #2A1B3D; border-bottom: 0; border-radius: 22px 22px 0 0; display: block; }
+  .duv { background: #fff; border-radius: 16px; padding: 14px; border: 1px solid var(--linha); }
+  .duv b { display: block; margin-bottom: 4px; color: var(--tinta); }
+  .duv p { margin: 0; font-size: 14px; color: var(--texto2); line-height: 1.45; }
+  .zap { align-self: center; color: #1F7A52; font-weight: 800; font-size: 14px; text-decoration: none; padding: 8px; }
+  .fixo { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; padding: 10px 18px calc(10px + env(safe-area-inset-bottom)); background: linear-gradient(to top, #FFFBF7 70%, rgba(255,251,247,0)); transition: transform .25s ease, opacity .25s ease; }
+  .fixo .btn { max-width: 444px; margin: 0 auto; display: flex; box-shadow: 0 10px 24px rgba(31,122,82,.35); }
+  .fixo.escondido { transform: translateY(120%); opacity: 0; pointer-events: none; }
+  .ja-conta { background: #EAF7EF; border: 1px solid #BFE3CE; border-radius: 16px; padding: 12px 14px; font-weight: 700; text-align: center; }
+  .ja-conta a { color: #1F7A52; }
+  .erro a { color: inherit; font-weight: 800; }
+</style>
+</head>
+<body>
+<div class="lp">
+  <header class="topo">
+    <svg class="bandeirinhas" viewBox="0 0 480 64" aria-hidden="true"><path d="M4 6 Q120 34 240 10 Q360 -10 476 18" fill="none" stroke="#2A1B3D" stroke-width="3" stroke-linecap="round"/><path d="M28 13 L60 19 L42 52 Z" fill="#E4505C"/><path d="M84 22 L116 25 L98 58 Z" fill="#FFC94A"/><path d="M140 25 L172 23 L156 58 Z" fill="#5B3A99"/><path d="M196 18 L228 13 L214 48 Z" fill="#E4505C"/><path d="M252 9 L284 5 L270 40 Z" fill="#FFC94A"/><path d="M308 3 L340 3 L324 38 Z" fill="#1F7A52"/><path d="M364 4 L396 7 L378 42 Z" fill="#E4505C"/><path d="M420 10 L452 15 L434 48 Z" fill="#FFC94A"/></svg>
+    <div class="marca"><svg width="72" height="72" viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="128" fill="#E4505C"/><path d="M84 150 Q256 236 428 150" fill="none" stroke="#FFFBF7" stroke-width="14" stroke-linecap="round"/><path d="M114 166 L180 182 L142 246 Z" fill="#FFC94A" stroke="#FFC94A" stroke-width="10" stroke-linejoin="round"/><path d="M222 190 L290 190 L256 262 Z" fill="#FFFBF7" stroke="#FFFBF7" stroke-width="10" stroke-linejoin="round"/><path d="M398 166 L332 182 L370 246 Z" fill="#FFC94A" stroke="#FFC94A" stroke-width="10" stroke-linejoin="round"/><path d="M168 336 L230 396 L346 282" fill="none" stroke="#FFFBF7" stroke-width="42" stroke-linecap="round" stroke-linejoin="round"/></svg> App Pegue e Monte</div>
+    <span class="publico">Para quem aluga kits pegue e monte</span>
+    <h1>Organize seus kits e reservas <em>pelo celular</em></h1>
+    <p class="sub">Teste grátis por 7 dias. Sem cartão de crédito.</p>
+  </header>
+
+  <div class="ja-conta oculto" id="ja-conta">Você já tem conta neste celular. <a href="../">Abrir meu app</a></div>
+
+  <div class="video" id="video">
+    <video src="video-vendas.mp4" poster="capa-video.jpg" muted loop playsinline preload="metadata" aria-label="Vídeo: como funciona o App Pegue e Monte"></video>
+    <button class="som" type="button" aria-label="Seu vídeo já começou. Toque para ouvir">
+      <b>Seu vídeo já começou</b>
+      <svg viewBox="0 0 64 64" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 25h10l13-11v36L20 39H10z" fill="#fff"/><path d="M42 24c3 2 5 5 5 8s-2 6-5 8"/><path d="M48 18c5 4 8 9 8 14s-3 10-8 14"/><path d="M8 8l48 48" stroke-width="5"/></svg>
+      <b>Toque para ouvir</b>
+    </button>
+  </div>
+
+  <p class="chamada">Gostou? Crie sua conta e teste agora 👇</p>
+  <form class="form" id="cadastro" novalidate>
+    <label class="campo">Seu e-mail<input type="email" name="email" autocomplete="email" inputmode="email" placeholder="voce@email.com" required></label>
+    <label class="campo">Seu WhatsApp<input name="whatsapp" inputmode="tel" autocomplete="tel" placeholder="(51) 99999-0000" required></label>
+    <label class="campo">Crie uma senha<input type="password" name="senha" autocomplete="new-password" minlength="6" placeholder="mínimo 6 caracteres" required></label>
+    <div class="erro oculto" id="erro" role="alert"></div>
+    <button class="btn verde cheio btn-grande" type="submit">Começar meu teste grátis</button>
+    <div class="garantias"><span>Sem cartão</span><span>Leva 1 minuto</span><span>Seus dados ficam salvos</span></div>
+  </form>
+
+  <h2>O que você vai testar</h2>
+  <div class="func"><div><b>Nunca mais reserva dupla</b><p>O app avisa na hora se o kit já está alugado naquela data.</p></div><img src="tela-reserva-dupla.jpg" alt="Tela do app avisando reserva dupla" loading="lazy" width="600" height="800"></div>
+  <div class="func"><div><b>Seu link de reservas</b><p>Suas clientes veem os kits com fotos, escolhem a data livre e o pedido chega no seu WhatsApp.</p></div><img src="tela-link.jpg" alt="Link de reservas com os kits" loading="lazy" width="600" height="800"></div>
+  <div class="func"><div><b>Checklist de peças</b><p>Confira cada peça na entrega e na devolução. Nada some sem você saber.</p></div><img src="tela-checklist.jpg" alt="Checklist de peças do kit" loading="lazy" width="600" height="800"></div>
+  <div class="func"><div><b>Sinal e lembretes</b><p>Veja quem falta pagar o sinal e mande a cobrança pronta pelo WhatsApp.</p></div><img src="tela-sinal.jpg" alt="Reserva aguardando sinal" loading="lazy" width="600" height="800"></div>
+
+  <h2>Dúvidas rápidas</h2>
+  <div class="duv"><b>Preciso colocar cartão?</b><p>Não. É só e-mail, WhatsApp e uma senha.</p></div>
+  <div class="duv"><b>O que acontece depois dos 7 dias?</b><p>O app pede para você assinar. Se não quiser, é só não assinar: nada é cobrado.</p></div>
+  <div class="duv"><b>Perco o que cadastrei?</b><p>Não. Assinando com o mesmo e-mail, seus kits, fotos e reservas continuam lá.</p></div>
+
+  <button class="btn verde cheio btn-grande" type="button" id="ir-form-fim">Começar meu teste grátis</button>
+  <a class="zap" id="zap" href="#" target="_blank" rel="noopener">Dúvidas? Fale no WhatsApp</a>
+</div>
+
+<div class="fixo" id="fixo"><button class="btn verde cheio btn-grande" type="button" id="ir-form">Começar meu teste grátis</button></div>
+<div id="toast" class="toast oculto" role="status" aria-live="polite"></div>
+
+<script>
+  // Vídeo: toca sem som quando aparece; o botão recomeça com som e controles (igual à página de vendas).
+  (function () {
+    var caixa = document.getElementById('video'), v = caixa.querySelector('video');
+    if ('IntersectionObserver' in window) {
+      new IntersectionObserver(function (itens) {
+        itens.forEach(function (i) {
+          if (caixa.classList.contains('com-som')) return;
+          if (i.isIntersecting) { var p = v.play(); if (p && p.catch) p.catch(function () {}); } else { v.pause(); }
+        });
+      }, { threshold: 0.5 }).observe(caixa);
+    }
+    caixa.querySelector('.som').addEventListener('click', function () {
+      caixa.classList.add('com-som');
+      v.loop = false; v.muted = false; v.currentTime = 0; v.setAttribute('controls', '');
+      var p = v.play(); if (p && p.catch) p.catch(function () {});
+    });
+  })();
+</script>
+<script type="module" src="teste.js?v=20261113c"></script>
+</body>
+</html>
