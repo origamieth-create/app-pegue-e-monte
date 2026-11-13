@@ -465,5 +465,38 @@ document.addEventListener('click', function (e) {
     });
   })();
 </script>
+<!-- Origem do anúncio no botão de WhatsApp (rastreio de pedidos de teste e dúvidas) -->
+<script>
+(function () {
+  var CHAVE = 'apm-origem';
+  // 1) Guarda as UTMs da primeira chegada pelo anúncio (válidas por 30 dias).
+  try {
+    var q = new URLSearchParams(location.search);
+    if (q.get('utm_campaign') || q.get('utm_content') || q.get('utm_source')) {
+      localStorage.setItem(CHAVE, JSON.stringify({
+        fonte: q.get('utm_source') || '', campanha: q.get('utm_campaign') || '',
+        conjunto: q.get('utm_medium') || '', anuncio: q.get('utm_content') || '', em: Date.now()
+      }));
+    }
+  } catch (e) { /* sem armazenamento */ }
+  function origem() {
+    try {
+      var o = JSON.parse(localStorage.getItem(CHAVE) || 'null');
+      if (!o || Date.now() - o.em > 30 * 864e5) return null;
+      return o;
+    } catch (e) { return null; }
+  }
+  // Nome legível: a Utmify manda "nome|id"; fica só com o nome.
+  function nome(v) { return String(v || '').split('|')[0].replace(/\+/g, ' ').trim().slice(0, 40); }
+  // 2) No clique do WhatsApp: registra o evento Contato no Pixel (aparece por campanha no Gerenciador).
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest && e.target.closest('a[href*="wa.me/5551982316117"]');
+    if (!a) return;
+    var o = origem();
+    var ref = o ? [nome(o.campanha), nome(o.anuncio)].filter(Boolean).join(' / ') : '';
+    if (window.fbq) fbq('track', 'Contact', { content_name: 'WhatsApp página de vendas', content_category: ref || 'sem origem' });
+  }, true);
+})();
+</script>
 </body>
 </html>
