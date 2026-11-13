@@ -11,12 +11,20 @@ export const SUPABASE_URL = 'https://qjezuqbxcvcvqhkbrugb.supabase.co';
 export const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFqZXp1cWJ4Y3ZjdnFoa2JydWdiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyMDg3MjIsImV4cCI6MjEwODc4NDcyMn0.vv1yoEFNiTrj4sz4hk50-fK08XhX4WJ47nPNtkYMTcg';
 
 // Deixa a compradora criar a conta na tela de login (com o mesmo e-mail da compra).
-// Quem não tem assinatura cria a conta, mas não consegue usar o app.
+// Quem cria a conta sem ter comprado ganha 7 dias de teste grátis (uma vez por e-mail).
 export const PERMITIR_CADASTRO = true;
 
 // E-mail que aparece no botão de ajuda do app.
-export const EMAIL_SUPORTE = 'origami.eth@gmail.com';
+export const EMAIL_SUPORTE = 'apppegueemonte@gmail.com';
+
+// WhatsApp do suporte, com DDD (ex.: '11999990000'). Vazio = o botão não aparece.
+export const WHATSAPP_SUPORTE = '51982316117';
 
 // Links de pagamento da Cakto (usados no aviso de pagamento e na tela de assinatura)
 export const LINK_MENSAL = 'https://pay.cakto.com.br/3bnawbt_1255298';
 export const LINK_ANUAL = 'https://pay.cakto.com.br/65irjr2';
+
+// Demonstração pública no site (pegueemonte.com/demo). Deixe false no app de verdade.
+export const DEMO_SITE = false;
+// Para onde vai o botão "Quero assinar" da demonstração.
+export const LINK_PLANOS = 'https://pegueemonte.com/#precos';

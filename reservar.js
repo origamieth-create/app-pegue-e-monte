@@ -2,12 +2,48 @@
 // App Pegue e Monte — link público de reservas (a cliente final usa)
 // Endereço: reservar.html?l=<link-do-negocio>
 // =====================================================================
-import * as dados from './dados.js?v=20261029b';
+import * as dados from './dados.js?v=20261113b';
+
+// Demonstração do site: botões de WhatsApp mostram um aviso em vez de abrir conversa.
+if (dados.DEMONSTRACAO_SITE) {
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest && e.target.closest('a[href*="wa.me/"]');
+    if (!a) return;
+    e.preventDefault();
+    const t = document.getElementById('toast');
+    if (t) { t.textContent = 'Na versão real, o pedido chega direto no WhatsApp da loja 😉'; t.classList.remove('oculto'); setTimeout(() => t.classList.add('oculto'), 3200); }
+  }, true);
+}
 
 const { hojeISO, somaDias } = dados;
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+// Foto inteira dentro de um quadro quadrado (sem cortar), com fundo desfocado.
+function fotoCaixa(url, alt = '', lazy = false) {
+  const u = String(url || '').replace(/["'()\\]/g, (c) => encodeURIComponent(c));
+  return `<span class="foto-caixa" style="--fundo-foto:url('${u}')"><img src="${esc(url)}" alt="${esc(alt)}"${lazy ? ' loading="lazy"' : ''}></span>`;
+}
+// Fotos do kit (a primeira é a principal)
+function fotosDe(k) {
+  if (Array.isArray(k.fotos) && k.fotos.length) return k.fotos;
+  return k.foto_url ? [k.foto_url] : [];
+}
+function galeria(fotos) {
+  if (!fotos.length) return '';
+  if (fotos.length === 1) return fotoCaixa(fotos[0]);
+  return `<div><div class="galeria" id="galeria">${fotos.map((f, i) => fotoCaixa(f, `Foto ${i + 1} do kit`, i > 0)).join('')}</div>
+    <div class="pontos-galeria">${fotos.map((_, i) => `<i class="${i ? '' : 'on'}"></i>`).join('')}</div></div>`;
+}
+function ligarGaleria(p) {
+  const g = p.querySelector('#galeria');
+  if (!g) return;
+  const pontos = [...p.querySelectorAll('.pontos-galeria i')];
+  g.addEventListener('scroll', () => {
+    const atual = Math.round(g.scrollLeft / g.clientWidth);
+    pontos.forEach((pt, i) => pt.classList.toggle('on', i === atual));
+  }, { passive: true });
+}
 const reais = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const paraData = (iso) => { const [a, m, d] = iso.split('-').map(Number); return new Date(a, m - 1, d); };
 const maiuscula = (s) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -17,7 +53,10 @@ const FECHAR = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stro
 const ESQ = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>';
 const DIR = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
 
-const slug = (new URLSearchParams(location.search).get('l') || '').toLowerCase();
+// Aceita os dois formatos: reservar.html?l=nome-da-loja e /nome-da-loja
+const slug = (new URLSearchParams(location.search).get('l')
+  || decodeURIComponent(location.pathname.replace(/^\/+|\/+$/g, '').split('/').pop() || '').replace(/\.html$/, '').replace(/^reservar$|^404$|^index$/, '')
+  || '').toLowerCase();
 let loja = null;
 
 function aviso(msg) {
@@ -57,22 +96,49 @@ async function iniciar() {
   }
   if (!loja) { raiz.innerHTML = '<div class="erro">Este link de reservas não está disponível.</div>'; return; }
   document.title = `Reservas · ${loja.nome}`;
+  const categorias = [...new Set(loja.kits.map((k) => (k.categoria || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
   raiz.innerHTML = `
     <header class="cabeca">
-      ${loja.logo_url ? `<img src="${esc(loja.logo_url)}" alt="">` : ''}
+      ${loja.logo_url ? `<img src="${esc(loja.logo_url)}" alt="Logo de ${esc(loja.nome)}">` : ''}
       <h1>${esc(loja.nome)}</h1>
+      ${loja.recado ? `<p class="recado-loja">${esc(loja.recado)}</p>` : ''}
       <p class="pequeno">Escolha o kit e veja as datas livres. A reserva é confirmada depois do sinal.</p>
+      <a class="btn verde mini" href="${esc(linkZap(loja.whatsapp, 'Oi! Vim pelo link de reservas e tenho uma dúvida.'))}" target="_blank" rel="noopener">Dúvidas? Fale no WhatsApp</a>
     </header>
+    ${categorias.length > 1 ? `
+    <div class="busca-kits">
+      <input type="search" id="busca" placeholder="Buscar kit pelo nome" aria-label="Buscar kit pelo nome">
+      <div class="filtros-cat" role="tablist">${['Todos', ...categorias].map((c, i) => `<button type="button" class="filtro-cat ${i ? '' : 'ativo'}" data-cat="${i ? esc(c) : ''}">${esc(c)}</button>`).join('')}</div>
+    </div>` : loja.kits.length > 6 ? `<div class="busca-kits"><input type="search" id="busca" placeholder="Buscar kit pelo nome" aria-label="Buscar kit pelo nome"></div>` : ''}
     ${loja.kits.length ? `<div class="grade">${loja.kits.map((k) => `
-      <button class="cartao clicavel kit" data-kit="${esc(k.id)}">
-        ${k.foto_url ? `<img class="foto-kit" src="${esc(k.foto_url)}" alt="" loading="lazy">` : '<div class="foto-kit foto-vazia">Sem foto</div>'}
+      <button class="cartao clicavel kit" data-kit="${esc(k.id)}" data-categoria="${esc(k.categoria || '')}" data-nome="${esc(String(k.nome).toLowerCase())}">
+        <span style="position:relative; display:block">${k.foto_url ? fotoCaixa(k.foto_url, '', true) : '<div class="foto-kit foto-vazia">Sem foto</div>'}
+        ${fotosDe(k).length > 1 ? `<span class="contador-fotos">📷 ${fotosDe(k).length}</span>` : ''}</span>
+        ${k.categoria ? `<span class="etiqueta et-categoria">${esc(k.categoria)}</span>` : ''}
         <span class="nome">${esc(k.nome)}</span>
         <span class="preco">${reais(k.preco)}</span>
         <span class="btn principal mini">Ver datas livres</span>
-      </button>`).join('')}</div>` : '<p class="vazio-txt centro">Nenhum kit disponível no momento.</p>'}
+      </button>`).join('')}</div>
+    <p class="vazio-txt centro oculto" id="sem-resultado">Nenhum kit encontrado. Tente outra categoria ou outro nome.</p>` : '<p class="vazio-txt centro">Nenhum kit disponível no momento.</p>'}
     <a class="btn contorno cheio" href="${esc(linkZap(loja.whatsapp, 'Oi! Vim pelo link de reservas e tenho uma dúvida.'))}" target="_blank" rel="noopener">Tirar dúvida no WhatsApp</a>
     <p class="rodape"><img src="icone.svg" alt="">Reservas por App Pegue e Monte</p>`;
   $$('[data-kit]').forEach((b) => (b.onclick = () => escolherData(loja.kits.find((k) => k.id === b.dataset.kit))));
+  // Filtro por categoria e busca pelo nome
+  let catAtual = '';
+  const filtrar = () => {
+    const termo = ($('#busca') ? $('#busca').value : '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    let visiveis = 0;
+    $$('[data-kit]').forEach((b) => {
+      const nome = b.dataset.nome.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const ok = (!catAtual || b.dataset.categoria === catAtual) && (!termo || nome.includes(termo));
+      b.classList.toggle('oculto', !ok); if (ok) visiveis++;
+    });
+    const vazio = $('#sem-resultado'); if (vazio) vazio.classList.toggle('oculto', visiveis > 0);
+  };
+  $$('.filtro-cat').forEach((b) => (b.onclick = () => {
+    catAtual = b.dataset.cat; $$('.filtro-cat').forEach((x) => x.classList.toggle('ativo', x === b)); filtrar();
+  }));
+  if ($('#busca')) $('#busca').oninput = filtrar;
 }
 
 async function escolherData(kit) {
@@ -128,7 +194,7 @@ async function escolherData(kit) {
   };
 
   abrirPainel(kit.nome, `
-    ${kit.foto_url ? `<img class="foto-kit" src="${esc(kit.foto_url)}" alt="">` : ''}
+    ${galeria(fotosDe(kit))}
     <div class="linha-flex entre"><span class="preco" style="font-family:'Fredoka',sans-serif;font-size:22px;font-weight:600">${reais(kit.preco)}</span>
       ${Number(kit.sinal) > 0 ? `<span class="pequeno">Sinal para reservar: <b>${reais(kit.sinal)}</b></span>` : ''}</div>
     <h3>Escolha a data da festa</h3>
@@ -141,6 +207,7 @@ async function escolherData(kit) {
       <button class="btn principal cheio" type="submit">Pedir reserva</button>
       <p class="dica centro">Seu pedido segura a data até a loja confirmar o sinal.</p>
     </form>`, (p) => {
+    ligarGaleria(p);
     desenhar(p);
     const form = $('#form', p);
     form.onsubmit = async (e) => {

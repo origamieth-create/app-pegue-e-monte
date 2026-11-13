@@ -3,7 +3,7 @@
 // Só abre para e-mails cadastrados na tabela "administradores".
 // Quem confere é o banco de dados: esta página só mostra o resultado.
 // =====================================================================
-import * as dados from './dados.js?v=20261029b';
+import * as dados from './dados.js?v=20261113b';
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -60,10 +60,12 @@ const SITUACAO = {
   cancelada: 'Cancelada',
   suspensa: 'Bloqueada',
   lead: 'Lead',
+  teste: 'Em teste',
+  teste_encerrado: 'Teste acabou',
   cortesia: 'Cortesia',
 };
 const FILTROS = [
-  ['todos', 'Todos'], ['ativa', 'Ativas'], ['carencia', 'Pagamento pendente'], ['lead', 'Leads'],
+  ['todos', 'Todos'], ['ativa', 'Ativas'], ['teste', 'Em teste'], ['teste_encerrado', 'Teste acabou'], ['carencia', 'Pagamento pendente'], ['lead', 'Leads'],
   ['cancelada', 'Canceladas'], ['suspensa', 'Bloqueadas'], ['cortesia', 'Cortesia'],
 ];
 const EVENTO = {
@@ -83,6 +85,8 @@ const EVENTO = {
   purchase_refused: ['Compra recusada', '#9A5B00'],
   admin_liberou: ['Você liberou o acesso', '#1E5FA8'],
   admin_bloqueou: ['Você bloqueou o acesso', '#1E5FA8'],
+  admin_teste: ['Você liberou o teste de 7 dias', '#1E5FA8'],
+  teste_automatico: ['Criou conta e começou o teste', '#0E7C86'],
 };
 const sit = (s) => `<span class="sit sit-${esc(s)}">${esc(SITUACAO[s] || s)}</span>`;
 
@@ -185,6 +189,14 @@ function abaResumo(tela) {
       ${cartaoNum('Bloqueadas', r.suspensas, r.suspensas ? 'ruim' : '')}
     </div>
 
+    <h2>Teste grátis de 7 dias</h2>
+    <div class="grade-num">
+      ${cartaoNum('Em teste agora', (r.teste || {}).em_teste || 0)}
+      ${cartaoNum('Acabou sem assinar', (r.teste || {}).encerrados || 0, (r.teste || {}).encerrados ? 'alerta' : '')}
+      ${cartaoNum('Viraram assinantes', (r.teste || {}).convertidos || 0, 'bom')}
+      ${cartaoNum('Conversão do teste', (r.teste || {}).total ? Math.round(((r.teste.convertidos || 0) / r.teste.total) * 100) + '%' : '—', 'bom')}
+    </div>
+
     <h2>Uso do app</h2>
     <div class="grade-num">
       ${cartaoNum('Contas criadas', r.contas)}
@@ -224,9 +236,10 @@ function abaClientes(tela) {
   tela.innerHTML = `
     <form class="cartao coluna" id="liberar-form" novalidate>
       <h2>Liberar acesso para um e-mail</h2>
-      <p class="pequeno">Use para testadoras, parcerias ou para quem pagou por fora. A pessoa cria a conta no app com este e-mail.</p>
+      <p class="pequeno">Teste de 7 dias: para quem pediu pelo WhatsApp. Sem prazo: testadoras, parcerias ou quem pagou por fora. A pessoa cria a conta no app com este e-mail.</p>
       <label class="campo"><span>E-mail</span><input type="email" name="email" inputmode="email" autocomplete="off" placeholder="cliente@email.com" required></label>
-      <button class="btn verde cheio" type="submit">Liberar acesso</button>
+      <button class="btn verde cheio" type="submit" data-tipo="teste">🎁 Liberar teste de 7 dias</button>
+      <button class="btn contorno cheio" type="submit" data-tipo="acesso">Liberar acesso sem prazo</button>
     </form>
 
     <label class="campo"><span>Buscar</span><input type="search" id="busca" placeholder="Nome, e-mail, telefone ou negócio" value="${esc(estado.busca)}"></label>
@@ -239,7 +252,9 @@ function abaClientes(tela) {
     const campo = e.currentTarget.email;
     const email = campo.value.trim().toLowerCase();
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { aviso('Digite um e-mail válido.'); campo.focus(); return; }
-    await definirAcesso(email, true, e.currentTarget.querySelector('button'));
+    const botao = e.submitter || e.currentTarget.querySelector('button');
+    if (botao.dataset.tipo === 'teste') await liberarTeste(email, botao);
+    else await definirAcesso(email, true, botao);
   };
   $('#busca', tela).oninput = (e) => { estado.busca = e.target.value; desenharLista(); };
   $$('.filtro', tela).forEach((b) => {
@@ -252,11 +267,13 @@ function abaClientes(tela) {
 function cartaoPessoa(c) {
   const nome = c.nome || c.negocio || c.email;
   const tel = c.telefone || c.whatsapp;
-  const liberada = ['ativa', 'carencia', 'cortesia'].includes(c.situacao);
+  const liberada = ['ativa', 'carencia', 'cortesia', 'teste'].includes(c.situacao);
   const primeiroNome = String(c.nome || '').split(' ')[0];
   const msg = c.situacao === 'lead'
     ? `Oi${primeiroNome ? ', ' + primeiroNome : ''}! Vi que você se interessou pelo App Pegue e Monte. Posso te ajudar com alguma dúvida?`
-    : `Oi${primeiroNome ? ', ' + primeiroNome : ''}! Aqui é do App Pegue e Monte.`;
+    : c.situacao === 'teste_encerrado'
+      ? `Oi${primeiroNome ? ', ' + primeiroNome : ''}! Seu teste do App Pegue e Monte terminou. Gostou? Assinando com o mesmo e-mail, seus kits e reservas continuam lá. Posso te ajudar?`
+      : `Oi${primeiroNome ? ', ' + primeiroNome : ''}! Aqui é do App Pegue e Monte.`;
   const infos = [];
   if (c.plano && c.plano !== 'manual') infos.push(['Plano', c.plano === 'anual' ? 'Anual' : 'Mensal']);
   if (c.plano === 'manual') infos.push(['Plano', 'Liberado por você']);
@@ -268,6 +285,8 @@ function cartaoPessoa(c) {
   if (c.primeira_compra) infos.push(['Cliente desde', data(c.primeira_compra)]);
   if (Number(c.total_pago)) infos.push(['Total pago', reais(c.total_pago)]);
   if (c.situacao === 'carencia' && c.carencia_ate) infos.push(['Bloqueia em', dataHora(c.carencia_ate)]);
+  if (c.situacao === 'teste' && c.teste_ate) infos.push(['Teste termina', dataHora(c.teste_ate)]);
+  if (c.situacao === 'teste_encerrado' && c.teste_ate) infos.push(['Teste acabou em', data(c.teste_ate)]);
   if (c.ultimo_aviso_evento) infos.push(['Último aviso', `${(EVENTO[c.ultimo_aviso_evento] || [c.ultimo_aviso_evento])[0]} (${data(c.ultimo_aviso)})`]);
 
   return `<article class="cartao pessoa" data-email="${esc(c.email)}">
@@ -311,6 +330,26 @@ function desenharLista() {
       definirAcesso(email, liberar, b);
     };
   });
+}
+
+async function liberarTeste(email, botao) {
+  const texto = botao.textContent;
+  botao.disabled = true; botao.textContent = 'Aguarde…';
+  try {
+    const r = await dados.adminLiberarTeste(email, 7);
+    if (dados.MODO_DEMO) {
+      const c = estado.clientes.find((x) => x.email === email);
+      const novo = { situacao: 'teste', status: 'teste', teste_inicio: new Date().toISOString(), teste_ate: r.teste_ate };
+      if (c) Object.assign(c, novo); else estado.clientes.unshift({ email, tem_conta: false, ...novo });
+    } else {
+      await carregar();
+    }
+    desenhar();
+    aviso(`Teste de 7 dias liberado para ${email} (até ${dataHora(r.teste_ate)}).`);
+  } catch (e) {
+    aviso(e.message || 'Não deu certo. Tente de novo.');
+    if (botao.isConnected) { botao.disabled = false; botao.textContent = texto; }
+  }
 }
 
 async function definirAcesso(email, liberar, botao) {

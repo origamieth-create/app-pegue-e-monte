@@ -2,8 +2,8 @@
 // App Pegue e Monte — app da dona
 // Abas: Hoje, Agenda, Kits, Mais
 // =====================================================================
-import * as dados from './dados.js?v=20261029b';
-import { PERMITIR_CADASTRO, EMAIL_SUPORTE, LINK_MENSAL, LINK_ANUAL } from './config.js?v=20261029b';
+import * as dados from './dados.js?v=20261113b';
+import { PERMITIR_CADASTRO, EMAIL_SUPORTE, WHATSAPP_SUPORTE, LINK_MENSAL, LINK_ANUAL, DEMO_SITE, LINK_PLANOS } from './config.js?v=20261113b';
 
 const { hojeISO, somaDias, cruza } = dados;
 
@@ -49,7 +49,14 @@ function slugDe(texto) {
   return String(texto || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
     .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
 }
-function linkPublico(slug) { return new URL(`reservar.html?l=${encodeURIComponent(slug)}`, location.href).href; }
+// No endereço oficial, o link fica bonito: app.pegueemonte.com/nome-da-loja
+const DOMINIO_LINK_BONITO = /(^|\.)pegueemonte\.com$/;
+function linkPublico(slug) {
+  if (DOMINIO_LINK_BONITO.test(location.hostname)) return `${location.origin}/${encodeURIComponent(slug)}`;
+  return new URL(`reservar.html?l=${encodeURIComponent(slug)}`, location.href).href;
+}
+// Nomes que não podem virar link (já são páginas do app)
+const LINKS_RESERVADOS = ['admin', 'reservar', 'index', 'app', 'api', 'manifest', 'icone', 'login', 'suporte', 'ajuda', 'www'];
 function kitDe(id) { return estado.kits.find((k) => k.id === id) || { nome: 'Kit removido', pecas: [] }; }
 function podeEditar() { return !!(estado.assinatura && estado.assinatura.liberado); }
 
@@ -102,6 +109,7 @@ async function acao(botao, fn) {
 // celular também volta para a tela anterior em vez de sair do app.
 // ---------------------------------------------------------------------
 let painelAberto = false;
+let fecharRecorteAberto = null;
 let voltarAtual = null;
 
 function abrirPainel(titulo, corpo, aoMontar, voltar) {
@@ -121,6 +129,56 @@ function abrirPainel(titulo, corpo, aoMontar, voltar) {
   document.body.style.overflow = 'hidden';
   if (aoMontar) aoMontar($('.painel', p));
 }
+// Janela por cima da tela (usa o mesmo controle do botão voltar do celular).
+function abrirPopup(corpo, aoMontar) {
+  const p = $('#painel');
+  if (!painelAberto) { history.pushState({ painel: true }, ''); painelAberto = true; }
+  voltarAtual = null;
+  p.innerHTML = `<div class="popup-fundo"><div class="popup" role="dialog" aria-modal="true">${corpo}</div></div>`;
+  document.body.style.overflow = 'hidden';
+  $('.popup-fundo', p).onclick = (e) => { if (e.target.classList.contains('popup-fundo')) fecharPainel(); };
+  if (aoMontar) aoMontar($('.popup', p));
+}
+
+// ---------------------------------------------------------------------
+// Novidades: aparece uma vez por atualização, na primeira vez que a
+// dona abre o app depois que os arquivos novos forem publicados.
+// ---------------------------------------------------------------------
+const NOVIDADES = {
+  versao: '2026-11-16',
+  itens: [
+    ['📷', 'Até 5 fotos por kit, sem cortes', 'Em Kits, toque no kit e em "Adicionar fotos". Você ajusta o recorte antes de enviar (ou usa a foto inteira), e no seu link a cliente passa as fotos com o dedo.'],
+    ['💬', 'Suas mensagens do WhatsApp', 'Em Mais > Mensagens do WhatsApp, escreva do seu jeito os textos de sinal, confirmação, retirada e devolução.'],
+    ['🎨', 'Sua logo e um recado no link', 'Em Mais > Meus dados, coloque a sua logo e um recado que aparece no topo do seu link de reservas.'],
+    ['🗂️', 'Categorias, peças e observações', 'Escolha a categoria de cada kit (a cliente filtra no seu link), cadastre as peças uma em cada linha e anote o que precisar em cada reserva.'],
+    ['🙋', 'Suporte pelo WhatsApp', 'Ficou com dúvida? Em Mais > Precisa de ajuda, fale com a gente direto no WhatsApp.'],
+  ],
+};
+function mostrarNovidades() {
+  const chave = 'apm-novidades-vistas';
+  let vista = '';
+  try { vista = localStorage.getItem(chave) || ''; } catch (e) { /* sem armazenamento: mostra mesmo assim */ }
+  if (DEMO_SITE || vista >= NOVIDADES.versao) return;
+  // Conta criada depois da atualização já nasce com tudo: não precisa do aviso.
+  const criado = estado.negocio && estado.negocio.criado_em;
+  if (criado && String(criado).slice(0, 10) >= NOVIDADES.versao) { marcar(); return; }
+  function marcar() { try { localStorage.setItem(chave, NOVIDADES.versao); } catch (e) { /* ignora */ } }
+  abrirPopup(`
+    ${BANDEIRINHAS}
+    <h2 class="centro" style="font-size:26px">Novidades no app 🎉</h2>
+    <p class="centro pequeno">Acabamos de atualizar o App Pegue e Monte. Veja o que chegou:</p>
+    <div class="coluna" style="gap:10px">
+      ${NOVIDADES.itens.map(([ic, t, d]) => `
+        <div class="novidade"><span class="novidade-ic">${ic}</span><div><b>${esc(t)}</b><p class="pequeno">${esc(d)}</p></div></div>`).join('')}
+    </div>
+    <button class="btn principal cheio" id="nov-msg">Personalizar minhas mensagens</button>
+    <button class="btn contorno cheio" id="nov-ok">Entendi</button>`, (p) => {
+    marcar();
+    $('#nov-ok', p).onclick = () => fecharPainel();
+    $('#nov-msg', p).onclick = () => painelMensagens();
+  });
+}
+
 function voltarPainel() {
   if (voltarAtual) { const f = voltarAtual; f(); } else fecharPainel();
 }
@@ -133,6 +191,12 @@ function fecharPainel(vindoDoCelular) {
   if (!vindoDoCelular) history.back();
 }
 window.addEventListener('popstate', () => {
+  // Voltar do celular com o ajuste de foto aberto: fecha só o ajuste.
+  if (fecharRecorteAberto) {
+    const f = fecharRecorteAberto; f();
+    if (painelAberto) history.pushState({ painel: true }, '');
+    return;
+  }
   if (!painelAberto) return;
   if (voltarAtual) {
     history.pushState({ painel: true }, '');
@@ -145,10 +209,25 @@ window.addEventListener('popstate', () => {
 // =====================================================================
 // Início
 // =====================================================================
+// Demonstração do site: os botões de WhatsApp das clientes de exemplo não
+// abrem conversa de verdade (os números são fictícios). O suporte continua normal.
+function faixaDemo() {
+  if (DEMO_SITE) return `<div class="faixa demo faixa-site"><span>Você está na <b>demonstração</b>: mexa à vontade, os dados são de exemplo.</span><a class="btn verde mini" href="${esc(LINK_PLANOS)}" target="_top">Quero usar com meus kits</a></div>`;
+  return '<div class="faixa demo">Modo demonstração: os dados são de exemplo e ficam só neste aparelho.</div>';
+}
+function ligarDemoSite() {
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest && e.target.closest('a[href*="wa.me/"]');
+    if (!a) return;
+    if (WHATSAPP_SUPORTE && a.href.includes(soDigitos(WHATSAPP_SUPORTE))) return;
+    e.preventDefault();
+    aviso('Na versão real, abre o WhatsApp da cliente com a mensagem pronta 😉');
+  }, true);
+}
+
 async function iniciar() {
-  if (dados.MODO_DEMO) {
-    $('#faixa').innerHTML = '<div class="faixa demo">Modo demonstração: os dados são de exemplo e ficam só neste aparelho.</div>';
-  }
+  if (DEMO_SITE) ligarDemoSite();
+  if (dados.MODO_DEMO) $('#faixa').innerHTML = faixaDemo();
   await dados.aoMudarLogin((evento) => {
     if (evento === 'PASSWORD_RECOVERY') telaNovaSenha();
   });
@@ -165,7 +244,11 @@ async function carregarTudo() {
   [estado.negocio, estado.assinatura] = await Promise.all([dados.meuNegocio(), dados.minhaAssinatura()]);
   marcarRelogio();
   const a = estado.assinatura || {};
-  if (!a.cortesia && !a.encontrada) return telaSemAssinatura();
+  if (!a.cortesia && !a.encontrada) {
+    // Conta nova sem compra: ganha 7 dias de teste grátis (uma vez por e-mail).
+    try { await dados.iniciarTeste(); estado.assinatura = await dados.minhaAssinatura(); marcarRelogio(); } catch (e) { /* segue para a tela de assinatura */ }
+    if (!estado.assinatura.encontrada) return telaSemAssinatura();
+  }
   if (!estado.negocio) return telaConfiguracaoInicial();
   [estado.kits, estado.reservas, estado.gastos] = await Promise.all([dados.listarKits(), dados.listarReservas(), dados.listarGastos().catch(() => [])]);
   estado.carregadoEm = Date.now();
@@ -192,22 +275,107 @@ function marcarRelogio() {
   if (a && a.agora) diferencaRelogio = new Date(a.agora).getTime() - Date.now();
 }
 function agoraServidor() { return Date.now() + diferencaRelogio; }
-function linkPagamento() { return (estado.assinatura && estado.assinatura.plano === 'anual') ? LINK_ANUAL : LINK_MENSAL; }
 function tempoRestante(ms) {
   const min = Math.max(0, Math.floor(ms / 60000));
   const d = Math.floor(min / 1440); const h = Math.floor((min % 1440) / 60); const m = min % 60;
   return `${d ? d + 'd ' : ''}${h}h ${String(m).padStart(2, '0')}min`;
 }
 
-// Situação para a faixa: null (tudo certo), 'carencia' ou 'suspensa'
+// Situação para a faixa: null (tudo certo), 'teste', 'teste_fim', 'carencia', 'cancelada' ou 'suspensa'
 function situacaoAssinatura() {
   const a = estado.assinatura || {};
   if (a.cortesia || a.status === 'ativa') return null;
+  if (a.status === 'teste') return a.liberado ? 'teste' : 'teste_fim';
+  if (a.status === 'cancelada') return 'cancelada';
   if (a.liberado && a.carencia_ate) return 'carencia';
   return 'suspensa';
 }
 
+function dataHora(iso) {
+  const d = new Date(iso);
+  return `${d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} às ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+}
+function botaoZapSuporte(texto) {
+  if (!WHATSAPP_SUPORTE) return '';
+  return `<a class="zap-pequeno" href="${esc(linkZap(WHATSAPP_SUPORTE, texto))}" target="_blank" rel="noopener">${ICONE.zap} Problema ou dúvida? Fale no WhatsApp</a>`;
+}
+const ZAP_PAGAMENTO = 'Oi! Sou cliente do App Pegue e Monte e preciso de ajuda com o pagamento da minha assinatura.';
+
+// Pagamento pendente: Pix pronto (cenário A) ou cobrança enviada por e-mail (cenário B).
+// Quem já é assinante NÃO faz compra nova: paga a cobrança que já foi gerada.
+function popupPagamento() {
+  const a = estado.assinatura || {};
+  const temPix = !!(a.pix_codigo && a.pix_vence && new Date(a.pix_vence).getTime() > agoraServidor());
+  const corpo = temPix ? `
+    <h2 class="centro" style="font-size:24px">Renove com Pix</h2>
+    <p class="centro pequeno">A cobrança da sua assinatura já está pronta. Pague aqui mesmo, sem sair do app:</p>
+    <div class="pix-qr" id="pix-qr" aria-label="QR Code do Pix"></div>
+    <button class="btn principal cheio" id="pix-copiar">Copiar código Pix</button>
+    <p class="centro pequeno"><b>Vale até ${esc(dataHora(a.pix_vence))}</b></p>
+    <ol class="passos-pix pequeno">
+      <li>Toque em <b>Copiar código Pix</b>.</li>
+      <li>Abra o app do seu banco e escolha <b>Pix Copia e Cola</b>.</li>
+      <li>Cole o código e confirme. Pronto!</li>
+    </ol>
+    <button class="btn verde cheio" id="pix-paguei">Já paguei, verificar</button>
+    ${botaoZapSuporte(ZAP_PAGAMENTO)}` : `
+    <h2 class="centro" style="font-size:24px">Pagamento pendente</h2>
+    <p class="centro">Para continuar usando o app, pague a <b>cobrança da sua assinatura</b> que a Cakto enviou para o seu e-mail:</p>
+    <p class="centro email-destaque">${esc(a.email || '')}</p>
+    <p class="centro pequeno">Não achou? Procure por <b>"Cakto"</b> e confira também a caixa de <b>spam</b> e de <b>promoções</b>.</p>
+    <div class="nota-amarela pequeno">Não é preciso fazer uma compra nova: é só pagar a cobrança que já foi enviada.</div>
+    <button class="btn verde cheio" id="pix-paguei">Já paguei, verificar</button>
+    ${botaoZapSuporte(ZAP_PAGAMENTO)}`;
+  abrirPopup(corpo + '<button class="link-btn" id="pix-fechar">Fechar</button>', async (p) => {
+    $('#pix-fechar', p).onclick = () => fecharPainel();
+    $('#pix-paguei', p).onclick = (e) => acao(e.currentTarget, async () => {
+      await recarregar();
+      const ok = estado.assinatura.status === 'ativa' || estado.assinatura.cortesia;
+      if (ok) fecharPainel();
+      aviso(ok ? 'Pagamento confirmado! Obrigada 💛' : 'Ainda não recebemos a confirmação. Pode levar alguns minutos.');
+    });
+    if (!temPix) return;
+    $('#pix-copiar', p).onclick = async () => {
+      try { await navigator.clipboard.writeText(a.pix_codigo); aviso('Código Pix copiado! Agora cole no app do banco.'); }
+      catch (e) { prompt('Copie o código Pix:', a.pix_codigo); }
+    };
+    try {
+      const { default: qrcode } = await import('./qrcode.mjs?v=20261113b');
+      const q = qrcode(0, 'M'); q.addData(a.pix_codigo); q.make();
+      $('#pix-qr', p).innerHTML = q.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
+    } catch (e) { $('#pix-qr', p).remove(); }
+  });
+}
+
+// Fim do teste grátis: aviso na frente de tudo, sem fechar. Os dados ficam guardados.
+function bloqueioFimDoTeste() {
+  const a = estado.assinatura || {};
+  let caixa = $('#bloqueio');
+  if (!caixa) { caixa = document.createElement('div'); caixa.id = 'bloqueio'; document.body.appendChild(caixa); }
+  caixa.innerHTML = `<div class="popup-fundo bloqueio"><div class="popup" role="dialog" aria-modal="true">
+    ${BANDEIRINHAS}
+    <h2 class="centro" style="font-size:25px">Seu teste grátis terminou</h2>
+    <p class="centro">Gostou de organizar seus kits no app? Assine para continuar de onde parou.</p>
+    <div class="nota-amarela">Assine com o <b>mesmo e-mail do teste</b> (<b>${esc(a.email || '')}</b>) para não perder seus kits, fotos e reservas já cadastrados.</div>
+    <a class="btn verde cheio" href="${esc(LINK_MENSAL)}" target="_blank" rel="noopener">Assinar e continuar usando</a>
+    <button class="btn contorno cheio" id="teste-verificar">Já assinei, verificar</button>
+    ${botaoZapSuporte('Oi! Meu teste do App Pegue e Monte terminou e tenho uma dúvida.')}
+    <button class="link-btn" id="teste-sair">Sair do app</button>
+    ${dados.MODO_DEMO && !DEMO_SITE ? '<button class="btn contorno cheio" id="demo-normal">Demonstração: voltar ao normal</button>' : ''}
+  </div></div>`;
+  document.body.style.overflow = 'hidden';
+  $('#teste-verificar', caixa).onclick = (e) => acao(e.currentTarget, async () => {
+    await recarregar();
+    if (situacaoAssinatura() !== 'teste_fim') { caixa.remove(); document.body.style.overflow = ''; aviso('Assinatura confirmada! Bem-vinda 💛'); }
+    else aviso('Ainda não recebemos a confirmação. Pode levar alguns minutos.');
+  });
+  const normal = $('#demo-normal', caixa);
+  if (normal) normal.onclick = async () => { dados.demoSimular('normal'); caixa.remove(); document.body.style.overflow = ''; await recarregar(); montarApp(); };
+  $('#teste-sair', caixa).onclick = async () => { await dados.sair(); caixa.remove(); document.body.style.overflow = ''; telaLogin('entrar'); };
+}
+
 let relogioFaixa = null;
+let popupPagamentoMostrado = false;
 function ajustarAlturaFaixa() {
   const f = $('#faixa');
   document.documentElement.style.setProperty('--altura-faixa', (f ? f.offsetHeight : 0) + 'px');
@@ -216,37 +384,68 @@ function desenharFaixaAssinatura() {
   clearInterval(relogioFaixa);
   setTimeout(ajustarAlturaFaixa, 0);
   const faixa = $('#faixa');
-  const base = dados.MODO_DEMO ? '<div class="faixa demo">Modo demonstração: os dados são de exemplo e ficam só neste aparelho.</div>' : '';
+  const base = dados.MODO_DEMO ? faixaDemo() : '';
   const sit = situacaoAssinatura();
+  if (sit !== 'teste_fim' && $('#bloqueio')) { $('#bloqueio').remove(); document.body.style.overflow = ''; }
   if (!sit) { faixa.innerHTML = base; return; }
   const a = estado.assinatura;
-  const cancelada = a.status === 'cancelada';
-  if (sit === 'carencia') {
+
+  if (sit === 'teste') {
+    const dias = Math.max(1, Math.ceil((new Date(a.teste_ate).getTime() - agoraServidor()) / 864e5));
     faixa.innerHTML = base + `
-      <div class="faixa-pagamento" role="alert">
-        <div><b>${cancelada ? 'Sua assinatura foi cancelada.' : 'Pagamento não confirmado.'}</b>
-        ${cancelada ? 'Reative' : 'Regularize'} em <b id="contagem">${tempoRestante(new Date(a.carencia_ate).getTime() - agoraServidor())}</b> para não perder o acesso.</div>
-        <a class="btn mini" href="${esc(linkPagamento())}" target="_blank" rel="noopener">${cancelada ? 'Reativar assinatura' : 'Regularizar pagamento'}</a>
+      <div class="faixa-pagamento teste" role="status">
+        <div>🎁 <b>Seu teste grátis termina ${dias === 1 ? 'amanhã' : `em ${dias} dias`}.</b> Assine com este mesmo e-mail e continue com tudo que cadastrou.</div>
+        <a class="btn mini" href="${esc(LINK_MENSAL)}" target="_blank" rel="noopener">Assinar agora</a>
       </div>`;
+    return;
+  }
+  if (sit === 'teste_fim') { faixa.innerHTML = base; bloqueioFimDoTeste(); return; }
+
+  if (sit === 'cancelada') {
+    const ainda = a.liberado && a.carencia_ate;
+    faixa.innerHTML = base + `
+      <div class="faixa-pagamento ${ainda ? '' : 'suspensa'}" role="alert">
+        <div><b>Sua assinatura foi cancelada.</b> ${ainda
+          ? `Seu acesso termina em <b id="contagem">${tempoRestante(new Date(a.carencia_ate).getTime() - agoraServidor())}</b>.`
+          : 'Você ainda vê suas reservas, mas não pode criar ou alterar nada, e seu link de reservas está fora do ar.'}
+        Assine de novo com o <b>mesmo e-mail</b> (${esc(a.email || '')}) para recuperar seus kits, fotos e reservas.</div>
+        <div class="linha-flex" style="flex-wrap:wrap">
+          <a class="btn mini" href="${esc(LINK_MENSAL)}" target="_blank" rel="noopener">Assinar de novo</a>
+          ${ainda ? '' : '<button class="btn mini contorno-claro" id="ja-paguei">Já assinei</button>'}
+        </div>
+        ${botaoZapSuporte(ZAP_PAGAMENTO)}
+      </div>`;
+  } else {
+    const temPix = !!(a.pix_codigo && a.pix_vence);
+    const emCarencia = sit === 'carencia';
+    faixa.innerHTML = base + `
+      <div class="faixa-pagamento ${emCarencia ? '' : 'suspensa'}" role="alert">
+        <div>${emCarencia
+          ? `<b>Pagamento da assinatura pendente.</b> Pague em <b id="contagem">${tempoRestante(new Date(a.carencia_ate).getTime() - agoraServidor())}</b> para não perder o acesso.`
+          : '<b>Assinatura suspensa.</b> Você ainda vê suas reservas, mas não pode criar ou alterar nada, e seu link de reservas está fora do ar.'}</div>
+        <div class="linha-flex" style="flex-wrap:wrap">
+          <button class="btn mini" id="como-pagar">${temPix ? 'Pagar com Pix' : 'Como pagar'}</button>
+          ${emCarencia ? '' : '<button class="btn mini contorno-claro" id="ja-paguei">Já paguei</button>'}
+        </div>
+        ${botaoZapSuporte(ZAP_PAGAMENTO)}
+      </div>`;
+    $('#como-pagar').onclick = popupPagamento;
+    // Abre o aviso de pagamento sozinho uma vez ao entrar.
+    if (!popupPagamentoMostrado && !$('#painel').innerHTML) { popupPagamentoMostrado = true; setTimeout(popupPagamento, 300); }
+  }
+
+  const jaPaguei = $('#ja-paguei');
+  if (jaPaguei) jaPaguei.onclick = (e) => acao(e.currentTarget, async () => {
+    await recarregar();
+    aviso(estado.assinatura.liberado ? 'Pagamento confirmado!' : 'Ainda não recebemos a confirmação. Pode levar alguns minutos.');
+  });
+  if ($('#contagem')) {
     relogioFaixa = setInterval(() => {
       const resta = new Date(a.carencia_ate).getTime() - agoraServidor();
       const c = $('#contagem');
       if (c) c.textContent = tempoRestante(resta);
       if (resta <= 0) { clearInterval(relogioFaixa); recarregar().catch(() => {}); }
     }, 30000);
-  } else {
-    faixa.innerHTML = base + `
-      <div class="faixa-pagamento suspensa" role="alert">
-        <div><b>Assinatura suspensa.</b> Você ainda vê suas reservas, mas não pode criar ou alterar nada, e seu link de reservas está fora do ar.</div>
-        <div class="linha-flex" style="flex-wrap:wrap">
-          <a class="btn mini" href="${esc(linkPagamento())}" target="_blank" rel="noopener">Regularizar pagamento</a>
-          <button class="btn mini contorno-claro" id="ja-paguei">Já paguei</button>
-        </div>
-      </div>`;
-    $('#ja-paguei').onclick = (e) => acao(e.currentTarget, async () => {
-      await recarregar();
-      aviso(estado.assinatura.liberado ? 'Pagamento confirmado!' : 'Ainda não recebemos a confirmação. Pode levar alguns minutos.');
-    });
   }
 }
 
@@ -286,15 +485,24 @@ function atualizarAoVoltar() {
   });
 }
 
-// Número vermelho na aba Hoje com os pedidos aguardando sinal.
+// Número vermelho no Início = total de alertas da tela
+// (atrasadas + aguardando sinal + retiradas de hoje + devoluções de hoje).
+function contarAlertas() {
+  const h = hojeISO();
+  const ativas = estado.reservas.filter((r) => r.status !== 'cancelada');
+  return ativas.filter(estaAtrasada).length
+    + ativas.filter((r) => r.status === 'aguardando_sinal').length
+    + ativas.filter((r) => r.status === 'confirmada' && r.data_retirada === h).length
+    + ativas.filter((r) => r.status === 'retirada' && r.data_devolucao === h).length;
+}
 function atualizarContador() {
   const c = $('#cont-hoje');
   if (!c) return;
-  const n = estado.reservas.filter((r) => r.status === 'aguardando_sinal').length;
+  const n = contarAlertas();
   c.textContent = n > 9 ? '9+' : String(n);
   c.classList.toggle('oculto', n === 0);
   const b = c.closest('button');
-  if (b) b.setAttribute('aria-label', n ? `Início, ${n} pedido(s) aguardando sinal` : 'Início');
+  if (b) b.setAttribute('aria-label', n ? `Início, ${n} alerta(s)` : 'Início');
 }
 
 // =====================================================================
@@ -306,7 +514,7 @@ function telaLogin(modo) {
     <div class="entrada"><form class="caixa" novalidate>
       ${BANDEIRINHAS}<div class="logo-app">${ICONE.logo}</div>
       <h1 class="centro">App Pegue e Monte</h1>
-      <p class="centro pequeno">${modo === 'esqueci' ? 'Enviaremos um link para você criar uma nova senha.' : modo === 'criar' ? 'Crie sua senha usando o <b>mesmo e-mail da compra</b>.' : 'Sua agenda de kits no celular.'}</p>
+      <p class="centro pequeno">${modo === 'esqueci' ? 'Enviaremos um link para você criar uma nova senha.' : modo === 'criar' ? 'Crie sua conta com seu e-mail e uma senha. Já comprou? Use o <b>mesmo e-mail da compra</b>.' : 'Sua agenda de kits no celular.'}</p>
       <label class="campo">E-mail<input type="email" name="email" autocomplete="email" inputmode="email" required></label>
       ${modo !== 'esqueci' ? `<label class="campo">Senha<input type="password" name="senha" autocomplete="${modo === 'criar' ? 'new-password' : 'current-password'}" minlength="6" required></label>` : ''}
       <div class="erro oculto" id="erro-login"></div>
@@ -314,6 +522,11 @@ function telaLogin(modo) {
       ${modo === 'entrar' ? `<button type="button" class="link-btn" data-modo="esqueci">Esqueci minha senha</button>` : ''}
       ${modo === 'entrar' && PERMITIR_CADASTRO ? `<button type="button" class="link-btn" data-modo="criar">Ainda não tenho conta</button>` : ''}
       ${modo !== 'entrar' ? `<button type="button" class="link-btn" data-modo="entrar">Voltar para entrar</button>` : ''}
+      ${modo === 'entrar' && !DEMO_SITE ? `<a class="btn-conheca" href="https://pegueemonte.com" target="_blank" rel="noopener">Ainda não é assinante? <b>Conheça o App Pegue e Monte</b></a>` : ''}
+      <div class="ajuda-login">
+        <span class="pequeno">Precisa de ajuda?</span>
+        ${WHATSAPP_SUPORTE ? `<a class="btn verde mini" href="${esc(linkZap(WHATSAPP_SUPORTE, 'Oi! Preciso de ajuda para entrar no App Pegue e Monte.'))}" target="_blank" rel="noopener">${ICONE.zap} WhatsApp</a>` : ''}
+      </div>
     </form></div>`;
   $$('[data-modo]').forEach((b) => (b.onclick = () => telaLogin(b.dataset.modo)));
   const form = $('form');
@@ -323,13 +536,15 @@ function telaLogin(modo) {
     const senha = form.senha ? form.senha.value : '';
     const caixaErro = $('#erro-login');
     caixaErro.classList.add('oculto');
+    caixaErro.classList.remove('sucesso');
     const botao = $('button[type=submit]', form);
     botao.disabled = true;
     try {
       if (!email.includes('@')) throw new Error('Digite um e-mail válido.');
       if (modo === 'esqueci') {
         await dados.esqueciSenha(email);
-        caixaErro.textContent = 'Pronto! Se esse e-mail tiver conta, você vai receber o link em instantes.';
+        caixaErro.innerHTML = '<b>Pronto!</b> Se esse e-mail tiver conta, você vai receber em instantes um link para criar uma nova senha. Não chegou? Confira a caixa de spam ou fale com o suporte aqui embaixo.';
+        caixaErro.classList.add('sucesso');
         caixaErro.classList.remove('oculto');
         return;
       }
@@ -413,6 +628,7 @@ function lerCamposNegocio(form, inicial) {
   }
   if (c.nome.length < 2) throw new Error('Digite o nome do seu negócio.');
   if (!/^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/.test(c.slug)) throw new Error('O link precisa ter de 3 a 40 letras ou números, sem espaços.');
+  if (LINKS_RESERVADOS.includes(c.slug)) throw new Error('Esse link é reservado pelo app. Escolha outro, como o nome da sua loja.');
   if (c.whatsapp.length < 10 || c.whatsapp.length > 11) throw new Error('Digite o WhatsApp com DDD, só números.');
   return c;
 }
@@ -457,17 +673,55 @@ function telaConfiguracaoInicial() {
 }
 
 function painelNegocio() {
-  abrirPainel('Meus dados', `<form class="coluna" novalidate>${camposNegocio(estado.negocio, false)}
+  const n = estado.negocio;
+  let logo = n.logo_url || null;
+  abrirPainel('Meus dados', `<form class="coluna" novalidate>${camposNegocio(n, false)}
+      <section class="cartao coluna">
+        <div><h3>Seu link de reservas</h3><span class="dica">É assim que as suas clientes veem o topo do seu link.</span></div>
+        <div class="linha-flex" style="gap:14px">
+          <div id="logo-area" class="logo-prev"></div>
+          <div class="coluna" style="gap:6px; flex:1">
+            <label class="btn contorno mini" style="cursor:pointer">Escolher logo<input type="file" accept="image/*" name="logo" class="oculto"></label>
+            <button type="button" class="link-btn oculto" id="tirar-logo" style="min-height:32px; padding:0">Tirar logo</button>
+          </div>
+        </div>
+        <label class="campo">Recado para as clientes (opcional)
+          <textarea name="recado_link" maxlength="300" rows="3" placeholder="Ex.: Kits completos para festas inesquecíveis 🎈 Retirada no Centro. Atendemos de segunda a sábado.">${esc(n.recado_link || '')}</textarea>
+          <span class="dica" id="recado-conta"></span>
+        </label>
+      </section>
       <div class="erro oculto" id="erro-neg"></div>
       <button class="btn principal cheio" type="submit">Salvar</button></form>`, (p) => {
     const form = $('form', p);
     ligarPreviaLink(form);
+    const area = $('#logo-area', p);
+    const tirar = $('#tirar-logo', p);
+    const desenharLogo = (txt) => {
+      area.innerHTML = logo ? `<img src="${esc(logo)}" alt="Sua logo">` : `<span>${txt || 'Sem logo'}</span>`;
+      tirar.classList.toggle('oculto', !logo);
+    };
+    desenharLogo();
+    tirar.onclick = () => { logo = null; desenharLogo(); };
+    form.logo.onchange = async () => {
+      const arq = form.logo.files[0];
+      form.logo.value = '';
+      if (!arq) return;
+      desenharLogo('Enviando…');
+      const ajustada = await recortarFoto(arq, '', { logo: true });
+      if (!ajustada) { desenharLogo(); return; }
+      try { logo = await dados.enviarFoto(ajustada, 500); } catch (e) { aviso(e.message); }
+      desenharLogo();
+    };
+    const conta = () => { $('#recado-conta', p).textContent = `${form.recado_link.value.length}/300 caracteres`; };
+    form.recado_link.oninput = conta; conta();
     form.onsubmit = async (e) => {
       e.preventDefault();
       await acao($('button[type=submit]', form), async () => {
         try {
           const c = lerCamposNegocio(form, false);
           if (c.slug !== estado.negocio.slug && !(await dados.linkDisponivel(c.slug))) throw new Error('Esse link já está em uso. Escolha outro.');
+          c.logo_url = logo;
+          c.recado_link = form.recado_link.value.trim().slice(0, 300) || null;
           estado.negocio = await dados.salvarNegocio(c);
           fecharPainel(); aviso('Dados salvos!'); montarApp();
         } catch (err) { $('#erro-neg', p).textContent = err.message; $('#erro-neg', p).classList.remove('oculto'); }
@@ -497,6 +751,7 @@ function montarApp() {
   atualizarAoVoltar();
   const deHash = location.hash.replace('#', '');
   irPara(['hoje', 'agenda', 'kits', 'mais'].includes(deHash) ? deHash : 'hoje');
+  setTimeout(mostrarNovidades, 600);
 }
 
 function irPara(aba) {
@@ -776,9 +1031,10 @@ function abaAgenda(tela) {
 function abaKits(tela) {
   const cartoes = estado.kits.map((k) => `
     <button class="cartao clicavel kit-card" data-kit="${esc(k.id)}">
-      ${k.foto_url ? `<img class="foto-kit" src="${esc(k.foto_url)}" alt="" loading="lazy">` : '<div class="foto-kit foto-vazia">Sem foto</div>'}
+      ${k.foto_url ? fotoCaixa(k.foto_url, '', true) : '<div class="foto-kit foto-vazia">Sem foto</div>'}
       <div class="nome">${esc(k.nome)}</div>
       <div class="pequeno">${reais(k.preco)} · ${k.pecas.length} peça${k.pecas.length === 1 ? '' : 's'}</div>
+      ${k.categoria ? `<span class="etiqueta et-categoria">${esc(k.categoria)}</span>` : ''}
       ${k.ativo ? '' : '<span class="etiqueta et-cancelada">Fora do link</span>'}
     </button>`).join('');
   tela.innerHTML = `
@@ -789,41 +1045,262 @@ function abaKits(tela) {
   $$('[data-kit]', tela).forEach((b) => (b.onclick = () => formKit(estado.kits.find((k) => k.id === b.dataset.kit))));
 }
 
+// Foto inteira dentro de um quadro quadrado (sem cortar), com fundo desfocado.
+function fotoCaixa(url, alt = '', lazy = false) {
+  const u = String(url || '').replace(/["'()\\]/g, (c) => encodeURIComponent(c));
+  return `<span class="foto-caixa" style="--fundo-foto:url('${u}')"><img src="${esc(url)}" alt="${esc(alt)}"${lazy ? ' loading="lazy"' : ''}></span>`;
+}
+// ---------------------------------------------------------------------
+// Ajuste da foto antes de enviar: a dona arrasta e aproxima a foto dentro
+// de um quadrado e vê exatamente o que vai aparecer. Pode também usar a
+// foto inteira, sem recorte.
+// Devolve: a foto recortada (quadrada), o arquivo original (foto inteira)
+// ou null (cancelou).
+// ---------------------------------------------------------------------
+function recortarFoto(arquivo, posicao, opcoes = {}) {
+  const logo = !!opcoes.logo;
+  return new Promise((resolver) => {
+    const url = URL.createObjectURL(arquivo);
+    const fundo = document.createElement('div');
+    fundo.className = 'recorte-fundo';
+    fundo.innerHTML = `
+      <div class="recorte" role="dialog" aria-modal="true" aria-label="Ajustar foto">
+        <h2 class="centro">${logo ? 'Ajuste sua logo' : 'Ajuste a foto'}${posicao ? ` <span class="pequeno">(${posicao})</span>` : ''}</h2>
+        <p class="centro pequeno">${logo
+          ? 'A logo já começa inteira dentro do círculo. Aumente ou diminua com a barrinha (ou com dois dedos) e arraste para centralizar.'
+          : 'Arraste para posicionar e aproxime com dois dedos ou com a barrinha. O que estiver no quadrado é o que vai aparecer.'}</p>
+        <div class="recorte-area ${logo ? 'logo' : ''}"><img alt="Imagem para ajustar" draggable="false"><span class="recorte-grade" aria-hidden="true"></span></div>
+        <label class="recorte-zoom"><span aria-hidden="true">－</span><input type="range" min="${logo ? '0.4' : '1'}" max="4" step="0.01" value="1" aria-label="Aumentar ou diminuir"><span aria-hidden="true">＋</span></label>
+        <button class="btn principal cheio" type="button" data-r="ok">${logo ? 'Usar esta logo' : 'Usar este recorte'}</button>
+        ${logo ? '' : '<button class="btn contorno cheio" type="button" data-r="inteira">Usar foto inteira</button>'}
+        <button class="link-btn" type="button" data-r="cancelar" style="align-self:center">Cancelar</button>
+      </div>`;
+    document.body.appendChild(fundo);
+    const area = $('.recorte-area', fundo);
+    const img = $('img', fundo);
+    const zoom = $('input[type=range]', fundo);
+    let nw = 0, nh = 0, base = 1, escala = 1, x = 0, y = 0;
+    const lado = () => area.clientWidth;
+    const limitar = () => {
+      const L = lado(), w = nw * escala, h = nh * escala;
+      x = Math.min(Math.max(0, L - w), Math.max(Math.min(0, L - w), x));
+      y = Math.min(Math.max(0, L - h), Math.max(Math.min(0, L - h), y));
+    };
+    const aplicar = () => { limitar(); img.style.transform = `translate(${x}px, ${y}px) scale(${escala})`; };
+    const mudarZoom = (novo, cx, cy) => {
+      const L = lado();
+      const z = Math.min(4, Math.max(logo ? 0.4 : 1, novo));
+      const nova = base * z;
+      const px = cx ?? L / 2, py = cy ?? L / 2;
+      x = px - (px - x) * (nova / escala);
+      y = py - (py - y) * (nova / escala);
+      escala = nova; zoom.value = String(z); aplicar();
+    };
+    img.onload = () => {
+      nw = img.naturalWidth; nh = img.naturalHeight;
+      const L = lado();
+      // Foto preenche o quadrado; logo começa inteira dentro do círculo (com uma folga).
+      base = logo ? (0.96 * L) / Math.hypot(nw, nh) : Math.max(L / nw, L / nh);
+      escala = base;
+      x = (L - nw * escala) / 2; y = (L - nh * escala) / 2;
+      img.style.width = nw + 'px'; img.style.height = nh + 'px';
+      aplicar();
+    };
+    img.onerror = () => { fechar(null); aviso('Esse arquivo não parece uma foto.'); };
+    img.src = url;
+    zoom.oninput = () => mudarZoom(Number(zoom.value));
+
+    // Arrastar e pinçar (mouse e dedo)
+    const toques = new Map();
+    let distIni = 0, zoomIni = 1;
+    area.addEventListener('pointerdown', (e) => {
+      area.setPointerCapture(e.pointerId);
+      toques.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (toques.size === 2) {
+        const [a, b] = [...toques.values()];
+        distIni = Math.hypot(a.x - b.x, a.y - b.y); zoomIni = escala / base;
+      }
+    });
+    area.addEventListener('pointermove', (e) => {
+      if (!toques.has(e.pointerId)) return;
+      const ant = toques.get(e.pointerId);
+      toques.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (toques.size === 1) {
+        x += e.clientX - ant.x; y += e.clientY - ant.y; aplicar();
+      } else if (toques.size === 2 && distIni) {
+        const [a, b] = [...toques.values()];
+        const r = area.getBoundingClientRect();
+        mudarZoom(zoomIni * (Math.hypot(a.x - b.x, a.y - b.y) / distIni), (a.x + b.x) / 2 - r.left, (a.y + b.y) / 2 - r.top);
+      }
+    });
+    const soltar = (e) => { toques.delete(e.pointerId); if (toques.size < 2) distIni = 0; };
+    area.addEventListener('pointerup', soltar);
+    area.addEventListener('pointercancel', soltar);
+    area.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const r = area.getBoundingClientRect();
+      mudarZoom(escala / base * (e.deltaY < 0 ? 1.1 : 0.9), e.clientX - r.left, e.clientY - r.top);
+    }, { passive: false });
+
+    function fechar(resultado) {
+      fecharRecorteAberto = null;
+      URL.revokeObjectURL(url);
+      fundo.remove();
+      resolver(resultado);
+    }
+    fecharRecorteAberto = () => fechar(null);
+    $('[data-r="cancelar"]', fundo).onclick = () => fechar(null);
+    const inteira = $('[data-r="inteira"]', fundo);
+    if (inteira) inteira.onclick = () => fechar(arquivo);
+    $('[data-r="ok"]', fundo).onclick = () => {
+      if (logo) {
+        // Fundo branco (igual ao círculo do link) e a logo do tamanho que ela escolheu, sem cortes.
+        const L = lado(), saida = 500, k = saida / L;
+        const c = document.createElement('canvas');
+        c.width = saida; c.height = saida;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, saida, saida);
+        ctx.drawImage(img, x * k, y * k, nw * escala * k, nh * escala * k);
+        c.toBlob((b) => fechar(b || arquivo), 'image/jpeg', 0.92);
+        return;
+      }
+      const L = lado();
+      const sx = -x / escala, sy = -y / escala, sl = L / escala;
+      const saida = Math.round(Math.min(1200, sl));
+      const c = document.createElement('canvas');
+      c.width = saida; c.height = saida;
+      c.getContext('2d').drawImage(img, sx, sy, sl, sl, 0, 0, saida, saida);
+      c.toBlob((b) => fechar(b || arquivo), 'image/jpeg', 0.9);
+    };
+  });
+}
+
+const MAX_FOTOS = 5;
+const CATEGORIAS_PADRAO = ['Menino', 'Menina', 'Unissex', 'Chá revelação', 'Chá de bebê', 'Batizado', 'Adulto', 'Casamento', 'Formatura', 'Datas comemorativas'];
+function opcoesCategoria(atual) {
+  const proprias = estado.kits.map((x) => x.categoria).filter(Boolean);
+  const todas = [...new Set([...CATEGORIAS_PADRAO, ...proprias, ...(atual ? [atual] : [])])];
+  const extras = todas.filter((c) => !CATEGORIAS_PADRAO.includes(c)).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  return [...CATEGORIAS_PADRAO, ...extras];
+}
+function fotosDoKit(k) {
+  if (Array.isArray(k.fotos) && k.fotos.length) return [...k.fotos];
+  return k.foto_url ? [k.foto_url] : [];
+}
+
 function formKit(kit) {
-  const k = kit || { nome: '', preco: '', sinal: '', pecas: [], foto_url: null, ativo: true };
-  let foto = k.foto_url;
+  const k = kit || { nome: '', preco: '', sinal: '', pecas: [], foto_url: null, fotos: [], ativo: true };
+  let fotos = fotosDoKit(k);
+  let enviando = 0;
   const so = !podeEditar();
   abrirPainel(kit ? 'Editar kit' : 'Novo kit', `
     <form class="coluna" novalidate>
-      <div id="foto-area">${foto ? `<img class="foto-kit" src="${esc(foto)}" alt="Foto do kit">` : '<div class="foto-kit foto-vazia">Sem foto</div>'}</div>
-      ${so ? '' : `<label class="btn contorno cheio" style="cursor:pointer">Escolher foto<input type="file" accept="image/*" name="arquivo" class="oculto"></label>`}
+      <div id="foto-area"></div>
+      ${so ? '' : `<label class="btn contorno cheio" style="cursor:pointer" id="add-foto">Adicionar fotos<input type="file" accept="image/*" name="arquivo" multiple class="oculto"></label>
+      <span class="dica" style="margin-top:-6px">Até ${MAX_FOTOS} fotos. A primeira é a foto principal: toque numa miniatura para torná-la principal.</span>`}
       <label class="campo">Nome do kit<input name="nome" maxlength="80" value="${esc(k.nome)}" placeholder="Ex.: Safári" required></label>
+      <label class="campo">Categoria (opcional)
+        <select name="categoria">
+          <option value="">Sem categoria</option>
+          ${opcoesCategoria(k.categoria).map((c) => `<option value="${esc(c)}" ${c === k.categoria ? 'selected' : ''}>${esc(c)}</option>`).join('')}
+          <option value="__nova">➕ Criar nova categoria…</option>
+        </select>
+      </label>
+      <label class="campo oculto" id="campo-nova-cat">Nome da nova categoria
+        <input name="nova_categoria" maxlength="40" placeholder="Ex.: Super-heróis" autocomplete="off">
+      </label>
+      <span class="dica" style="margin-top:-6px">No seu link de reservas, a cliente filtra os kits por categoria.</span>
       <div class="grade-2">
         <label class="campo">Preço (R$)<input name="preco" inputmode="decimal" value="${esc(k.preco === '' ? '' : String(k.preco).replace('.', ','))}" placeholder="350"></label>
         <label class="campo">Sinal (R$)<input name="sinal" inputmode="decimal" value="${esc(k.sinal === '' ? '' : String(k.sinal).replace('.', ','))}" placeholder="100"></label>
       </div>
-      <label class="campo">Peças do kit (uma por linha)
-        <textarea name="pecas" placeholder="Painel redondo&#10;Boleira&#10;Vaso girafa">${esc(k.pecas.join('\n'))}</textarea>
+      <div class="campo">Peças do kit
+        <div class="lista-pecas" id="lista-pecas"></div>
+        ${so ? '' : '<button type="button" class="btn claro cheio" id="add-peca">＋ Adicionar mais uma peça</button>'}
         <span class="dica">Essa lista vira o checklist de cada retirada e devolução.</span>
-      </label>
+      </div>
       <label class="check ${k.ativo ? 'marcado' : ''}"><input type="checkbox" name="ativo" ${k.ativo ? 'checked' : ''}> Mostrar no link de reservas</label>
       <div class="erro oculto" id="erro-kit"></div>
       ${so ? '' : `<button class="btn principal cheio" type="submit">Salvar kit</button>`}
       ${kit && !so ? `<button class="btn perigo cheio" type="button" id="apagar-kit">Apagar kit</button>` : ''}
     </form>`, (p) => {
     const form = $('form', p);
+    const area = $('#foto-area', p);
+    const desenharFotos = () => {
+      const principal = fotos[0]
+        ? fotoCaixa(fotos[0], 'Foto principal do kit')
+        : `<div class="foto-kit foto-vazia">${enviando ? 'Enviando foto…' : 'Sem foto'}</div>`;
+      const minis = fotos.map((f, i) => `
+        <div class="mini-foto ${i === 0 ? 'principal' : ''}">
+          <button type="button" class="mini-img" data-principal="${i}" aria-label="Tornar foto ${i + 1} a principal"><img src="${esc(f)}" alt=""></button>
+          ${i === 0 ? '<span class="mini-tag">Principal</span>' : ''}
+          ${so ? '' : `<button type="button" class="mini-tirar" data-tirar="${i}" aria-label="Tirar foto ${i + 1}">×</button>`}
+        </div>`).join('');
+      const carregando = Array.from({ length: enviando }, () => '<div class="mini-foto carregando-foto">…</div>').join('');
+      area.innerHTML = `${principal}${fotos.length + enviando > 0 ? `<div class="minis">${minis}${carregando}</div>` : ''}`;
+      const add = $('#add-foto', p);
+      if (add) {
+        const cheio = fotos.length + enviando >= MAX_FOTOS;
+        add.classList.toggle('oculto', cheio);
+        add.firstChild.textContent = fotos.length ? `Adicionar fotos (${fotos.length}/${MAX_FOTOS})` : 'Adicionar fotos';
+      }
+      if (so) return;
+      $$('[data-principal]', area).forEach((b) => (b.onclick = () => {
+        const i = Number(b.dataset.principal);
+        if (i > 0) { fotos.unshift(fotos.splice(i, 1)[0]); desenharFotos(); }
+      }));
+      $$('[data-tirar]', area).forEach((b) => (b.onclick = () => {
+        fotos.splice(Number(b.dataset.tirar), 1); desenharFotos();
+      }));
+    };
+    desenharFotos();
     form.ativo.onchange = () => form.ativo.closest('.check').classList.toggle('marcado', form.ativo.checked);
+    form.categoria.onchange = () => {
+      const nova = form.categoria.value === '__nova';
+      $('#campo-nova-cat', p).classList.toggle('oculto', !nova);
+      if (nova) form.nova_categoria.focus();
+    };
+    // Peças: uma linha para cada peça, com botão para adicionar mais
+    const listaPecas = $('#lista-pecas', p);
+    const linhaPeca = (v = '') => `<div class="linha-peca"><span class="num-peca"></span><input class="peca" maxlength="80" value="${esc(v)}" placeholder="Ex.: Painel redondo" ${so ? 'disabled' : ''}>${so ? '' : '<button type="button" class="tirar-peca" aria-label="Tirar esta peça">×</button>'}</div>`;
+    const numerar = () => $$('.num-peca', listaPecas).forEach((el, i) => (el.textContent = `${i + 1}.`));
+    const addPeca = (v = '', focar = true) => {
+      listaPecas.insertAdjacentHTML('beforeend', linhaPeca(v));
+      numerar();
+      const inp = listaPecas.lastElementChild.querySelector('input');
+      if (focar) inp.focus();
+    };
+    const pecasIniciais = k.pecas.length ? k.pecas : ['', '', ''];
+    pecasIniciais.forEach((v) => addPeca(v, false));
+    listaPecas.addEventListener('click', (e) => {
+      const b = e.target.closest('.tirar-peca'); if (!b) return;
+      b.closest('.linha-peca').remove();
+      if (!listaPecas.children.length) addPeca('', false);
+      numerar();
+    });
+    // Enter numa peça já abre a próxima linha
+    listaPecas.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' || !e.target.classList.contains('peca')) return;
+      e.preventDefault();
+      const prox = e.target.closest('.linha-peca').nextElementSibling;
+      if (prox) prox.querySelector('input').focus(); else if ($$('.peca', listaPecas).length < 100) addPeca();
+    });
+    const botaoAdd = $('#add-peca', p);
+    if (botaoAdd) botaoAdd.onclick = () => { if ($$('.peca', listaPecas).length < 100) addPeca(); };
     if (form.arquivo) {
       form.arquivo.onchange = async () => {
-        const arq = form.arquivo.files[0];
-        if (!arq) return;
-        $('#foto-area', p).innerHTML = '<div class="foto-kit foto-vazia">Enviando foto…</div>';
-        try {
-          foto = await dados.enviarFoto(arq);
-          $('#foto-area', p).innerHTML = `<img class="foto-kit" src="${esc(foto)}" alt="Foto do kit">`;
-        } catch (e) {
-          aviso(e.message);
-          $('#foto-area', p).innerHTML = foto ? `<img class="foto-kit" src="${esc(foto)}" alt="">` : '<div class="foto-kit foto-vazia">Sem foto</div>';
+        const vagas = MAX_FOTOS - fotos.length - enviando;
+        const arquivos = [...form.arquivo.files].slice(0, Math.max(0, vagas));
+        if (form.arquivo.files.length > arquivos.length) aviso(`Cada kit pode ter até ${MAX_FOTOS} fotos.`);
+        form.arquivo.value = '';
+        if (!arquivos.length) return;
+        for (let i = 0; i < arquivos.length; i++) {
+          const pronta = await recortarFoto(arquivos[i], arquivos.length > 1 ? `${i + 1} de ${arquivos.length}` : '');
+          if (!pronta) continue;
+          enviando++; desenharFotos();
+          try { fotos.push(await dados.enviarFoto(pronta)); }
+          catch (e) { aviso(e.message); }
+          finally { enviando--; desenharFotos(); }
         }
       };
     }
@@ -835,11 +1312,15 @@ function formKit(kit) {
         nome: form.nome.value.trim(),
         preco: numero(form.preco.value),
         sinal: numero(form.sinal.value),
-        pecas: form.pecas.value.split('\n').map((s) => s.trim()).filter(Boolean).slice(0, 100),
-        foto_url: foto,
+        pecas: $$('.peca', p).map((i) => i.value.trim()).filter(Boolean).slice(0, 100),
+        categoria: ((form.categoria.value === '__nova' ? form.nova_categoria.value : form.categoria.value).trim().replace(/\s+/g, ' ').slice(0, 40)) || null,
+        fotos: fotos.slice(0, MAX_FOTOS),
+        foto_url: fotos[0] || null,
         ativo: form.ativo.checked,
       };
       if (!novo.nome) { caixa.textContent = 'Dê um nome ao kit.'; caixa.classList.remove('oculto'); return; }
+      if (form.categoria.value === '__nova' && !novo.categoria) { caixa.textContent = 'Escreva o nome da nova categoria.'; caixa.classList.remove('oculto'); return; }
+      if (enviando) { caixa.textContent = 'Espere as fotos terminarem de enviar.'; caixa.classList.remove('oculto'); return; }
       if (kit) novo.id = kit.id;
       await acao($('button[type=submit]', form), async () => {
         await dados.salvarKit(novo);
@@ -873,49 +1354,144 @@ function abaMais(tela) {
       </div>
     </section>
     <section class="coluna">
-      <button class="cartao clicavel" id="meus-dados"><div class="nome" style="font-weight:800">Meus dados</div><div class="pequeno">Nome, link, WhatsApp, Pix e dias de retirada</div></button>
-      <div class="cartao"><div style="font-weight:800">Clientes</div><div class="pequeno">Chega na próxima atualização do app.</div></div>
+      <button class="cartao clicavel" id="meus-dados"><div class="nome" style="font-weight:800">Meus dados</div><div class="pequeno">Nome, logo, recado do link, WhatsApp, Pix e dias de retirada</div></button>
+      <button class="cartao clicavel" id="mensagens"><div style="font-weight:800">Mensagens do WhatsApp</div><div class="pequeno">Escreva seus textos de sinal, confirmação, retirada e devolução</div></button>
       ${estado.assinatura && estado.assinatura.admin ? '<a class="cartao clicavel" style="text-decoration:none; background: var(--tinta); color: #fff; border-color: var(--tinta)" href="admin.html"><div style="font-weight:800">Painel do administrador</div><div class="pequeno" style="color:#D9CFE6">Clientes, renovações, leads e acessos</div></a>' : ''}
-      <a class="cartao clicavel" style="text-decoration:none" href="mailto:${esc(EMAIL_SUPORTE)}?subject=${encodeURIComponent('Ajuda no App Pegue e Monte')}"><div style="font-weight:800">Preciso de ajuda</div><div class="pequeno">Respondemos por e-mail</div></a>
     </section>
-    ${dados.MODO_DEMO ? '<button class="btn contorno cheio" id="demo-falha">Simular: pagamento falhou</button><button class="btn contorno cheio" id="demo-reset">Recomeçar a demonstração</button>' : ''}
-    <button class="btn perigo cheio" id="sair">Sair do app</button>
+    <section class="cartao coluna">
+      <h2>Precisa de ajuda?</h2>
+      ${WHATSAPP_SUPORTE ? `<a class="btn verde cheio" href="${esc(linkZap(WHATSAPP_SUPORTE, 'Oi! Sou cliente do App Pegue e Monte e tenho uma dúvida.'))}" target="_blank" rel="noopener">${ICONE.zap} Falar com o suporte no WhatsApp</a>` : ''}
+      <a class="btn contorno cheio" href="mailto:${esc(EMAIL_SUPORTE)}?subject=${encodeURIComponent('Ajuda no App Pegue e Monte')}">Enviar e-mail para o suporte</a>
+      <p class="dica centro">${esc(EMAIL_SUPORTE)}</p>
+    </section>
+    ${DEMO_SITE ? `<a class="btn verde cheio" href="${esc(LINK_PLANOS)}" target="_top">Gostei! Quero usar com meus kits</a><button class="btn contorno cheio" id="demo-reset">Recomeçar a demonstração</button>`
+      : dados.MODO_DEMO ? `<section class="cartao coluna"><h2>Testar situações (só na demonstração)</h2>
+          ${[['normal', 'Assinatura ativa (normal)'], ['teste', 'Conta nova em teste de 7 dias'], ['teste_fim', 'Teste de 7 dias acabou'], ['pix', 'Pagamento pendente com Pix'], ['email', 'Pagamento pendente sem Pix'], ['suspensa', 'Assinatura suspensa'], ['cancelada', 'Cliente cancelou']]
+            .map(([k, t]) => `<button class="btn contorno cheio" data-simular="${k}">${t}</button>`).join('')}
+          <button class="btn contorno cheio" id="demo-reset">Recomeçar a demonstração</button></section>` : ''}
+    ${DEMO_SITE ? '' : '<button class="btn perigo cheio" id="sair">Sair do app</button>'}
     <p class="pequeno centro">Dica: no celular, use "Adicionar à tela inicial" no menu do navegador para abrir como aplicativo.</p>`;
   $('#copiar', tela).onclick = async () => {
     try { await navigator.clipboard.writeText(link); aviso('Link copiado!'); }
     catch (e) { prompt('Copie o link:', link); }
   };
   $('#meus-dados', tela).onclick = painelNegocio;
-  $('#sair', tela).onclick = async () => { await dados.sair(); location.hash = ''; telaLogin('entrar'); };
+  $('#mensagens', tela).onclick = painelMensagens;
+  const sairBtn = $('#sair', tela);
+  if (sairBtn) sairBtn.onclick = async () => { await dados.sair(); location.hash = ''; telaLogin('entrar'); };
   const reset = $('#demo-reset', tela);
   if (reset) reset.onclick = async () => { dados.demoReiniciar(); await carregarTudo(); aviso('Demonstração reiniciada.'); };
-  const falha = $('#demo-falha', tela);
-  if (falha) falha.onclick = async () => { dados.demoSimularFalha(); await recarregar(); montarApp(); };
+  $$('[data-simular]', tela).forEach((b) => (b.onclick = async () => {
+    dados.demoSimular(b.dataset.simular); popupPagamentoMostrado = false;
+    await recarregar(); montarApp(); window.scrollTo(0, 0);
+  }));
 }
 
 // =====================================================================
 // Reservas: criar, ver, conferir peças
 // =====================================================================
-function mensagem(tipo, r) {
-  const k = kitDe(r.kit_id);
-  const n = estado.negocio;
-  const nome = r.cliente_nome.split(' ')[0];
+// ---------------------------------------------------------------------
+// Mensagens de WhatsApp. Cada dona pode escrever os próprios textos em
+// Mais > Mensagens do WhatsApp; vazio = texto padrão abaixo.
+// ---------------------------------------------------------------------
+const TIPOS_MSG = [
+  { tipo: 'sinal', campo: 'msg_sinal', titulo: 'Cobrar o sinal', quando: 'Quando chega um pedido e você vai pedir o sinal' },
+  { tipo: 'confirmacao', campo: 'msg_confirmacao', titulo: 'Reserva confirmada', quando: 'Depois que o sinal é pago' },
+  { tipo: 'retirada', campo: 'msg_retirada', titulo: 'Lembrete de retirada', quando: 'Para lembrar o dia de buscar o kit' },
+  { tipo: 'devolucao', campo: 'msg_devolucao', titulo: 'Lembrete de devolução', quando: 'Para lembrar o dia de devolver o kit' },
+];
+const MARCADORES = [
+  ['{nome}', 'primeiro nome da cliente'], ['{kit}', 'nome do kit'], ['{festa}', 'data da festa'],
+  ['{retirada}', 'data da retirada'], ['{devolucao}', 'data da devolução'], ['{sinal}', 'valor do sinal'],
+  ['{total}', 'valor total'], ['{restante}', 'valor que falta'], ['{pix}', 'sua chave Pix'], ['{loja}', 'nome do seu negócio'],
+];
+function textoPadrao(tipo, n) {
   switch (tipo) {
     case 'sinal':
-      return `Oi, ${nome}! Recebi seu pedido do kit ${k.nome} para a festa de ${dataCurta(r.data_festa)}. `
-        + `Para confirmar a reserva, o sinal é de ${reais(r.valor_sinal)}${n.chave_pix ? `. Chave Pix: ${n.chave_pix}` : ''}. `
-        + 'Quando fizer, me manda o comprovante por aqui.';
+      return 'Oi, {nome}! Recebi seu pedido do kit {kit} para a festa de {festa}. Para confirmar a reserva, o sinal é de {sinal}'
+        + ((n && n.chave_pix) ? '. Chave Pix: {pix}' : '') + '. Quando fizer, me manda o comprovante por aqui.';
     case 'confirmacao':
-      return `Oi, ${nome}! Sua reserva do kit ${k.nome} está confirmada. `
-        + `Festa: ${dataCurta(r.data_festa)}. Retirada: ${dataCurta(r.data_retirada)}. Devolução: ${dataCurta(r.data_devolucao)}. `
-        + 'Qualquer dúvida é só chamar!';
+      return 'Oi, {nome}! Sua reserva do kit {kit} está confirmada. Festa: {festa}. Retirada: {retirada}. Devolução: {devolucao}. Qualquer dúvida é só chamar!';
     case 'retirada':
-      return `Oi, ${nome}! Lembrete: a retirada do kit ${k.nome} é ${r.data_retirada === hojeISO() ? 'hoje' : dataCurta(r.data_retirada)}. Te espero!`;
+      return 'Oi, {nome}! Lembrete: a retirada do kit {kit} é {retirada}. Te espero!';
     case 'devolucao':
-      return `Oi, ${nome}! Espero que a festa tenha sido linda! A devolução do kit ${k.nome} é ${r.data_devolucao === hojeISO() ? 'hoje' : dataCurta(r.data_devolucao)}.`;
+      return 'Oi, {nome}! Espero que a festa tenha sido linda! A devolução do kit {kit} é {devolucao}.';
     default:
-      return `Oi, ${nome}!`;
+      return 'Oi, {nome}!';
   }
+}
+function preencher(texto, r) {
+  const k = kitDe(r.kit_id);
+  const n = estado.negocio || {};
+  const dia = (iso) => (iso === hojeISO() ? 'hoje' : dataCurta(iso));
+  const valores = {
+    nome: String(r.cliente_nome || '').split(' ')[0], kit: k.nome, festa: dataCurta(r.data_festa),
+    retirada: dia(r.data_retirada), devolucao: dia(r.data_devolucao), sinal: reais(r.valor_sinal),
+    total: reais(r.valor_total), restante: reais(Math.max(0, Number(r.valor_total || 0) - Number(r.valor_sinal || 0))),
+    pix: n.chave_pix || '', loja: n.nome || '',
+  };
+  return texto.replace(/\{(nome|kit|festa|retirada|devolucao|sinal|total|restante|pix|loja)\}/g, (_, m) => valores[m]);
+}
+function mensagem(tipo, r) {
+  const info = TIPOS_MSG.find((t) => t.tipo === tipo);
+  const proprio = info && estado.negocio && String(estado.negocio[info.campo] || '').trim();
+  return preencher(proprio || textoPadrao(tipo, estado.negocio), r);
+}
+
+function painelMensagens() {
+  const n = estado.negocio;
+  const exemplo = {
+    cliente_nome: 'Ana Paula', kit_id: (estado.kits[0] || {}).id, data_festa: somaDias(hojeISO(), 10),
+    data_retirada: somaDias(hojeISO(), 9), data_devolucao: somaDias(hojeISO(), 11),
+    valor_total: (estado.kits[0] || {}).preco || 350, valor_sinal: (estado.kits[0] || {}).sinal || 100,
+  };
+  abrirPainel('Mensagens do WhatsApp', `
+    <p class="pequeno">Escreva do seu jeito. O app troca os marcadores pelos dados de cada reserva na hora de enviar. Toque num marcador para colocá-lo no texto.</p>
+    <div class="marcadores">${MARCADORES.map(([m, d]) => `<button type="button" class="marcador" data-m="${m}" title="${esc(d)}">${m}</button>`).join('')}</div>
+    <p class="dica" style="margin-top:-6px">${MARCADORES.map(([m, d]) => `<b>${m}</b> ${esc(d)}`).join(' · ')}</p>
+    <form class="coluna" novalidate>
+      ${TIPOS_MSG.map((t) => `
+        <section class="cartao coluna" style="gap:8px">
+          <div><h3>${esc(t.titulo)}</h3><span class="dica">${esc(t.quando)}</span></div>
+          <textarea class="msg-texto" name="${t.campo}" data-tipo="${t.tipo}" maxlength="1000" rows="5">${esc(String(n[t.campo] || '').trim() || textoPadrao(t.tipo, n))}</textarea>
+          <div class="previa-msg"><span class="dica">Como a cliente vai receber:</span><div class="bolha-zap" data-previa="${t.tipo}"></div></div>
+          <button type="button" class="link-btn" data-padrao="${t.tipo}" style="align-self:flex-start; min-height:32px; padding:0">Voltar ao texto padrão</button>
+        </section>`).join('')}
+      <div class="erro oculto" id="erro-msg"></div>
+      <button class="btn principal cheio" type="submit">Salvar mensagens</button>
+    </form>`, (p) => {
+    const form = $('form', p);
+    let ultimo = form.querySelector('textarea');
+    const previa = (ta) => { $(`[data-previa="${ta.dataset.tipo}"]`, p).textContent = preencher(ta.value, exemplo); };
+    $$('textarea', form).forEach((ta) => {
+      previa(ta);
+      ta.oninput = () => previa(ta);
+      ta.onfocus = () => { ultimo = ta; };
+    });
+    $$('[data-m]', p).forEach((b) => (b.onclick = () => {
+      const ta = ultimo; const ini = ta.selectionStart ?? ta.value.length; const fim = ta.selectionEnd ?? ini;
+      ta.value = ta.value.slice(0, ini) + b.dataset.m + ta.value.slice(fim);
+      ta.focus(); ta.selectionStart = ta.selectionEnd = ini + b.dataset.m.length; previa(ta);
+    }));
+    $$('[data-padrao]', p).forEach((b) => (b.onclick = () => {
+      const ta = form.querySelector(`[data-tipo="${b.dataset.padrao}"]`);
+      ta.value = textoPadrao(b.dataset.padrao, n); previa(ta);
+    }));
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const campos = {};
+      for (const t of TIPOS_MSG) {
+        const v = form[t.campo].value.trim();
+        campos[t.campo] = (!v || v === textoPadrao(t.tipo, n)) ? null : v.slice(0, 1000);
+      }
+      await acao($('button[type=submit]', form), async () => {
+        try {
+          estado.negocio = await dados.salvarNegocio(campos);
+          fecharPainel(); aviso('Mensagens salvas!');
+        } catch (err) { $('#erro-msg', p).textContent = err.message; $('#erro-msg', p).classList.remove('oculto'); }
+      });
+    };
+  });
 }
 
 function formReserva(pre, existente) {
@@ -942,7 +1518,7 @@ function formReserva(pre, existente) {
         <label class="campo">Sinal (R$)<input name="sinal" inputmode="decimal" value="${esc(String(r.valor_sinal ?? kit0.sinal).replace('.', ','))}"></label>
       </div>
       ${existente ? '' : `<label class="check"><input type="checkbox" name="pago"> O sinal já foi pago</label>`}
-      <label class="campo">Observação (opcional)<input name="obs" maxlength="500" value="${esc(r.obs || '')}"></label>
+      <label class="campo">Observação (opcional)<textarea name="obs" maxlength="500" rows="3" placeholder="Ex.: entregar no salão às 14h, cliente pediu balões extras">${esc(r.obs || '')}</textarea></label>
       <div class="erro oculto" id="erro-res"></div>
       <button class="btn principal cheio" type="submit">${existente ? 'Salvar alterações' : 'Criar reserva'}</button>
     </form>`, (p) => {
@@ -1058,12 +1634,28 @@ function abrirReserva(id) {
         <div><div class="pequeno">Valor total</div><b>${reais(r.valor_total)}</b></div>
         <div><div class="pequeno">Sinal</div><b>${reais(r.valor_sinal)}</b> ${r.sinal_recebido ? '<span class="etiqueta et-concluida">pago</span>' : ''}</div>
       </div>
-      ${r.obs ? `<div class="pequeno"><b>Obs.:</b> ${esc(r.obs)}</div>` : ''}
       ${['retirada', 'concluida'].includes(r.status) ? resumoChecklist('Retirada', r.checklist_retirada) : ''}
       ${r.status === 'concluida' ? resumoChecklist('Devolução', r.checklist_devolucao) : ''}
       ${r.avaria_obs || Number(r.avaria_valor) > 0 ? `<div class="pequeno" style="color: var(--destaque-escuro)"><b>Avaria:</b> ${esc(r.avaria_obs || '')} ${Number(r.avaria_valor) > 0 ? `(${reais(r.avaria_valor)})` : ''}</div>` : ''}
     </div>
+    <div class="cartao coluna anotacao">
+      <label class="campo" style="margin:0">📝 Observação
+        <textarea id="obs-reserva" maxlength="500" rows="3" placeholder="Anote o que precisar: horário de entrega, pedido especial, endereço do salão…" ${ed ? '' : 'disabled'}>${esc(r.obs || '')}</textarea>
+      </label>
+      ${ed ? '<button class="btn claro mini oculto" id="salvar-obs" style="align-self:flex-end">Salvar observação</button>' : ''}
+    </div>
     <div class="coluna">${botoes.join('')}</div>`, (p) => {
+    const obs = $('#obs-reserva', p), salvarObs = $('#salvar-obs', p);
+    if (salvarObs) {
+      obs.oninput = () => salvarObs.classList.toggle('oculto', obs.value.trim() === (r.obs || ''));
+      salvarObs.onclick = () => acao(salvarObs, async () => {
+        await dados.atualizarReserva(r.id, { obs: obs.value.trim().slice(0, 500) || null });
+        r.obs = obs.value.trim() || null;
+        salvarObs.classList.add('oculto');
+        aviso('Observação salva!');
+        recarregar().catch(() => {});
+      });
+    }
     const ligar = (nome, fn) => { const b = $(`[data-acao="${nome}"]`, p); if (b) b.addEventListener(b.type === 'checkbox' ? 'change' : 'click', () => fn(b)); };
     ligar('confirmar', (b) => acao(b, async () => {
       await dados.atualizarReserva(r.id, { status: 'confirmada', sinal_recebido: true });

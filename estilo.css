@@ -88,7 +88,12 @@ label.campo { display: flex; flex-direction: column; gap: 6px; font-weight: 700;
 .res-atrasada { background: #FFE9EB; border-color: #F0A9B1; border-width: 2px; }
 .legenda { display: flex; flex-wrap: wrap; gap: 6px; }
 
-.foto-kit { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 14px; background: var(--lilas); }
+.foto-kit { width: 100%; aspect-ratio: 1 / 1; object-fit: contain; border-radius: 14px; background: var(--lilas); }
+/* Foto inteira, sem corte: a imagem aparece completa e o espaço que sobra
+   é preenchido pela própria foto desfocada ao fundo. */
+.foto-caixa { position: relative; display: block; width: 100%; aspect-ratio: 1 / 1; border-radius: 14px; overflow: hidden; background: var(--lilas); isolation: isolate; }
+.foto-caixa::before { content: ''; position: absolute; inset: -24px; background-image: var(--fundo-foto); background-size: cover; background-position: center; filter: blur(18px) saturate(1.1); opacity: .55; z-index: -1; }
+.foto-caixa img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; }
 .foto-vazia { display: flex; align-items: center; justify-content: center; color: var(--lilas-texto); font-weight: 800; }
 
 /* Calendário */
@@ -140,3 +145,94 @@ label.campo { display: flex; flex-direction: column; gap: 6px; font-weight: 700;
 .faixa-pagamento.suspensa .btn { color: #2A1B3D; }
 .faixa-pagamento.suspensa .btn.contorno-claro { color: #fff; }
 #contagem { font-variant-numeric: tabular-nums; }
+
+/* Várias fotos por kit */
+.minis { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.mini-foto { position: relative; width: 64px; height: 64px; border-radius: 12px; overflow: visible; }
+.mini-foto .mini-img { width: 64px; height: 64px; padding: 0; border: 2px solid var(--linha); border-radius: 12px; overflow: hidden; background: var(--lilas); cursor: pointer; display: block; }
+.mini-foto .mini-img img { width: 100%; height: 100%; object-fit: cover; }
+.mini-foto.principal .mini-img { border-color: var(--destaque); }
+.mini-tag { position: absolute; left: 50%; bottom: -8px; transform: translateX(-50%); background: var(--destaque); color: #fff; font-size: 10px; font-weight: 800; padding: 1px 6px; border-radius: 99px; white-space: nowrap; }
+.mini-tirar { position: absolute; top: -8px; right: -8px; width: 26px; height: 26px; border-radius: 99px; border: 2px solid #fff; background: var(--tinta); color: #fff; font-weight: 800; font-size: 16px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.carregando-foto { display: flex; align-items: center; justify-content: center; background: var(--lilas); color: var(--lilas-texto); font-weight: 800; border-radius: 12px; }
+.galeria { display: flex; gap: 8px; overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; border-radius: 14px; }
+.galeria .foto-caixa { flex: 0 0 100%; scroll-snap-align: start; }
+.pontos-galeria { display: flex; justify-content: center; gap: 6px; margin-top: 6px; }
+.pontos-galeria i { width: 7px; height: 7px; border-radius: 99px; background: #D9CFE6; }
+.pontos-galeria i.on { background: var(--destaque); }
+.contador-fotos { position: absolute; right: 8px; top: 8px; background: rgba(42,27,61,.8); color: #fff; font-size: 12px; font-weight: 800; padding: 2px 8px; border-radius: 99px; }
+
+/* Mensagens personalizadas */
+.marcadores { display: flex; flex-wrap: wrap; gap: 6px; }
+.marcador { border: 0; background: var(--lilas); color: var(--lilas-texto); font-weight: 800; font-size: 13px; padding: 6px 10px; border-radius: 999px; cursor: pointer; min-height: 34px; }
+.msg-texto { width: 100%; min-height: 110px; padding: 12px 14px; border-radius: 14px; border: 2px solid var(--linha); background: #fff; font-size: 15px; font-weight: 600; resize: vertical; }
+.msg-texto:focus { outline: none; border-color: var(--lilas-texto); }
+.previa-msg { display: flex; flex-direction: column; gap: 4px; }
+.bolha-zap { background: #DCF8C6; color: #1F2D1F; border-radius: 12px 12px 12px 4px; padding: 10px 12px; font-size: 14px; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* Popup de novidades */
+.popup-fundo { position: fixed; inset: 0; z-index: 60; background: rgba(42,27,61,.55); display: flex; align-items: center; justify-content: center; padding: 18px; overflow-y: auto; }
+.popup { width: 100%; max-width: 420px; max-height: calc(100vh - 36px); overflow-y: auto; background: var(--fundo); border-radius: 26px; padding: 18px 20px 22px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 30px 60px rgba(42,27,61,.35); }
+.popup .bandeirinhas { max-width: 260px; }
+.novidade { display: flex; gap: 12px; align-items: flex-start; background: #fff; border: 1px solid var(--linha); border-radius: 16px; padding: 12px 14px; }
+.novidade-ic { font-size: 26px; line-height: 1; flex: 0 0 auto; }
+/* Login: ajuda e mensagem de sucesso */
+.ajuda-login { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; border-top: 1px solid var(--linha); padding-top: 14px; margin-top: 4px; }
+.erro.sucesso { background: var(--verde-claro); color: var(--verde); }
+
+/* Logo e recado do link de reservas */
+.logo-prev { width: 84px; height: 84px; border-radius: 999px; background: var(--lilas); color: var(--lilas-texto); font-weight: 800; font-size: 12px; display: flex; align-items: center; justify-content: center; overflow: hidden; flex: 0 0 auto; border: 2px solid var(--linha); text-align: center; }
+.logo-prev img { width: 100%; height: 100%; object-fit: contain; background: #fff; padding: 5px; }
+.recado-loja { font-size: 16px; font-weight: 700; color: var(--tinta); white-space: pre-line; max-width: 520px; }
+
+/* Ajuste (recorte) da foto antes de enviar */
+.recorte-fundo { position: fixed; inset: 0; z-index: 90; background: rgba(42,27,61,.75); display: flex; align-items: center; justify-content: center; padding: 14px; overflow-y: auto; }
+.recorte { width: 100%; max-width: 440px; background: var(--fundo); border-radius: 24px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.recorte h2 { font-size: 22px; }
+.recorte-area { position: relative; width: 100%; aspect-ratio: 1 / 1; overflow: hidden; border-radius: 14px; background: #1b1226; touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; }
+.recorte-area:active { cursor: grabbing; }
+.recorte-area img { position: absolute; left: 0; top: 0; transform-origin: 0 0; max-width: none; pointer-events: none; }
+.recorte-grade { position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 0 2px rgba(255,255,255,.9); background-image: linear-gradient(rgba(255,255,255,.35) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.35) 1px, transparent 1px); background-size: 33.333% 33.333%; background-position: -1px -1px; }
+.recorte-zoom { display: flex; align-items: center; gap: 10px; font-weight: 800; color: var(--lilas-texto); }
+.recorte-zoom input { flex: 1; accent-color: var(--destaque); height: 32px; }
+
+/* Categorias e busca de kits */
+.et-categoria { background: var(--lilas); color: var(--lilas-texto); align-self: flex-start; }
+.busca-kits { display: flex; flex-direction: column; gap: 10px; }
+.busca-kits input { width: 100%; min-height: 46px; padding: 10px 14px; border-radius: 999px; border: 2px solid var(--linha); background: #fff; font-size: 16px; font-weight: 600; }
+.busca-kits input:focus { outline: none; border-color: var(--lilas-texto); }
+.filtros-cat { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; }
+.filtro-cat { flex: 0 0 auto; border: 0; border-radius: 999px; padding: 8px 16px; min-height: 40px; font-weight: 800; font-size: 14px; background: #fff; color: var(--tinta); box-shadow: inset 0 0 0 2px var(--linha); cursor: pointer; }
+.filtro-cat.ativo { background: var(--tinta); color: #fff; box-shadow: none; }
+
+/* Faixa da demonstração do site */
+.faixa-site { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; padding: 10px 14px; }
+.faixa-site .btn { min-height: 36px; }
+
+/* Teste grátis, pagamento pendente e Pix */
+.faixa-pagamento.teste { background: #1F7A52; }
+.faixa-pagamento.teste .btn { color: #1F7A52; }
+.zap-pequeno { display: inline-flex; align-items: center; gap: 6px; align-self: center; font-size: 13px; font-weight: 800; color: var(--verde); text-decoration: none; padding: 6px 4px; min-height: 36px; }
+.zap-pequeno svg { width: 16px; height: 16px; }
+.faixa-pagamento .zap-pequeno { color: #fff; opacity: .92; align-self: flex-start; padding: 0; min-height: 28px; }
+.pix-qr { width: 220px; max-width: 70vw; aspect-ratio: 1; margin: 0 auto; background: #fff; border-radius: 16px; padding: 8px; box-shadow: inset 0 0 0 2px var(--linha); }
+.pix-qr svg { width: 100%; height: 100%; display: block; }
+.passos-pix { margin: 0; padding: 12px 14px 12px 32px; background: #fff; border-radius: 14px; box-shadow: inset 0 0 0 1px var(--linha); display: flex; flex-direction: column; gap: 4px; }
+.email-destaque { font-weight: 800; font-size: 17px; background: #fff; border-radius: 12px; padding: 10px; box-shadow: inset 0 0 0 1px var(--linha); overflow-wrap: anywhere; }
+.nota-amarela { background: #FFF6E3; border: 1px solid #F1D9A4; color: #6B4A00; border-radius: 14px; padding: 12px 14px; line-height: 1.45; }
+.popup-fundo.bloqueio { z-index: 90; background: rgba(42,27,61,.82); }
+.btn-conheca { display: block; text-align: center; text-decoration: none; color: var(--tinta); background: #FFF6E3; border: 1px solid #F1D9A4; border-radius: 14px; padding: 12px 14px; font-size: 14px; line-height: 1.4; }
+.btn-conheca b { color: var(--coral); }
+
+/* Ajuste da logo: fundo branco e círculo igual ao do link de reservas */
+.recorte-area.logo { background: #fff; }
+.recorte-area.logo .recorte-grade { background-image: none; border-radius: 999px; box-shadow: 0 0 0 999px rgba(42,27,61,.45), inset 0 0 0 3px var(--coral); }
+/* Peças do kit em linhas */
+.lista-pecas { display: flex; flex-direction: column; gap: 8px; }
+.linha-peca { display: flex; align-items: center; gap: 8px; }
+.linha-peca .num-peca { width: 26px; flex: 0 0 auto; text-align: right; font-weight: 800; color: var(--texto2); font-size: 14px; }
+.linha-peca input { flex: 1; min-width: 0; }
+.tirar-peca { flex: 0 0 auto; width: 40px; height: 40px; border: 0; border-radius: 12px; background: #FFE9EB; color: #B3202E; font-size: 22px; font-weight: 800; cursor: pointer; }
+/* Observação da reserva */
+.anotacao { background: #FFFBEA; border-color: #F1D9A4; }
+.anotacao textarea { background: #fff; }
