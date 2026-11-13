@@ -114,9 +114,13 @@ document.addEventListener('click', function (e) {
   /* Vídeo */
   .video { position: relative; width: 100%; max-width: 440px; margin: 22px auto 0; aspect-ratio: 4 / 5; border-radius: 24px; background: var(--ameixa); overflow: hidden; box-shadow: 0 18px 40px rgba(42, 27, 61, .16); }
   .video video { display: block; width: 100%; height: 100%; object-fit: cover; }
-  .video .play { position: absolute; left: 50%; top: 77%; transform: translate(-50%, -50%); width: 76px; height: 76px; border: 0; border-radius: 999px; background: var(--coral-forte); display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 0 0 10px rgba(255, 251, 247, .55); }
-  .video .play svg { width: 34px; height: 34px; margin-left: 4px; }
-  .video.tocando .play { display: none; }
+  .video .som { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 10px; border: 0; border-radius: 999px; padding: 14px 22px 14px 16px; background: var(--coral-forte); color: #fff; font: inherit; font-weight: 800; font-size: 17px; white-space: nowrap; cursor: pointer; box-shadow: 0 10px 28px rgba(42, 27, 61, .35); animation: pulsar 1.8s ease-in-out infinite; }
+  .video .som .ic { width: 34px; height: 34px; border-radius: 999px; background: #fff; display: inline-flex; align-items: center; justify-content: center; }
+  .video .som .ic svg { width: 16px; height: 16px; margin-left: 3px; }
+  .video .selo-mudo { position: absolute; left: 14px; top: 14px; display: inline-flex; align-items: center; gap: 6px; background: rgba(42, 27, 61, .78); color: #fff; font-size: 13px; font-weight: 800; padding: 6px 12px; border-radius: 999px; }
+  .video.com-som .som, .video.com-som .selo-mudo { display: none; }
+  @keyframes pulsar { 0%, 100% { transform: translateX(-50%) scale(1); } 50% { transform: translateX(-50%) scale(1.05); } }
+  @media (prefers-reduced-motion: reduce) { .video .som { animation: none; } }
 
   /* Grades de cartões */
   .grade { display: grid; grid-template-columns: 1fr; gap: 14px; margin-top: 28px; }
@@ -283,8 +287,9 @@ document.addEventListener('click', function (e) {
   <div class="conteudo">
     <h2 class="titulo-secao">Veja como funciona</h2>
     <div class="video" id="video">
-      <video src="video-vendas.mp4" poster="capa-video.jpg" preload="none" playsinline controls aria-label="Vídeo: como funciona o App Pegue e Monte"></video>
-      <button class="play" type="button" aria-label="Assistir ao vídeo"><svg viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></button>
+      <video src="video-vendas.mp4" poster="capa-video.jpg" muted loop playsinline preload="metadata" aria-label="Vídeo: como funciona o App Pegue e Monte"></video>
+      <span class="selo-mudo" aria-hidden="true">🔇 Vídeo sem som</span>
+      <button class="som" type="button"><span class="ic"><svg viewBox="0 0 24 24" fill="#C73B48" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>Assistir com som · 1 min</button>
     </div>
   </div>
 </section>
@@ -440,11 +445,21 @@ document.addEventListener('click', function (e) {
     var caixa = document.getElementById('video');
     if (!caixa) return;
     var v = caixa.querySelector('video');
-    v.removeAttribute('controls');
-    caixa.querySelector('.play').addEventListener('click', function () {
-      caixa.classList.add('tocando'); v.setAttribute('controls', ''); v.play();
+    // Toca sem som quando aparece na tela (mostra que é um vídeo) e pausa ao sair.
+    if ('IntersectionObserver' in window) {
+      new IntersectionObserver(function (itens) {
+        itens.forEach(function (i) {
+          if (caixa.classList.contains('com-som')) return;
+          if (i.isIntersecting) { var p = v.play(); if (p && p.catch) p.catch(function () {}); } else { v.pause(); }
+        });
+      }, { threshold: 0.5 }).observe(caixa);
+    }
+    // Toque no botão: recomeça do início, com som e controles.
+    caixa.querySelector('.som').addEventListener('click', function () {
+      caixa.classList.add('com-som');
+      v.loop = false; v.muted = false; v.currentTime = 0; v.setAttribute('controls', '');
+      var p = v.play(); if (p && p.catch) p.catch(function () {});
     });
-    v.addEventListener('play', function () { caixa.classList.add('tocando'); });
   })();
 </script>
 </body>
