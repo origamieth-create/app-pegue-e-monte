@@ -1,0 +1,8 @@
+VERSÃO DE CONFERÊNCIA DO APP (não mexe nos dados reais)
+
+Tudo aqui é de exemplo e fica guardado só no celular onde você abrir.
+Pode entrar com qualquer e-mail e qualquer senha (mínimo 6 letras).
+
+Em Mais > "Testar situações (só na demonstração)" você troca entre:
+teste de 7 dias, teste acabou, pagamento pendente com Pix, sem Pix,
+assinatura suspensa, cliente cancelou e voltar ao normal.
