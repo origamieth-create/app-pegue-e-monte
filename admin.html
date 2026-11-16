@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="icone-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito+Sans:wght@400;600;700;800&display=swap">
-<link rel="stylesheet" href="estilo.css?v=20261113b">
+<link rel="stylesheet" href="estilo.css?v=20261116a">
 <style>
   body { padding-bottom: calc(32px + env(safe-area-inset-bottom)); }
   .topo { position: sticky; top: 0; z-index: 20; background: var(--tinta); color: #fff; padding: calc(8px + env(safe-area-inset-top)) 10px 0; }
@@ -55,6 +55,18 @@
   .sit-lead { background: #5B3A99; }
   .sit-cortesia { background: #1E5FA8; }
   .sit-teste { background: #0E7C86; }
+  .tag-origem { display: inline-flex; background: #EEE6FA; color: #5B3A99; border-radius: 999px; padding: 3px 9px; font-size: 12px; font-weight: 800; }
+  .passos-adm { display: inline-flex; gap: 4px; align-items: center; font-size: 13px; font-weight: 800; color: var(--texto2); }
+  .passos-adm i { width: 22px; height: 8px; border-radius: 9px; background: #E2D6F3; }
+  .passos-adm i.ok { background: #1F7A52; }
+  .aviso-parada { background: #FFF6E3; border: 1px solid #F1D9A4; color: #6B4A00; border-radius: 12px; padding: 8px 10px; font-size: 13px; font-weight: 700; }
+  .lista-msgs { gap: 8px; }
+  .linha-taxa { display: grid; grid-template-columns: 1fr 90px 100px; gap: 8px; align-items: center; font-size: 14px; }
+  .linha-taxa input { width: 100%; min-height: 40px; border-radius: 10px; border: 1px solid var(--linha); padding: 6px 8px; font: inherit; }
+  .linha-taxa label { display: flex; align-items: center; gap: 4px; font-weight: 800; color: var(--texto2); }
+  details.cartao summary { list-style: none; }
+  .msg-pronta { display: flex; flex-direction: column; gap: 4px; background: #DCF8C6; border-radius: 12px 12px 12px 3px; padding: 10px 12px; color: #1b1b1b; text-decoration: none; font-size: 14px; line-height: 1.4; }
+  .msg-pronta b { font-size: 12px; color: #1F7A52; }
   .sit-teste_encerrado { background: #C2410C; }
   .evento { display: flex; gap: 12px; align-items: flex-start; }
   .evento .bola { width: 12px; height: 12px; border-radius: 99px; margin-top: 6px; flex: 0 0 auto; }
@@ -67,6 +79,6 @@
 <body>
 <div id="raiz"><div class="carregando">Carregando…</div></div>
 <div id="toast" class="toast oculto" role="status" aria-live="polite"></div>
-<script type="module" src="admin.js?v=20261113b"></script>
+<script type="module" src="admin.js?v=20261116a"></script>
 </body>
 </html>

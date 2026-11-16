@@ -4,7 +4,7 @@
 // - Sem configurar: MODO DEMONSTRAÇÃO, com dados de exemplo guardados
 //   só neste navegador. Serve para ver e testar o app antes de tudo.
 // =====================================================================
-import { SUPABASE_URL, SUPABASE_ANON_KEY, DEMO_SITE } from './config.js?v=20261113b';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, DEMO_SITE } from './config.js?v=20261116a';
 
 export const MODO_DEMO = !/^https:\/\/.+\.supabase\.co\/?$/.test(SUPABASE_URL);
 
@@ -54,7 +54,7 @@ export function cruza(r, ini, fim) { return r.data_retirada <= fim && r.data_dev
 // =====================================================================
 // MODO DEMONSTRAÇÃO
 // =====================================================================
-const CHAVE_DEMO = DEMO_SITE ? 'apm-demo-site-v1' : 'apm-demo-v1';
+const CHAVE_DEMO = DEMO_SITE ? 'apm-demo-site-v2' : 'apm-demo-v1';
 function uid() { return (crypto.randomUUID && crypto.randomUUID()) || String(Math.random()).slice(2); }
 
 function demoInicial() {
@@ -98,6 +98,11 @@ function demoInicial() {
     kits.forEach((k) => { k.foto_url = fotos[k.id]; k.fotos = [fotos[k.id]]; });
     negocio.recado_link = 'Kits completos para festas inesquecíveis 🎈 Retirada no Centro, de segunda a sábado.';
     negocio.criado_em = new Date().toISOString();
+    negocio.logo_url = 'fotos/logo.svg';
+    const cat = { k1: 'Menino', k2: 'Menina', k3: 'Menino' };
+    kits.forEach((k) => { k.categoria = cat[k.id] || null; });
+    kits[0].fotos = ['fotos/safari.svg', 'fotos/jardim.svg', 'fotos/fundo-do-mar.svg'];
+    kits.push({ ...kits[1], id: 'k4', nome: 'Chá Revelação Ursinhos', preco: 290, categoria: 'Chá revelação', foto_url: 'fotos/jardim.svg', fotos: ['fotos/jardim.svg'] });
   }
   return { negocio, kits, reservas, gastos, assinatura, logado: DEMO_SITE, geradoEm: Date.now() };
 }
@@ -139,10 +144,10 @@ export async function entrar(email, senha) {
   await ok(s.auth.signInWithPassword({ email, password: senha }));
 }
 export async function criarConta(email, senha) {
-  if (MODO_DEMO) { D().logado = true; demoSalvar(); return { precisaConfirmar: false }; }
+  if (MODO_DEMO) { D().logado = true; demoSalvar(); return { precisaConfirmar: false, usuario: null }; }
   const s = await cliente();
   const data = await ok(s.auth.signUp({ email, password: senha }));
-  return { precisaConfirmar: !data.session };
+  return { precisaConfirmar: !data.session, usuario: data.user?.id || null };
 }
 export async function esqueciSenha(email) {
   if (MODO_DEMO) return;
@@ -192,22 +197,44 @@ export async function minhaAssinatura() {
     const agora = new Date().toISOString();
     const liberado = a.status === 'ativa' || (a.status !== 'teste' && !!a.carencia_ate && a.carencia_ate > agora)
       || (a.status === 'teste' && !!a.teste_ate && a.teste_ate > agora);
-    return { email: 'demo@exemplo.com', cortesia: false, encontrada: true, ...a, liberado, admin: !DEMO_SITE, agora };
+    const oferta_bf = a.status === 'ativa' && (a.plano || 'mensal') === 'mensal' && (a.forma_pagamento || 'pix') === 'pix' && agora < '2026-11-30T02:59:59Z';
+    return { email: 'demo@exemplo.com', cortesia: false, encontrada: true, plano: 'mensal', forma_pagamento: 'pix', oferta_bf, oferta_bf_ate: '2026-11-30T02:59:59Z', ...a, liberado, admin: !DEMO_SITE, agora };
   }
   const s = await cliente();
   return ok(s.rpc('minha_assinatura'));
 }
-export async function iniciarTeste() {
+export async function iniciarTeste(origem = null, telefone = null) {
   if (MODO_DEMO) {
     if (!D().assinatura) { D().assinatura = { status: 'teste', teste_ate: new Date(Date.now() + 7 * 864e5).toISOString() }; demoSalvar(); }
     return { ok: true };
   }
   const s = await cliente();
-  return ok(s.rpc('iniciar_teste'));
+  return ok(s.rpc('iniciar_teste', { p_origem: origem, p_telefone: telefone }));
+}
+// 3º passo dos primeiros passos: guarda quando a dona copiou o link pela primeira vez.
+export async function marcarLinkCopiado() {
+  const agora = new Date().toISOString();
+  if (MODO_DEMO) { if (!D().negocio.link_copiado_em) { D().negocio.link_copiado_em = agora; demoSalvar(); } return; }
+  const s = await cliente();
+  const atual = await meuNegocio();
+  if (!atual || atual.link_copiado_em) return;
+  await ok(s.from('negocios').update({ link_copiado_em: agora }).eq('id', atual.id).is('link_copiado_em', null));
+}
+export async function adminTestesOrigem() {
+  if (MODO_DEMO) return { anuncio: { total: 18, convertidos: 4 }, direto: { total: 6, convertidos: 2 }, por_campanha: [{ campanha: 'teste-gratis-novembro', total: 18, convertidos: 4 }] };
+  const s = await cliente();
+  return ok(s.rpc('admin_testes_origem'));
 }
 // Demonstração: troca a situação da assinatura para testar as telas.
 export function demoSimular(caso) {
   const h = (n) => new Date(Date.now() + n * 3600e3).toISOString();
+  if (caso === 'nova') {
+    // Conta nova em teste, sem nada cadastrado (para ver os primeiros passos).
+    D().kits = []; D().reservas = []; D().gastos = [];
+    D().negocio.criado_em = new Date().toISOString(); D().negocio.link_copiado_em = null;
+    try { Object.keys(localStorage).filter((k) => k.startsWith('apm-passos-') || k.startsWith('apm-link-copiado-')).forEach((k) => localStorage.removeItem(k)); } catch (e) { /* segue */ }
+    caso = 'teste';
+  }
   const pix = '00020101021226870014br.gov.bcb.pix2565pix.exemplo.com.br/qr/v2/cobv/demonstracao0000000000005204000053039865406' + '29.905802BR5913DEMONSTRACAO6009SAO PAULO62070503***6304ABCD';
   D().assinatura = ({
     normal: { status: 'ativa', plano: 'mensal' },
@@ -387,7 +414,8 @@ function demoAdmin() {
     { email: 'renata.m@gmail.com', nome: 'Renata Melo', telefone: '5551977776666', situacao: 'cancelada', status: 'cancelada', plano: 'mensal', tem_conta: true, negocio: 'Renata Festas', slug: 'renata-festas', kits: 1, reservas: 0, total_pago: 29.9, primeira_compra: dias(50), ultimo_acesso: dias(20), ultimo_aviso: dias(19), ultimo_aviso_evento: 'subscription_canceled' },
     { email: 'lia.festinhas@gmail.com', nome: 'Lia Martins', telefone: '5511955554444', situacao: 'lead', tem_conta: false, kits: 0, reservas: 0, total_pago: 0, ultimo_aviso: dias(1), ultimo_aviso_evento: 'checkout_abandonment' },
     { email: 'paty.kits@gmail.com', nome: null, telefone: null, situacao: 'lead', tem_conta: true, negocio: 'Paty Kits', slug: 'paty-kits', kits: 2, reservas: 0, total_pago: 0, conta_criada_em: dias(3), ultimo_acesso: dias(3) },
-    { email: 'aline.kits@gmail.com', nome: 'Aline Prado', telefone: '5551988887777', situacao: 'teste', status: 'teste', teste_inicio: dias(3), teste_ate: new Date(Date.now() + 4 * 864e5).toISOString(), tem_conta: true, negocio: 'Aline Kits', slug: 'aline-kits', kits: 5, reservas: 2, total_pago: 0, ultimo_acesso: dias(0), ultimo_aviso: dias(3), ultimo_aviso_evento: 'admin_teste' },
+    { email: 'aline.kits@gmail.com', nome: 'Aline Prado', telefone: '5551988887777', situacao: 'teste', status: 'teste', teste_inicio: dias(3), teste_ate: new Date(Date.now() + 4 * 864e5).toISOString(), tem_conta: true, negocio: 'Aline Kits', slug: 'aline-kits', kits: 5, reservas: 2, total_pago: 0, ultimo_acesso: dias(0), ultimo_aviso: dias(3), ultimo_aviso_evento: 'teste_automatico', link_copiado_em: null, origem: { utm_source: 'meta', utm_campaign: 'teste-gratis-novembro', utm_medium: 'decoradoras-sul', utm_content: 'carrossel-telas' } },
+    { email: 'paty.decor@gmail.com', nome: null, telefone: '5551988776655', situacao: 'teste', status: 'teste', teste_inicio: dias(2), teste_ate: new Date(Date.now() + 5 * 864e5).toISOString(), tem_conta: true, negocio: 'Paty Decorações', slug: 'paty-decoracoes', kits: 0, reservas: 0, total_pago: 0, ultimo_acesso: dias(2), ultimo_aviso: dias(2), ultimo_aviso_evento: 'teste_automatico', origem: { utm_source: 'meta', utm_campaign: 'teste-gratis-novembro', utm_medium: 'decoradoras-sul', utm_content: 'video-gancho-01' } },
     { email: 'sol.festas@gmail.com', nome: 'Sol Ribeiro', telefone: '5551933332222', situacao: 'teste_encerrado', status: 'teste', teste_inicio: dias(9), teste_ate: dias(2), tem_conta: true, negocio: 'Sol Festas', slug: 'sol-festas', kits: 2, reservas: 1, total_pago: 0, ultimo_acesso: dias(2), ultimo_aviso: dias(9), ultimo_aviso_evento: 'admin_teste' },
     { email: 'demo@exemplo.com', nome: null, situacao: 'cortesia', cortesia: true, tem_conta: true, negocio: 'Festas da Maria (teste)', slug: 'demo', kits: 3, reservas: 4, total_pago: 0, ultimo_acesso: dias(0) },
   ];
@@ -429,4 +457,78 @@ export async function adminDefinirAcesso(email, liberar) {
   if (MODO_DEMO) return { ok: true, email, liberado: liberar };
   const s = await cliente();
   return ok(s.rpc('admin_definir_acesso', { p_email: email, p_liberar: liberar }));
+}
+
+// ---------- Contrato ----------
+export async function contratoDaReserva(reservaId) {
+  if (MODO_DEMO) return (D().contratos || []).find((c) => c.reserva_id === reservaId) || null;
+  const s = await cliente();
+  return ok(s.from('contratos').select('*').eq('reserva_id', reservaId).maybeSingle());
+}
+// Cria (ou atualiza, se ainda não foi aceito) o contrato da reserva com o texto já preenchido.
+export async function gerarContrato(reserva, texto, pedeCpf) {
+  if (MODO_DEMO) {
+    D().contratos = D().contratos || [];
+    let c = D().contratos.find((x) => x.reserva_id === reserva.id);
+    if (!c) { c = { id: 'c' + Date.now(), reserva_id: reserva.id, token: 'demo' + Math.random().toString(36).slice(2) + 'xxxxxxxxxxxxxxxx', criado_em: new Date().toISOString() }; D().contratos.push(c); }
+    if (!c.aceito_em) Object.assign(c, { texto, pede_cpf: pedeCpf });
+    demoSalvar(); return c;
+  }
+  const s = await cliente();
+  const atual = await contratoDaReserva(reserva.id);
+  if (atual && atual.aceito_em) return atual;
+  if (atual) return ok(s.from('contratos').update({ texto, pede_cpf: pedeCpf }).eq('id', atual.id).select().single());
+  return ok(s.from('contratos').insert({ negocio_id: reserva.negocio_id, reserva_id: reserva.id, texto, pede_cpf: pedeCpf }).select().single());
+}
+export async function contratoPublico(token) {
+  if (MODO_DEMO) {
+    const c = (D().contratos || []).find((x) => x.token === token);
+    if (!c) return null;
+    const r = D().reservas.find((x) => x.id === c.reserva_id) || {};
+    const k = D().kits.find((x) => x.id === r.kit_id) || {};
+    return { ...c, loja: D().negocio.nome, logo_url: D().negocio.logo_url, whatsapp: D().negocio.whatsapp, kit: k.nome, retirada: r.data_retirada, cliente: r.cliente_nome };
+  }
+  const s = await cliente();
+  return ok(s.rpc('contrato_publico', { p_token: token }));
+}
+export async function aceitarContrato(token, nome, cpf, endereco) {
+  const agente = (navigator.userAgent || '').slice(0, 300);
+  if (MODO_DEMO) {
+    const c = (D().contratos || []).find((x) => x.token === token);
+    if (!c) throw new Error('Contrato não encontrado');
+    if (!/\S+\s+\S+/.test(nome.trim())) throw new Error('Digite seu nome completo');
+    if (c.pede_cpf && cpf.replace(/\D/g, '').length !== 11) throw new Error('Digite um CPF válido (11 números)');
+    if (c.pede_cpf && endereco.trim().length < 8) throw new Error('Digite seu endereço completo');
+    Object.assign(c, { aceito_em: new Date().toISOString(), aceito_nome: nome.trim(), aceito_cpf: c.pede_cpf ? cpf : null, aceito_endereco: c.pede_cpf ? endereco.trim() : null });
+    demoSalvar(); return { ok: true };
+  }
+  const s = await cliente();
+  return ok(s.rpc('aceitar_contrato', { p_token: token, p_nome: nome, p_cpf: cpf, p_endereco: endereco, p_agente: agente }));
+}
+
+// ---------- Notificações do administrador ----------
+export async function adminSalvarPush(endpoint) {
+  if (MODO_DEMO) return 'demo-token';
+  const s = await cliente();
+  return ok(s.rpc('salvar_push', { p_endpoint: endpoint }));
+}
+export async function adminTestarPush() {
+  if (MODO_DEMO) return { ok: true };
+  const s = await cliente();
+  return ok(s.rpc('admin_testar_push'));
+}
+export async function adminFinanceiro() {
+  if (MODO_DEMO) return { mes_bruto: 328.8, mes_liquido: 301.4, total_bruto: 627.7, total_liquido: 575.2, mensal_estimado_liquido: 74.9, taxas_configuradas: true, migraram_anual: 1 };
+  const s = await cliente();
+  return ok(s.rpc('admin_financeiro'));
+}
+export async function adminTaxas() {
+  if (MODO_DEMO) return [{ forma: 'pix', percentual: 3.99, fixo: 2.49 }, { forma: 'pix_auto', percentual: 3.99, fixo: 2.49 }, { forma: 'credit_card', percentual: 4.99, fixo: 2.49 }, { forma: 'boleto', percentual: 3.99, fixo: 2.49 }, { forma: 'outro', percentual: 4.99, fixo: 2.49 }];
+  const s = await cliente();
+  return ok(s.rpc('admin_taxas'));
+}
+export async function adminDefinirTaxa(forma, percentual, fixo) {
+  if (MODO_DEMO) return { ok: true };
+  const s = await cliente();
+  return ok(s.rpc('admin_definir_taxa', { p_forma: forma, p_percentual: percentual, p_fixo: fixo }));
 }

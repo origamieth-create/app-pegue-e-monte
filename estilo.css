@@ -236,3 +236,61 @@ label.campo { display: flex; flex-direction: column; gap: 6px; font-weight: 700;
 /* Observação da reserva */
 .anotacao { background: #FFFBEA; border-color: #F1D9A4; }
 .anotacao textarea { background: #fff; }
+.primeiros{border:2px solid #5B3A99;background:#F6F1FC;gap:12px}
+.primeiros h2{margin:0;font-size:21px}
+.prog{height:10px;border-radius:99px;background:#E2D6F3;overflow:hidden}.prog i{display:block;height:100%;background:#1F7A52;border-radius:99px}
+.passo{display:grid;grid-template-columns:34px 1fr;gap:10px;align-items:start;background:#fff;border-radius:14px;padding:12px;border:1px solid var(--linha)}
+.passo .bola{width:30px;height:30px;border-radius:99px;display:flex;align-items:center;justify-content:center;font-weight:900;background:#EEE6FA;color:#5B3A99}
+.passo.feito{opacity:.75}.passo.feito .bola{background:#1F7A52;color:#fff}.passo.feito b{text-decoration:line-through}
+.passo b{display:block;font-size:16px;color:var(--tinta)}.passo span{font-size:13px;color:var(--texto2)}
+.passo .btn{margin-top:8px}
+
+/* Fim do teste: escolha de planos */
+.planos { display: flex; flex-direction: column; gap: 12px; }
+.plano { border-radius: 20px; padding: 16px; display: flex; flex-direction: column; gap: 6px; position: relative; text-align: left; }
+.plano.anual { background: #FFF8E6; border: 3px solid #E4505C; box-shadow: 0 10px 26px rgba(228,80,92,.22); margin-top: 8px; }
+.plano.mensal { background: #fff; border: 2px solid var(--linha); }
+.plano .fita { position: absolute; top: -13px; left: 16px; background: #E4505C; color: #fff; font-weight: 900; font-size: 12px; letter-spacing: .3px; border-radius: 999px; padding: 5px 12px; }
+.plano .desc { position: absolute; top: -13px; right: 16px; background: #1F7A52; color: #fff; font-weight: 900; font-size: 12px; border-radius: 999px; padding: 5px 12px; }
+.plano .nome { font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 19px; color: var(--tinta); }
+.plano .de { font-size: 14px; color: #8a8190; text-decoration: line-through; font-weight: 700; }
+.plano .por { font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 40px; line-height: 1; color: var(--tinta); }
+.plano .por small { font-size: 16px; font-weight: 600; color: var(--texto2); }
+.plano .mes { font-size: 14px; font-weight: 800; color: #1F7A52; }
+.plano.mensal .por { font-size: 28px; }
+.plano .btn { margin-top: 6px; }
+
+/* Black Friday */
+.popup.bf-fundo { background: #1B1226; color: #fff; }
+.popup.bf-fundo h2 { color: #fff; }
+.bf-tag { align-self: center; background: #FFC94A; color: #1B1226; font-weight: 900; font-size: 13px; letter-spacing: 1.5px; border-radius: 999px; padding: 6px 14px; }
+.bf-preco { display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; }
+.bf-preco .de { text-decoration: line-through; color: #bcb3c7; font-weight: 700; }
+.bf-preco .por { font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 56px; line-height: 1; color: #FFC94A; }
+.bf-preco .por small { font-size: 18px; color: #fff; font-weight: 600; }
+.bf-preco .mes { color: #9FE3BD; font-weight: 800; font-size: 15px; }
+.relogio { display: flex; justify-content: center; gap: 8px; }
+.relogio div { background: #2E2140; border-radius: 12px; padding: 8px 10px; min-width: 62px; text-align: center; }
+.relogio b { display: block; font-family: 'Fredoka', sans-serif; font-size: 26px; color: #fff; }
+.relogio span { font-size: 11px; color: #bcb3c7; font-weight: 800; }
+.bf-nota { background: #2E2140; border-radius: 14px; padding: 10px 12px; font-size: 13px; color: #e6dff0; line-height: 1.4; }
+.bf-card { background: #1B1226; color: #fff; border-radius: 20px; padding: 14px; display: flex; gap: 12px; align-items: center; }
+.bf-card .t b { color: #FFC94A; font-family: 'Fredoka', sans-serif; font-size: 17px; display: block; }
+.bf-card .t span { font-size: 13px; color: #e6dff0; }
+.bf-card .btn { margin-left: auto; white-space: nowrap; }
+
+/* Instalar o app */
+.cartao.instalar { border: 2px solid #1F7A52; background: #EAF7EF; gap: 10px; }
+.passo-inst { display: grid; grid-template-columns: 34px 1fr; gap: 10px; align-items: center; background: #fff; border: 1px solid var(--linha); border-radius: 14px; padding: 12px; }
+.passo-inst > b { width: 30px; height: 30px; border-radius: 99px; background: #EEE6FA; color: #5B3A99; display: flex; align-items: center; justify-content: center; }
+.ic-compart { display: inline-block; border: 2px solid #1E5FA8; border-radius: 6px; padding: 0 6px; color: #1E5FA8; font-weight: 900; }
+
+/* Contrato */
+.ct { gap: 10px; }
+.st { display: inline-flex; align-self: flex-start; border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 800; white-space: nowrap; }
+.st.esp { background: #FFF6E3; color: #6B4A00; border: 1px solid #F1D9A4; }
+.st.ok { background: #EAF7EF; color: #1F7A52; border: 1px solid #BFE3CE; }
+.folha { background: #fff; border-radius: 6px; box-shadow: 0 8px 24px rgba(42,27,61,.15); padding: 24px 20px; font-family: Georgia, 'Times New Roman', serif; font-size: 14px; line-height: 1.55; color: #222; white-space: pre-wrap; word-break: break-word; }
+.folha .aceite { margin-top: 18px; padding-top: 10px; border-top: 1px solid #333; font-family: inherit; font-size: 13px; }
+.so-impressao { display: none; }
+@media print { .so-impressao { display: block; } }

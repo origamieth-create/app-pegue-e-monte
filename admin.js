@@ -3,7 +3,8 @@
 // Só abre para e-mails cadastrados na tabela "administradores".
 // Quem confere é o banco de dados: esta página só mostra o resultado.
 // =====================================================================
-import * as dados from './dados.js?v=20261113b';
+import * as dados from './dados.js?v=20261116a';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=20261116a';
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -65,7 +66,7 @@ const SITUACAO = {
   cortesia: 'Cortesia',
 };
 const FILTROS = [
-  ['todos', 'Todos'], ['ativa', 'Ativas'], ['teste', 'Em teste'], ['teste_encerrado', 'Teste acabou'], ['carencia', 'Pagamento pendente'], ['lead', 'Leads'],
+  ['todos', 'Todos'], ['ativa', 'Ativas'], ['teste', 'Em teste'], ['parada', 'Paradas'], ['teste_encerrado', 'Teste acabou'], ['carencia', 'Pagamento pendente'], ['lead', 'Leads'],
   ['cancelada', 'Canceladas'], ['suspensa', 'Bloqueadas'], ['cortesia', 'Cortesia'],
 ];
 const EVENTO = {
@@ -88,6 +89,36 @@ const EVENTO = {
   admin_teste: ['Você liberou o teste de 7 dias', '#1E5FA8'],
   teste_automatico: ['Criou conta e começou o teste', '#0E7C86'],
 };
+// ---------------------------------------------------------------------
+// Teste grátis: dia do teste, primeiros passos e mensagens prontas
+// ---------------------------------------------------------------------
+function diaDoTeste(c) {
+  if (!c.teste_inicio) return null;
+  return Math.min(7, Math.max(1, Math.floor((Date.now() - new Date(c.teste_inicio).getTime()) / 864e5) + 1));
+}
+function passosDe(c) { return [Number(c.kits) > 0, Number(c.reservas) > 0, !!c.link_copiado_em]; }
+// "Parada": em teste há 2 dias ou mais e ainda sem nenhum kit.
+function estaParada(c) { return c.situacao === 'teste' && Number(c.kits || 0) === 0 && (diaDoTeste(c) || 1) >= 2; }
+const MSGS_TESTE = [
+  [1, 'Dia 1 · boas-vindas', (n) => `Oi${n}! Aqui é do App Pegue e Monte 💛 Seu teste de 7 dias já está liberado. Comece cadastrando 1 kit com foto, leva 2 minutinhos. Qualquer dúvida é só me chamar aqui!`],
+  [3, 'Dia 3 · quem não cadastrou kit', (n) => `Oi${n}! Vi que você ainda não cadastrou seu primeiro kit. Quer que eu te ajude? Me manda a foto de um kit e a lista de peças que eu te mostro como fica 😉`],
+  [5, 'Dia 5 · dica do link', (n) => `Oi${n}! Dica de ouro: coloque seu link de reservas na bio do Instagram. Suas clientes veem os kits, escolhem a data livre e o pedido chega pronto no seu WhatsApp 🎈`],
+  [6, 'Dia 6 · acaba amanhã', (n) => `Oi${n}! Seu teste termina amanhã. Para continuar com seus kits, fotos e reservas, é só assinar com o mesmo e-mail do teste. Quer o link?`],
+];
+function msgDoDia(dia, c = {}) {
+  const m = (d) => MSGS_TESTE.find(([x]) => x === d);
+  if (dia >= 6) return m(6);
+  if (dia >= 5) return m(5);
+  if (dia >= 3) return Number(c.kits || 0) === 0 ? m(3) : m(5); // já tem kit: manda a dica do link
+  return m(1);
+}
+function rotuloOrigem(o) {
+  if (!o || !o.utm_source) return '<span class="tag-origem">💬 WhatsApp / direto</span>';
+  return [`📣 ${o.utm_source === 'meta' ? 'Anúncio' : esc(o.utm_source)}${o.utm_campaign ? ': ' + esc(o.utm_campaign) : ''}`,
+    o.utm_medium ? `Conjunto: ${esc(o.utm_medium)}` : '', o.utm_content ? `Anúncio: ${esc(o.utm_content)}` : '']
+    .filter(Boolean).map((t) => `<span class="tag-origem">${t}</span>`).join('');
+}
+
 const sit = (s) => `<span class="sit sit-${esc(s)}">${esc(SITUACAO[s] || s)}</span>`;
 
 // ---------------------------------------------------------------------
@@ -99,6 +130,9 @@ async function iniciar() {
     if (!sessao) return telaAviso('Entre no app primeiro', 'Faça login com o seu e-mail de administrador e depois abra o painel de novo.', 'Ir para o app');
     const eu = await dados.minhaAssinatura();
     if (!eu || !eu.admin) return telaAviso('Página restrita', 'Este painel é só para o administrador do App Pegue e Monte.', 'Voltar ao app');
+    const pedido = new URLSearchParams(location.search);
+    if (['resumo', 'clientes', 'pagamentos'].includes(pedido.get('aba'))) estado.aba = pedido.get('aba');
+    if (pedido.get('f')) estado.filtro = pedido.get('f');
     await carregar();
     montar();
   } catch (e) {
@@ -111,8 +145,9 @@ function telaAviso(titulo, texto, botao) {
 }
 
 async function carregar() {
-  [estado.resumo, estado.clientes, estado.eventos] = await Promise.all([
-    dados.adminResumo(), dados.adminClientes(), dados.adminEventos(120),
+  [estado.resumo, estado.clientes, estado.eventos, estado.origem, estado.fin, estado.taxas] = await Promise.all([
+    dados.adminResumo(), dados.adminClientes(), dados.adminEventos(120), dados.adminTestesOrigem().catch(() => null),
+    dados.adminFinanceiro().catch(() => null), dados.adminTaxas().catch(() => []),
   ]);
 }
 
@@ -137,7 +172,7 @@ function montar() {
 function desenhar() {
   $$('.abas-adm button').forEach((b) => b.classList.toggle('ativa', b.dataset.aba === estado.aba));
   const tela = $('#tela');
-  if (estado.aba === 'resumo') abaResumo(tela);
+  if (estado.aba === 'resumo') { abaResumo(tela); ligarResumoExtras(tela); }
   else if (estado.aba === 'clientes') abaClientes(tela);
   else abaPagamentos(tela);
 }
@@ -169,14 +204,18 @@ function abaResumo(tela) {
       <span class="rot">Clientes ativas</span>
       <span class="num">${r.ativas}</span>
       <span class="sub">${esc(partes.join(' · '))}</span>
-      <span class="rot" style="margin-top:8px">Receita mensal estimada: <b style="color:#fff">${reais(r.receita_mensal_estimada)}</b></span>
+      <span class="rot" style="margin-top:8px">${estado.fin
+        ? `Comissão mensal estimada (já sem as taxas da Cakto): <b style="color:#fff">${reais(estado.fin.mensal_estimado_liquido)}</b>`
+        : `Receita mensal estimada: <b style="color:#fff">${reais(r.receita_mensal_estimada)}</b>`}</span>
     </div>
+    ${cartaoNotificacoes()}
 
     <h2>Em ${esc(nomeMes)}</h2>
     <div class="grade-num">
       ${cartaoNum('Vendas novas', m.vendas, 'bom')}
       ${cartaoNum('Renovações pagas', m.renovacoes, 'bom')}
-      ${cartaoNum('Faturamento', reais(m.faturamento), 'bom')}
+      ${cartaoNum('Faturamento bruto', reais(estado.fin ? estado.fin.mes_bruto : m.faturamento), 'bom')}
+      ${estado.fin ? cartaoNum('Comissão líquida (sem taxas)', reais(estado.fin.mes_liquido), 'bom') : ''}
       ${cartaoNum('Pagamentos recusados', m.falhas, m.falhas ? 'alerta' : '')}
       ${cartaoNum('Cancelamentos', m.cancelamentos, m.cancelamentos ? 'ruim' : '')}
       ${cartaoNum('Reembolsos', m.reembolsos, m.reembolsos ? 'ruim' : '')}
@@ -196,6 +235,32 @@ function abaResumo(tela) {
       ${cartaoNum('Viraram assinantes', (r.teste || {}).convertidos || 0, 'bom')}
       ${cartaoNum('Conversão do teste', (r.teste || {}).total ? Math.round(((r.teste.convertidos || 0) / r.teste.total) * 100) + '%' : '—', 'bom')}
     </div>
+
+    ${estado.origem ? `<h2>Testes por origem</h2>
+    <div class="grade-num">
+      ${cartaoNum('Anúncio: testes', estado.origem.anuncio.total)}
+      ${cartaoNum('Anúncio: viraram assinantes', estado.origem.anuncio.convertidos, 'bom')}
+      ${cartaoNum('WhatsApp/direto: testes', estado.origem.direto.total)}
+      ${cartaoNum('WhatsApp/direto: assinantes', estado.origem.direto.convertidos, 'bom')}
+    </div>
+    ${(estado.origem.por_campanha || []).length ? `<section class="cartao coluna"><h3>Por campanha</h3>${estado.origem.por_campanha.map((x) => `<div class="linha-flex entre pequeno"><span>${esc(x.campanha)}</span><b>${x.total} testes · ${x.convertidos} assinantes</b></div>`).join('')}</section>` : ''}` : ''}
+
+    ${estado.fin ? `<h2>Comissão líquida</h2>
+    <div class="grade-num">
+      ${cartaoNum('Total bruto recebido', reais(estado.fin.total_bruto))}
+      ${cartaoNum('Total líquido (sem taxas)', reais(estado.fin.total_liquido), 'bom')}
+      ${cartaoNum('Migraram para o anual', estado.fin.migraram_anual || 0)}
+    </div>
+    <p class="pequeno" style="margin:0">O líquido é a comissão que a própria Cakto informa em cada venda (já sem as taxas).</p>
+    ${estado.fin.taxas_configuradas ? '' : '<div class="cartao pequeno" style="background:#FFF6E3;border-color:#F1D9A4">Alguma venda antiga veio sem a comissão da Cakto. Para ela, o app usa as taxas abaixo: preencha para o valor ficar certo.</div>'}
+    <details class="cartao coluna" id="taxas"><summary style="font-weight:800;cursor:pointer">Taxas da Cakto (só para vendas sem a comissão informada)</summary>
+      ${(estado.taxas || []).map((t) => `<div class="linha-taxa" data-forma="${esc(t.forma)}">
+        <b>${esc(({ pix: 'Pix', pix_auto: 'Pix Automático', credit_card: 'Cartão', boleto: 'Boleto', outro: 'Outros' })[t.forma] || t.forma)}</b>
+        <label>% <input type="number" step="0.01" min="0" max="100" value="${Number(t.percentual)}" data-campo="percentual"></label>
+        <label>R$ <input type="number" step="0.01" min="0" value="${Number(t.fixo)}" data-campo="fixo"></label>
+      </div>`).join('')}
+      <button class="btn principal cheio" id="salvar-taxas">Salvar taxas</button>
+    </details>` : ''}
 
     <h2>Uso do app</h2>
     <div class="grade-num">
@@ -224,15 +289,89 @@ function abaResumo(tela) {
 // ---------------------------------------------------------------------
 // Clientes e leads
 // ---------------------------------------------------------------------
+// ---------------------------------------------------------------------
+// Notificações no celular (só administrador)
+// ---------------------------------------------------------------------
+function suportaAvisos() { return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
+function cartaoNotificacoes() {
+  if (!suportaAvisos()) return '';
+  const ativo = Notification.permission === 'granted' && localStorage.getItem('apm-avisos-ativos') === '1';
+  return `<section class="cartao coluna" id="cartao-avisos" style="border:2px solid #1F7A52;background:#EAF7EF;gap:10px">
+    <div style="display:flex;gap:12px;align-items:center"><div style="font-size:34px" aria-hidden="true">🔔</div><div>
+      <b style="font-size:17px">Notificações no celular</b>
+      <div class="pequeno">${ativo ? 'Ativadas neste celular. Você recebe: novo teste grátis, venda realizada, teste que virou assinante e pagamento recusado.'
+        : 'Avisos de novo teste grátis, venda realizada, teste que virou assinante e pagamento recusado.'}</div></div></div>
+    ${ativo ? '<button class="btn contorno cheio" id="testar-avisos">Enviar uma notificação de teste</button>'
+      : '<button class="btn verde cheio" id="ativar-avisos">Ativar notificações</button>'}
+    ${Notification.permission === 'denied' ? '<div class="pequeno" style="color:#B3202E">As notificações estão bloqueadas no navegador. Toque no cadeado ao lado do endereço, abra Permissões e libere Notificações.</div>' : ''}
+  </section>`;
+}
+function chaveParaBytes(b64) {
+  const pad = '='.repeat((4 - (b64.length % 4)) % 4);
+  const bin = atob((b64 + pad).replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from(bin, (c) => c.charCodeAt(0));
+}
+async function ativarAvisos(botao) {
+  const texto = botao.textContent;
+  botao.disabled = true; botao.textContent = 'Ativando…';
+  try {
+    if (dados.MODO_DEMO) throw new Error('Na demonstração as notificações não são enviadas.');
+    const reg = await navigator.serviceWorker.register('sw.js?v=1', { scope: './' });
+    await navigator.serviceWorker.ready;
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') throw new Error('Você não permitiu as notificações. Dá para liberar depois nas configurações do navegador.');
+    const r = await fetch(`${SUPABASE_URL}/functions/v1/notificar-admin?acao=chave`);
+    const { publica } = await r.json();
+    if (!publica) throw new Error('Não consegui pegar a chave das notificações.');
+    let inscricao = await reg.pushManager.getSubscription();
+    if (!inscricao) inscricao = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: chaveParaBytes(publica) });
+    const token = await dados.adminSalvarPush(inscricao.endpoint);
+    const cache = await caches.open('apm-avisos');
+    await cache.put('/apm-avisos/token', new Response(String(token)));
+    await cache.put('/apm-avisos/cfg', new Response(JSON.stringify({ url: SUPABASE_URL, chave: SUPABASE_ANON_KEY })));
+    localStorage.setItem('apm-avisos-ativos', '1');
+    aviso('Notificações ativadas neste celular!');
+    desenhar();
+  } catch (e) {
+    aviso(e.message || 'Não deu certo. Tente de novo.');
+    botao.disabled = false; botao.textContent = texto;
+  }
+}
+function ligarResumoExtras(tela) {
+  const at = $('#ativar-avisos', tela);
+  if (at) at.onclick = () => ativarAvisos(at);
+  const te = $('#testar-avisos', tela);
+  if (te) te.onclick = async () => {
+    te.disabled = true;
+    try { await dados.adminTestarPush(); aviso('Pronto! A notificação de teste deve chegar em alguns segundos.'); }
+    catch (e) { aviso(e.message); }
+    te.disabled = false;
+  };
+  const st = $('#salvar-taxas', tela);
+  if (st) st.onclick = async () => {
+    st.disabled = true; st.textContent = 'Salvando…';
+    try {
+      for (const linha of $$('.linha-taxa', tela)) {
+        const pct = Number(linha.querySelector('[data-campo="percentual"]').value || 0);
+        const fixo = Number(linha.querySelector('[data-campo="fixo"]').value || 0);
+        await dados.adminDefinirTaxa(linha.dataset.forma, pct, fixo);
+      }
+      await carregar(); desenhar(); aviso('Taxas salvas. Os valores líquidos já foram recalculados.');
+    } catch (e) { aviso(e.message); st.disabled = false; st.textContent = 'Salvar taxas'; }
+  };
+}
+
 function filtrados() {
   const b = estado.busca.trim().toLowerCase();
   return estado.clientes.filter((c) =>
-    (estado.filtro === 'todos' || c.situacao === estado.filtro) &&
+    (estado.filtro === 'todos' || c.situacao === estado.filtro || (estado.filtro === 'parada' && estaParada(c))) &&
     (!b || [c.email, c.nome, c.negocio, c.telefone, c.whatsapp].some((v) => String(v || '').toLowerCase().includes(b))));
 }
 
 function abaClientes(tela) {
-  const contagem = (f) => (f === 'todos' ? estado.clientes.length : estado.clientes.filter((c) => c.situacao === f).length);
+  const contagem = (f) => (f === 'todos' ? estado.clientes.length
+    : f === 'parada' ? estado.clientes.filter(estaParada).length
+    : estado.clientes.filter((c) => c.situacao === f).length);
   tela.innerHTML = `
     <form class="cartao coluna" id="liberar-form" novalidate>
       <h2>Liberar acesso para um e-mail</h2>
@@ -275,7 +414,8 @@ function cartaoPessoa(c) {
       ? `Oi${primeiroNome ? ', ' + primeiroNome : ''}! Seu teste do App Pegue e Monte terminou. Gostou? Assinando com o mesmo e-mail, seus kits e reservas continuam lá. Posso te ajudar?`
       : `Oi${primeiroNome ? ', ' + primeiroNome : ''}! Aqui é do App Pegue e Monte.`;
   const infos = [];
-  if (c.plano && c.plano !== 'manual') infos.push(['Plano', c.plano === 'anual' ? 'Anual' : 'Mensal']);
+  if (c.plano && c.plano !== 'manual') infos.push(['Plano', c.plano === 'anual' ? (c.migrou_anual_em ? 'Anual (migrou do mensal)' : 'Anual') : 'Mensal']);
+  if (c.forma_pagamento) infos.push(['Pagamento', ({ pix: 'Pix', pix_auto: 'Pix Automático', credit_card: 'Cartão', boleto: 'Boleto' })[c.forma_pagamento] || c.forma_pagamento]);
   if (c.plano === 'manual') infos.push(['Plano', 'Liberado por você']);
   if (tel) infos.push(['Telefone', telefoneBonito(tel)]);
   if (c.negocio) infos.push(['Negócio', c.negocio]);
@@ -284,13 +424,35 @@ function cartaoPessoa(c) {
   if (c.tem_conta) infos.push(['Último acesso', haQuanto(c.ultimo_acesso)]);
   if (c.primeira_compra) infos.push(['Cliente desde', data(c.primeira_compra)]);
   if (Number(c.total_pago)) infos.push(['Total pago', reais(c.total_pago)]);
+  if (Number(c.total_liquido)) infos.push(['Líquido (sem taxas)', reais(c.total_liquido)]);
   if (c.situacao === 'carencia' && c.carencia_ate) infos.push(['Bloqueia em', dataHora(c.carencia_ate)]);
   if (c.situacao === 'teste' && c.teste_ate) infos.push(['Teste termina', dataHora(c.teste_ate)]);
   if (c.situacao === 'teste_encerrado' && c.teste_ate) infos.push(['Teste acabou em', data(c.teste_ate)]);
   if (c.ultimo_aviso_evento) infos.push(['Último aviso', `${(EVENTO[c.ultimo_aviso_evento] || [c.ultimo_aviso_evento])[0]} (${data(c.ultimo_aviso)})`]);
 
+  const emTeste = c.situacao === 'teste';
+  const dia = diaDoTeste(c);
+  const parada = estaParada(c);
+  const passos = passosDe(c);
+  const nomeMsg = primeiroNome ? ', ' + primeiroNome : '';
+  const [, rotuloMsg, textoMsg] = emTeste ? msgDoDia(dia || 1, c) : [];
+  const blocoTeste = emTeste ? `
+    <div class="linha-flex" style="gap:8px;flex-wrap:wrap;align-items:center">
+      <b class="pequeno">Dia ${dia || 1} de 7</b>
+      <span class="passos-adm">${passos.map((ok) => `<i class="${ok ? 'ok' : ''}"></i>`).join('')} ${passos.filter(Boolean).length} de 3 passos</span>
+      ${parada ? '<span class="sit sit-teste_encerrado">Parada</span>' : ''}
+    </div>
+    ${parada ? '<div class="aviso-parada">Ainda não cadastrou nenhum kit. Vale chamar hoje.</div>' : ''}
+    ${tel ? `<div class="acoes">
+      <a class="btn mini verde" href="${esc(linkZap(tel, textoMsg(nomeMsg)))}" target="_blank" rel="noopener">💬 Mensagem: ${esc(rotuloMsg)}</a>
+      <button class="btn mini contorno" data-msgs="${esc(c.email)}">Outras mensagens</button>
+    </div>` : ''}` : '';
+  const origem = (c.teste_inicio || c.origem) ? `<div class="linha-flex" style="gap:6px;flex-wrap:wrap">${rotuloOrigem(c.origem)}</div>` : '';
+
   return `<article class="cartao pessoa" data-email="${esc(c.email)}">
     <div class="cab"><div style="min-width:0"><div class="nome">${esc(nome)}</div><div class="email">${esc(c.email)}</div></div>${sit(c.situacao)}</div>
+    ${blocoTeste}
+    ${origem}
     <div class="infos">${infos.map(([k, v]) => `<div>${esc(k)}<br><b>${esc(v)}</b></div>`).join('')}</div>
     <div class="acoes">
       ${tel ? `<a class="btn mini verde" href="${esc(linkZap(tel, msg))}" target="_blank" rel="noopener">WhatsApp</a>` : ''}
@@ -311,6 +473,18 @@ function desenharLista() {
   lista.innerHTML = itens.length
     ? itens.map(cartaoPessoa).join('')
     : '<p class="pequeno centro" style="padding:20px 0">Ninguém por aqui ainda.</p>';
+  $$('[data-msgs]', lista).forEach((b) => {
+    b.onclick = () => {
+      const c = estado.clientes.find((x) => x.email === b.dataset.msgs);
+      const tel = c.telefone || c.whatsapp;
+      const n = String(c.nome || '').split(' ')[0];
+      const caixa = b.closest('.pessoa');
+      const ja = caixa.querySelector('.lista-msgs');
+      if (ja) { ja.remove(); return; }
+      caixa.insertAdjacentHTML('beforeend', `<div class="lista-msgs coluna">${MSGS_TESTE.map(([, rot, txt]) => `
+        <a class="msg-pronta" href="${esc(linkZap(tel, txt(n ? ', ' + n : '')))}" target="_blank" rel="noopener"><b>${esc(rot)}</b><span>${esc(txt(n ? ', ' + n : ''))}</span></a>`).join('')}</div>`);
+    };
+  });
   $$('[data-acao]', lista).forEach((b) => {
     b.onclick = () => {
       const email = b.closest('[data-email]').dataset.email;

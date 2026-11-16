@@ -2,8 +2,8 @@
 // App Pegue e Monte — app da dona
 // Abas: Hoje, Agenda, Kits, Mais
 // =====================================================================
-import * as dados from './dados.js?v=20261113b';
-import { PERMITIR_CADASTRO, EMAIL_SUPORTE, WHATSAPP_SUPORTE, LINK_MENSAL, LINK_ANUAL, DEMO_SITE, LINK_PLANOS } from './config.js?v=20261113b';
+import * as dados from './dados.js?v=20261116a';
+import { PERMITIR_CADASTRO, EMAIL_SUPORTE, WHATSAPP_SUPORTE, LINK_MENSAL, LINK_ANUAL, LINK_ANUAL_PROMO, DEMO_SITE, LINK_PLANOS } from './config.js?v=20261116a';
 
 const { hojeISO, somaDias, cruza } = dados;
 
@@ -145,8 +145,11 @@ function abrirPopup(corpo, aoMontar) {
 // dona abre o app depois que os arquivos novos forem publicados.
 // ---------------------------------------------------------------------
 const NOVIDADES = {
-  versao: '2026-11-16',
+  versao: '2026-11-17',
+  desde: '2026-11-16T18:00:00Z', // contas criadas depois disso já nascem com tudo
   itens: [
+    ['📄', 'Contrato pronto em cada reserva', 'Em Mais > Meu contrato, ajuste o seu modelo uma vez. Na reserva, toque em "Gerar contrato" e mande o link: a cliente lê e aceita pelo celular.'],
+    ['📲', 'Instale o app no celular', 'Em Mais, toque em "Instalar o app na tela inicial" e abra direto pelo ícone, como um aplicativo.'],
     ['📷', 'Até 5 fotos por kit, sem cortes', 'Em Kits, toque no kit e em "Adicionar fotos". Você ajusta o recorte antes de enviar (ou usa a foto inteira), e no seu link a cliente passa as fotos com o dedo.'],
     ['💬', 'Suas mensagens do WhatsApp', 'Em Mais > Mensagens do WhatsApp, escreva do seu jeito os textos de sinal, confirmação, retirada e devolução.'],
     ['🎨', 'Sua logo e um recado no link', 'Em Mais > Meus dados, coloque a sua logo e um recado que aparece no topo do seu link de reservas.'],
@@ -161,7 +164,8 @@ function mostrarNovidades() {
   if (DEMO_SITE || vista >= NOVIDADES.versao) return;
   // Conta criada depois da atualização já nasce com tudo: não precisa do aviso.
   const criado = estado.negocio && estado.negocio.criado_em;
-  if (criado && String(criado).slice(0, 10) >= NOVIDADES.versao) { marcar(); return; }
+  // (a atualização foi publicada em 13/11 às 14h; contas criadas depois disso não veem o aviso)
+  if (criado && String(criado) >= NOVIDADES.desde) { marcar(); return; }
   function marcar() { try { localStorage.setItem(chave, NOVIDADES.versao); } catch (e) { /* ignora */ } }
   abrirPopup(`
     ${BANDEIRINHAS}
@@ -171,11 +175,11 @@ function mostrarNovidades() {
       ${NOVIDADES.itens.map(([ic, t, d]) => `
         <div class="novidade"><span class="novidade-ic">${ic}</span><div><b>${esc(t)}</b><p class="pequeno">${esc(d)}</p></div></div>`).join('')}
     </div>
-    <button class="btn principal cheio" id="nov-msg">Personalizar minhas mensagens</button>
+    <button class="btn principal cheio" id="nov-msg">Ajustar meu contrato</button>
     <button class="btn contorno cheio" id="nov-ok">Entendi</button>`, (p) => {
     marcar();
     $('#nov-ok', p).onclick = () => fecharPainel();
-    $('#nov-msg', p).onclick = () => painelMensagens();
+    $('#nov-msg', p).onclick = () => painelContrato();
   });
 }
 
@@ -340,7 +344,7 @@ function popupPagamento() {
       catch (e) { prompt('Copie o código Pix:', a.pix_codigo); }
     };
     try {
-      const { default: qrcode } = await import('./qrcode.mjs?v=20261113b');
+      const { default: qrcode } = await import('./qrcode.mjs?v=20261116a');
       const q = qrcode(0, 'M'); q.addData(a.pix_codigo); q.make();
       $('#pix-qr', p).innerHTML = q.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
     } catch (e) { $('#pix-qr', p).remove(); }
@@ -354,10 +358,23 @@ function bloqueioFimDoTeste() {
   if (!caixa) { caixa = document.createElement('div'); caixa.id = 'bloqueio'; document.body.appendChild(caixa); }
   caixa.innerHTML = `<div class="popup-fundo bloqueio"><div class="popup" role="dialog" aria-modal="true">
     ${BANDEIRINHAS}
-    <h2 class="centro" style="font-size:25px">Seu teste grátis terminou</h2>
-    <p class="centro">Gostou de organizar seus kits no app? Assine para continuar de onde parou.</p>
-    <div class="nota-amarela">Assine com o <b>mesmo e-mail do teste</b> (<b>${esc(a.email || '')}</b>) para não perder seus kits, fotos e reservas já cadastrados.</div>
-    <a class="btn verde cheio" href="${esc(LINK_MENSAL)}" target="_blank" rel="noopener">Assinar e continuar usando</a>
+    <h2 class="centro" style="font-size:24px;margin:0">Seu teste grátis terminou</h2>
+    <p class="centro pequeno" style="margin:0">Escolha seu plano e continue de onde parou. Seus kits, fotos e reservas estão guardados.</p>
+    <div class="planos">
+      <div class="plano anual"><span class="fita">OFERTA DE FIM DE TESTE</span><span class="desc">53% OFF</span>
+        <div class="nome">Plano anual</div>
+        <div class="de">De R$ 358,80</div>
+        <div class="por">R$ 167 <small>por 12 meses</small></div>
+        <div class="mes">Sai por R$ 13,92 por mês · ou parcele no cartão</div>
+        <a class="btn verde cheio" style="min-height:52px;font-size:17px" href="${esc(LINK_ANUAL_PROMO)}" target="_blank" rel="noopener">Quero o anual com desconto</a>
+      </div>
+      <div class="plano mensal">
+        <div class="nome">Plano mensal</div>
+        <div class="por">R$ 29,90 <small>por mês</small></div>
+        <a class="btn contorno cheio" href="${esc(LINK_MENSAL)}" target="_blank" rel="noopener">Assinar o mensal</a>
+      </div>
+    </div>
+    <div class="nota-amarela pequeno">Assine com o <b>mesmo e-mail do teste</b> (<b>${esc(a.email || '')}</b>) para não perder nada do que já cadastrou.</div>
     <button class="btn contorno cheio" id="teste-verificar">Já assinei, verificar</button>
     ${botaoZapSuporte('Oi! Meu teste do App Pegue e Monte terminou e tenho uma dúvida.')}
     <button class="link-btn" id="teste-sair">Sair do app</button>
@@ -508,7 +525,36 @@ function atualizarContador() {
 // =====================================================================
 // Entrar, criar conta, recuperar senha
 // =====================================================================
+// ---------------------------------------------------------------------
+// Pixel do Meta: carrega só na tela de criar conta e avisa o cadastro
+// (CompleteRegistration + StartTrial) uma única vez por conta.
+// ---------------------------------------------------------------------
+const PIXEL_META = '1489696249388385';
+function carregarPixel() {
+  if (dados.MODO_DEMO || window.fbq) return;
+  /* eslint-disable */
+  !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');
+  /* eslint-enable */
+  window.fbq('init', PIXEL_META);
+  window.fbq('track', 'PageView');
+}
+function idEvento(nome) {
+  const aleatorio = (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
+  return `${nome}-${aleatorio}`;
+}
+function avisarCadastroPixel(conta) {
+  if (dados.MODO_DEMO) return;
+  const chave = `apm-pixel-cadastro-${conta}`;
+  try { if (localStorage.getItem(chave)) return; } catch (e) { /* segue */ }
+  carregarPixel();
+  const ids = { cadastro: idEvento('cadastro'), teste: idEvento('teste') };
+  window.fbq('track', 'CompleteRegistration', {}, { eventID: ids.cadastro });
+  window.fbq('track', 'StartTrial', { value: 0, currency: 'BRL' }, { eventID: ids.teste });
+  try { localStorage.setItem(chave, JSON.stringify({ ...ids, em: new Date().toISOString() })); } catch (e) { /* segue */ }
+}
+
 function telaLogin(modo) {
+  if (modo === 'criar') carregarPixel();
   const titulos = { entrar: 'Entrar', criar: 'Criar conta', esqueci: 'Recuperar senha' };
   $('#raiz').innerHTML = `
     <div class="entrada"><form class="caixa" novalidate>
@@ -551,6 +597,7 @@ function telaLogin(modo) {
       if (senha.length < 6) throw new Error('A senha precisa ter pelo menos 6 caracteres.');
       if (modo === 'criar') {
         const r = await dados.criarConta(email, senha);
+        avisarCadastroPixel(r.usuario || email.toLowerCase());
         if (r.precisaConfirmar) {
           caixaErro.textContent = 'Conta criada! Abra o e-mail que enviamos e clique no link para confirmar. Depois é só entrar.';
           caixaErro.classList.remove('oculto');
@@ -649,7 +696,7 @@ function telaConfiguracaoInicial() {
       ${BANDEIRINHAS}<div class="logo-app">${ICONE.logo}</div>
       <h1 class="centro">Vamos começar</h1>
       <p class="centro pequeno">Quatro informações e seu app está pronto.</p>
-      ${camposNegocio({}, true)}
+      ${camposNegocio({ whatsapp: soDigitos(guardado('apm-teste-whatsapp') || '') || null }, true)}
       <div class="erro oculto" id="erro-cfg"></div>
       <button class="btn principal cheio" type="submit">Pronto, abrir meu app</button>
       <button type="button" class="link-btn" id="sair">Sair</button>
@@ -752,6 +799,190 @@ function montarApp() {
   const deHash = location.hash.replace('#', '');
   irPara(['hoje', 'agenda', 'kits', 'mais'].includes(deHash) ? deHash : 'hoje');
   setTimeout(mostrarNovidades, 600);
+  setTimeout(mostrarBlackFriday, 1200);
+}
+
+// ---------------------------------------------------------------------
+// Black Friday: anual por R$ 167 só para quem assina o mensal pagando
+// com Pix comum (o banco decide quem pode ver: oferta_bf), até 29/11.
+// ---------------------------------------------------------------------
+function temOfertaBF() {
+  const a = estado.assinatura || {};
+  return !DEMO_SITE && !!a.oferta_bf && !!a.oferta_bf_ate && agoraServidor() < new Date(a.oferta_bf_ate).getTime();
+}
+function faltaBF() {
+  const ms = Math.max(0, new Date(estado.assinatura.oferta_bf_ate).getTime() - agoraServidor());
+  return { d: Math.floor(ms / 864e5), h: Math.floor((ms % 864e5) / 36e5), m: Math.floor((ms % 36e5) / 6e4) };
+}
+function popupBlackFriday() {
+  const a = estado.assinatura || {};
+  const f = faltaBF();
+  const dois = (n) => String(n).padStart(2, '0');
+  abrirPopup(`
+    <div class="bf-pop coluna" style="gap:14px">
+      <span class="bf-tag">BLACK FRIDAY</span>
+      <h2 class="centro" style="font-size:25px;margin:0">Troque o mensal pelo anual com 53% OFF</h2>
+      <div class="bf-preco"><span class="de">De R$ 358,80 por ano no mensal</span><span class="por">R$ 167 <small>por 12 meses</small></span><span class="mes">Sai por R$ 13,92 por mês</span></div>
+      <div class="relogio" aria-label="Tempo até o fim da oferta"><div><b>${dois(f.d)}</b><span>DIAS</span></div><div><b>${dois(f.h)}</b><span>HORAS</span></div><div><b>${dois(f.m)}</b><span>MIN</span></div></div>
+      <a class="btn verde cheio" style="min-height:54px;font-size:17px" href="${esc(LINK_ANUAL_PROMO)}" target="_blank" rel="noopener">Quero o anual por R$ 167</a>
+      <div class="bf-nota">Use o <b>mesmo e-mail do app</b> (${esc(a.email || '')}). Seus kits, fotos e reservas continuam iguais, e o mensal no Pix não é mais cobrado: é só não pagar o próximo Pix. Oferta só para quem assina o mensal, até <b>29/11</b>.</div>
+      <button class="link-btn" id="bf-fechar" style="color:#bcb3c7">Agora não</button>
+    </div>`, (p) => {
+    p.classList.add('bf-fundo');
+    $('#bf-fechar', p).onclick = () => fecharPainel();
+  });
+}
+function mostrarBlackFriday() {
+  if (!temOfertaBF() || painelAberto || $('#bloqueio')) return;
+  const hoje = hojeISO();
+  let visto = '';
+  try { visto = localStorage.getItem('apm-bf-visto') || ''; } catch (e) { /* segue */ }
+  if (visto === hoje) return;
+  try { localStorage.setItem('apm-bf-visto', hoje); } catch (e) { /* segue */ }
+  popupBlackFriday();
+}
+
+// ---------------------------------------------------------------------
+// Instalar o app na tela inicial
+// ---------------------------------------------------------------------
+let pedidoInstalacao = null;
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); pedidoInstalacao = e; });
+window.addEventListener('appinstalled', () => { pedidoInstalacao = null; aviso('App instalado! Agora é só abrir pelo ícone 🎉'); });
+function appInstalado() {
+  return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
+}
+function ehIphone() { return /iphone|ipad|ipod/i.test(navigator.userAgent); }
+async function instalarApp() {
+  if (pedidoInstalacao) {
+    pedidoInstalacao.prompt();
+    const { outcome } = await pedidoInstalacao.userChoice.catch(() => ({}));
+    pedidoInstalacao = null;
+    if (outcome === 'accepted') aviso('Instalando… o ícone aparece na sua tela inicial.');
+    return;
+  }
+  const iphone = ehIphone();
+  const foraDoSafari = iphone && /CriOS|FxiOS|EdgiOS|Instagram|FBAN|FBAV|Line\//i.test(navigator.userAgent);
+  const passo = (n, t) => `<div class="passo-inst"><b>${n}</b><span>${t}</span></div>`;
+  abrirPopup(`
+    <h2 class="centro" style="font-size:23px;margin:0">${iphone ? 'Instalar no iPhone' : 'Instalar no celular'}</h2>
+    ${foraDoSafari ? '<div class="nota-amarela pequeno">Primeiro abra este app no <b>Safari</b> (no iPhone, só o Safari instala). Copie o endereço e cole no Safari.</div>' : ''}
+    ${iphone
+      ? passo(1, 'Toque em <b>Compartilhar</b> <span class="ic-compart">⇧</span> na barra do Safari') + passo(2, 'Role e toque em <b>"Adicionar à Tela de Início"</b> ➕') + passo(3, 'Toque em <b>Adicionar</b>. Pronto, o ícone aparece na sua tela 🎉')
+      : passo(1, 'Toque nos <b>3 pontinhos ⋮</b> no canto do navegador') + passo(2, 'Toque em <b>"Instalar app"</b> ou <b>"Adicionar à tela inicial"</b>') + passo(3, 'Confirme. Pronto, o ícone aparece na sua tela 🎉')}
+    <button class="btn principal cheio" id="inst-ok">Entendi</button>`, (p) => { $('#inst-ok', p).onclick = () => fecharPainel(); });
+}
+
+// ---------------------------------------------------------------------
+// Contrato: modelo da dona (Mais > Meu contrato) e contrato de cada reserva
+// ---------------------------------------------------------------------
+const CONTRATO_PADRAO = `CONTRATO DE LOCAÇÃO DE KIT DE FESTA
+
+Locadora: {loja}
+Locatária: {nome} · CPF {cpf}
+Endereço: {endereco}
+
+Kit: {kit}
+Data da festa: {festa}
+Retirada: {retirada} · Devolução: {devolucao}
+Valor total: {total} · Sinal: {sinal} · Restante: {restante}
+
+Peças entregues:
+{pecas}
+
+1. A locatária se responsabiliza pelas peças até a devolução. Peças danificadas ou não devolvidas serão cobradas pelo valor de reposição.
+2. Atraso na devolução: R$ 30,00 por dia.
+3. O sinal garante a data e não é devolvido em caso de desistência.`;
+const MARCADORES_CONTRATO = [
+  ['{nome}', 'nome completo da cliente'], ['{cpf}', 'CPF (a cliente preenche no aceite)'], ['{endereco}', 'endereço (a cliente preenche no aceite)'],
+  ['{kit}', 'nome do kit'], ['{pecas}', 'lista de peças'], ['{festa}', 'data da festa'], ['{retirada}', 'data da retirada'],
+  ['{devolucao}', 'data da devolução'], ['{total}', 'valor total'], ['{sinal}', 'valor do sinal'], ['{restante}', 'valor que falta'], ['{loja}', 'nome do seu negócio'],
+];
+function dataContrato(iso) { return paraData(iso).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }).replace('.', ''); }
+// Preenche o modelo com os dados da reserva. CPF e endereço ficam para o aceite.
+function preencherContrato(modelo, r, pedeCpf) {
+  const k = kitDe(r.kit_id) || {};
+  const pecas = (r.pecas && r.pecas.length ? r.pecas : (k.pecas || [])).map((x) => `• ${x}`).join('\n') || '• (sem lista de peças)';
+  const restante = Math.max(0, Number(r.valor_total) - Number(r.valor_sinal));
+  let t = String(modelo || CONTRATO_PADRAO);
+  if (!pedeCpf) {
+    t = t.replace(/\s*·?\s*CPF:?\s*\{cpf\}/gi, '').split('\n').filter((l) => !/\{cpf\}|\{endereco\}/.test(l)).join('\n');
+  }
+  const valores = {
+    '{nome}': r.cliente_nome, '{kit}': k.nome || '', '{pecas}': pecas, '{festa}': dataContrato(r.data_festa),
+    '{retirada}': dataContrato(r.data_retirada), '{devolucao}': dataContrato(r.data_devolucao), '{total}': reais(r.valor_total),
+    '{sinal}': reais(r.valor_sinal), '{restante}': reais(restante), '{loja}': estado.negocio.nome,
+  };
+  return t.replace(/\{(nome|kit|pecas|festa|retirada|devolucao|total|sinal|restante|loja)\}/g, (m) => valores[m] ?? m);
+}
+function linkContrato(token) { return new URL('contrato.html?c=' + encodeURIComponent(token), location.href).href.split('#')[0]; }
+
+function painelContrato() {
+  const n = estado.negocio;
+  const pede = n.contrato_pede_cpf !== false;
+  abrirPainel('Meu contrato', `
+    <p class="pequeno">Escreva seu contrato uma vez. Em cada reserva, o app troca os marcadores pelos dados da cliente.</p>
+    <form class="coluna" novalidate>
+      <label class="campo">Texto do contrato<textarea name="modelo" maxlength="8000" rows="18" style="min-height:360px;font-size:14px;line-height:1.45">${esc(String(n.contrato_modelo || '').trim() || CONTRATO_PADRAO)}</textarea></label>
+      <div class="pequeno"><b>Toque para inserir:</b></div>
+      <div class="marcadores">${MARCADORES_CONTRATO.map(([m, d]) => `<button type="button" class="marcador" data-m="${m}" title="${esc(d)}">${m}</button>`).join('')}</div>
+      <label class="check ${pede ? 'marcado' : ''}"><input type="checkbox" name="pede" ${pede ? 'checked' : ''}> Pedir CPF e endereço da cliente no aceite</label>
+      <div class="erro oculto" id="erro-ct"></div>
+      <button class="btn principal cheio" type="submit">Salvar contrato</button>
+      <button class="link-btn" type="button" id="ct-padrao">Voltar ao modelo padrão</button>
+    </form>`, (p) => {
+    const form = $('form', p);
+    const ta = form.modelo;
+    form.pede.onchange = () => form.pede.closest('.check').classList.toggle('marcado', form.pede.checked);
+    $$('[data-m]', p).forEach((b) => (b.onclick = () => {
+      const ini = ta.selectionStart ?? ta.value.length; const fim = ta.selectionEnd ?? ini;
+      ta.value = ta.value.slice(0, ini) + b.dataset.m + ta.value.slice(fim);
+      ta.focus(); ta.selectionStart = ta.selectionEnd = ini + b.dataset.m.length;
+    }));
+    $('#ct-padrao', p).onclick = () => { ta.value = CONTRATO_PADRAO; };
+    form.onsubmit = (e) => {
+      e.preventDefault();
+      acao(form.querySelector('button[type=submit]'), async () => {
+        const texto = ta.value.trim();
+        if (texto.length < 30) { const c = $('#erro-ct', p); c.textContent = 'O contrato ficou muito curto.'; c.classList.remove('oculto'); return; }
+        estado.negocio = await dados.salvarNegocio({ contrato_modelo: texto === CONTRATO_PADRAO ? null : texto, contrato_pede_cpf: form.pede.checked });
+        aviso('Contrato salvo!');
+        fecharPainel();
+      });
+    };
+  });
+}
+
+// Cartão "Contrato" dentro da reserva
+async function desenharCartaoContrato(caixa, r) {
+  if (!caixa) return;
+  const ed = podeEditar();
+  let c = null;
+  try { c = await dados.contratoDaReserva(r.id); } catch (e) { caixa.innerHTML = '<div class="pequeno">Não consegui carregar o contrato.</div>'; return; }
+  const situacao = c && c.aceito_em ? '<span class="st ok">Aceito ✓</span>' : c ? '<span class="st esp">Aguardando aceite</span>' : '<span class="st esp">Não enviado</span>';
+  const primeiro = r.cliente_nome.split(' ')[0];
+  const msg = c ? `Oi, ${primeiro}! Segue o contrato da sua reserva do kit ${(kitDe(r.kit_id) || {}).nome || ''}. É só abrir, conferir e tocar em "Aceitar contrato": ${linkContrato(c.token)}` : '';
+  caixa.innerHTML = `
+    <div class="linha-flex entre"><h3 style="margin:0">📄 Contrato</h3>${situacao}</div>
+    ${c && c.aceito_em
+      ? `<div class="pequeno">Aceito por <b>${esc(c.aceito_nome || '')}</b> em ${esc(new Date(c.aceito_em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }))}</div>
+         <div class="linha-flex" style="gap:8px;flex-wrap:wrap"><a class="btn contorno mini" href="${esc(linkContrato(c.token))}" target="_blank" rel="noopener">Ver contrato</a><a class="btn contorno mini" href="${esc(linkContrato(c.token))}&pdf=1" target="_blank" rel="noopener">⬇️ PDF</a></div>`
+      : c
+        ? `<div class="pequeno">Mande o link para a cliente aceitar pelo celular.</div>
+           <div class="linha-flex" style="gap:8px;flex-wrap:wrap">
+             <a class="btn verde mini" href="${esc(linkZap(r.cliente_whatsapp, msg))}" target="_blank" rel="noopener">${ICONE.zap} Enviar para aceite</a>
+             <a class="btn contorno mini" href="${esc(linkContrato(c.token))}" target="_blank" rel="noopener">Ver contrato</a>
+             ${ed ? '<button class="btn contorno mini" id="ct-refazer">Atualizar dados</button>' : ''}
+           </div>`
+        : `<div class="pequeno">Gere o contrato com os dados desta reserva e mande o link para a cliente aceitar pelo celular.</div>
+           ${ed ? '<button class="btn principal mini" id="ct-gerar" style="align-self:flex-start">Gerar contrato</button>' : ''}`}`;
+  const gerar = async (b) => acao(b, async () => {
+    const pede = estado.negocio.contrato_pede_cpf !== false;
+    await dados.gerarContrato(r, preencherContrato(estado.negocio.contrato_modelo, r, pede), pede);
+    aviso(c ? 'Contrato atualizado com os dados da reserva.' : 'Contrato pronto! Agora é só enviar para a cliente.');
+    desenharCartaoContrato(caixa, r);
+  });
+  const g = $('#ct-gerar', caixa); if (g) g.onclick = () => gerar(g);
+  const rf = $('#ct-refazer', caixa); if (rf) rf.onclick = () => gerar(rf);
 }
 
 function irPara(aba) {
@@ -825,6 +1056,87 @@ function resumoDoMes(mes) {
 function mesAnterior(mes) { const [a, m] = mes.split('-').map(Number); return dados.isoDe(new Date(a, m - 2, 1)).slice(0, 7); }
 function nomeDoMes(mes) { const [a, m] = mes.split('-').map(Number); return maiuscula(new Date(a, m - 1, 1).toLocaleDateString('pt-BR', { month: 'long' })); }
 
+// ---------------------------------------------------------------------
+// Primeiros passos: aparece no Início para contas novas (criadas a partir
+// desta atualização) até completar os 3 passos ou tocar em "Não mostrar mais".
+// ---------------------------------------------------------------------
+const PASSOS_DESDE = '2026-11-13T21:00:00Z';
+function guardado(chave, valor) {
+  try { if (valor === undefined) return localStorage.getItem(chave); localStorage.setItem(chave, valor); } catch (e) { /* sem memória do navegador */ }
+  return null;
+}
+function passosFeitos() {
+  const n = estado.negocio || {};
+  return {
+    kit: estado.kits.length > 0,
+    reserva: estado.reservas.length > 0,
+    link: !!(n.link_copiado_em || guardado(`apm-link-copiado-${n.id}`)),
+  };
+}
+function mostrarPassos() {
+  const n = estado.negocio;
+  if (!n || DEMO_SITE || !podeEditar()) return false;
+  if (!n.criado_em || n.criado_em < PASSOS_DESDE) return false;
+  if (guardado(`apm-passos-ocultos-${n.id}`)) return false;
+  const f = passosFeitos();
+  if (f.kit && f.reserva && f.link) {
+    // Completou agora: parabéns uma única vez.
+    if (!guardado(`apm-passos-parabens-${n.id}`)) { guardado(`apm-passos-parabens-${n.id}`, '1'); setTimeout(popupParabens, 400); }
+    return false;
+  }
+  return true;
+}
+async function copiarMeuLink() {
+  const link = linkPublico(estado.negocio.slug);
+  try { await navigator.clipboard.writeText(link); aviso('Link copiado! Agora cole na bio do Instagram.'); }
+  catch (e) { prompt('Copie o link:', link); }
+  guardado(`apm-link-copiado-${estado.negocio.id}`, '1');
+  if (!estado.negocio.link_copiado_em) {
+    dados.marcarLinkCopiado().catch(() => {});
+    estado.negocio.link_copiado_em = new Date().toISOString();
+  }
+}
+function cartaoPassos() {
+  const f = passosFeitos();
+  const feitos = [f.kit, f.reserva, f.link].filter(Boolean).length;
+  const passo = (n, ok, titulo, texto, botao, id, principal) => `
+    <div class="passo ${ok ? 'feito' : ''}">
+      <div class="bola">${ok ? '✓' : n}</div>
+      <div><b>${titulo}</b><span>${texto}</span>${ok ? '' : `<div><button class="btn ${principal ? 'principal' : 'contorno'} mini" id="${id}">${botao}</button></div>`}</div>
+    </div>`;
+  const proximo = !f.kit ? 1 : !f.reserva ? 2 : 3;
+  return `<section class="cartao coluna primeiros">
+    <div class="linha-flex entre"><h2>🚀 Comece em 3 passos</h2><b class="pequeno">${feitos} de 3</b></div>
+    <div class="prog"><i style="width:${Math.max(4, Math.round((feitos / 3) * 100))}%"></i></div>
+    ${passo(1, f.kit, 'Cadastre seu primeiro kit', 'Com foto e lista de peças. Leva 2 minutos.', 'Cadastrar kit', 'passo-kit', proximo === 1)}
+    ${passo(2, f.reserva, 'Crie uma reserva', 'Pode ser uma de teste, para ver a agenda funcionando.', 'Criar reserva', 'passo-reserva', proximo === 2)}
+    ${passo(3, f.link, 'Coloque seu link no Instagram', 'Suas clientes escolhem o kit e a data sozinhas.', 'Copiar meu link', 'passo-link', proximo === 3)}
+    <div class="linha-flex entre" style="flex-wrap:wrap;gap:6px">
+      ${WHATSAPP_SUPORTE ? `<a class="link-btn" href="${esc(linkZap(WHATSAPP_SUPORTE, 'Oi! Comecei a usar o App Pegue e Monte e preciso de ajuda com os primeiros passos.'))}" target="_blank" rel="noopener">Precisa de ajuda? WhatsApp</a>` : '<span></span>'}
+      <button class="link-btn" id="passos-ocultar" style="color:var(--texto2)">Não mostrar mais</button>
+    </div>
+  </section>`;
+}
+function ligarPassos(tela) {
+  const liga = (id, fn) => { const b = $('#' + id, tela); if (b) b.onclick = fn; };
+  liga('passo-kit', () => formKit(null));
+  liga('passo-reserva', () => (estado.kits.length ? formReserva({}) : aviso('Cadastre um kit primeiro (passo 1).')));
+  liga('passo-link', async () => { await copiarMeuLink(); desenharAba(); });
+  liga('passos-ocultar', () => { guardado(`apm-passos-ocultos-${estado.negocio.id}`, '1'); desenharAba(); });
+}
+function popupParabens() {
+  abrirPopup(`
+    <div style="font-size:54px;text-align:center" aria-hidden="true">🎉</div>
+    <h2 class="centro" style="font-size:25px">Seu app está pronto!</h2>
+    <p class="centro">Você cadastrou seu kit, criou uma reserva e já tem seu link. Agora é só deixar suas clientes reservarem sozinhas.</p>
+    <div class="nota-amarela pequeno"><b>Dica:</b> coloque o link na bio do Instagram e na mensagem automática do WhatsApp Business.</div>
+    <button class="btn principal cheio" id="parabens-copiar">Copiar meu link de reservas</button>
+    <button class="link-btn" id="parabens-fechar">Fechar</button>`, (p) => {
+    $('#parabens-copiar', p).onclick = () => copiarMeuLink();
+    $('#parabens-fechar', p).onclick = () => fecharPainel();
+  });
+}
+
 function abaHoje(tela) {
   const h = hojeISO();
   const mes = estado.mesFin || h.slice(0, 7);
@@ -852,7 +1164,9 @@ function abaHoje(tela) {
     </section>`;
   const algumAlerta = atrasadas.length + pendentes.length + retiradas.length + devolucoes.length > 0;
 
+  const comPassos = mostrarPassos();
   tela.innerHTML = `
+    ${comPassos ? cartaoPassos() : ''}
     <section class="fin">
       <div class="linha-flex entre">
         <button class="fechar" id="fin-ant" aria-label="Mês anterior">${ICONE.esq}</button>
@@ -890,8 +1204,9 @@ function abaHoje(tela) {
     ${devolucoes.length ? bloco('Devoluções de hoje', '#1E5FA8', devolucoes, () => 'Abra para conferir as peças') : ''}
     ${algumAlerta ? '' : '<div class="cartao res-concluida"><b>Tudo em dia!</b><div class="pequeno">Nenhuma pendência para hoje.</div></div>'}
     ${proximas.length ? bloco('Próximos 7 dias', '#4E4459', proximas, (r) => `Retirada ${dataCurta(r.data_retirada)}`) : ''}
-    ${estado.kits.length === 0 ? `<div class="cartao coluna"><h3>Comece cadastrando seus kits</h3><p class="pequeno">Eles aparecem no seu link de reservas.</p><button class="btn principal" id="ir-kits">Cadastrar meu primeiro kit</button></div>` : ''}`;
+    ${estado.kits.length === 0 && !comPassos ? `<div class="cartao coluna"><h3>Comece cadastrando seus kits</h3><p class="pequeno">Eles aparecem no seu link de reservas.</p><button class="btn principal" id="ir-kits">Cadastrar meu primeiro kit</button></div>` : ''}`;
   ligarItens(tela);
+  if (comPassos) ligarPassos(tela);
   const muda = (delta) => { const [a, m] = mes.split('-').map(Number); estado.mesFin = dados.isoDe(new Date(a, m - 1 + delta, 1)).slice(0, 7); abaHoje(tela); };
   $('#fin-ant', tela).onclick = () => muda(-1);
   $('#fin-prox', tela).onclick = () => muda(1);
@@ -1342,8 +1657,13 @@ function formKit(kit) {
 // ---------------------------------------------------------------------
 function abaMais(tela) {
   const link = linkPublico(estado.negocio.slug);
+  const mostrarInstalar = !DEMO_SITE && !appInstalado();
   tela.innerHTML = `
     <h1>Mais</h1>
+    ${temOfertaBF() ? `<div class="bf-card"><div style="font-size:30px" aria-hidden="true">🏷️</div><div class="t"><b>Black Friday: anual por R$ 167</b><span>53% OFF · só até 29/11</span></div><button class="btn principal mini" id="ver-bf">Ver oferta</button></div>` : ''}
+    ${mostrarInstalar ? `<section class="cartao coluna instalar">
+      <div style="display:flex;gap:12px;align-items:center"><div style="font-size:36px" aria-hidden="true">📲</div><div><b style="font-size:17px">Instale o app no seu celular</b><div class="pequeno">Abra direto pela tela inicial, como um aplicativo.</div></div></div>
+      <button class="btn verde cheio" id="instalar">Instalar o app na tela inicial</button></section>` : ''}
     <section class="cartao coluna">
       <h2>Meu link de reservas</h2>
       <p class="pequeno">Coloque na bio do Instagram. A cliente escolhe o kit e uma data livre, e o pedido aparece aqui como "aguardando sinal".</p>
@@ -1356,6 +1676,7 @@ function abaMais(tela) {
     <section class="coluna">
       <button class="cartao clicavel" id="meus-dados"><div class="nome" style="font-weight:800">Meus dados</div><div class="pequeno">Nome, logo, recado do link, WhatsApp, Pix e dias de retirada</div></button>
       <button class="cartao clicavel" id="mensagens"><div style="font-weight:800">Mensagens do WhatsApp</div><div class="pequeno">Escreva seus textos de sinal, confirmação, retirada e devolução</div></button>
+      ${DEMO_SITE ? '' : '<button class="cartao clicavel" id="meu-contrato"><div style="font-weight:800">📄 Meu contrato</div><div class="pequeno">Seu modelo de contrato para enviar em cada reserva</div></button>'}
       ${estado.assinatura && estado.assinatura.admin ? '<a class="cartao clicavel" style="text-decoration:none; background: var(--tinta); color: #fff; border-color: var(--tinta)" href="admin.html"><div style="font-weight:800">Painel do administrador</div><div class="pequeno" style="color:#D9CFE6">Clientes, renovações, leads e acessos</div></a>' : ''}
     </section>
     <section class="cartao coluna">
@@ -1366,15 +1687,14 @@ function abaMais(tela) {
     </section>
     ${DEMO_SITE ? `<a class="btn verde cheio" href="${esc(LINK_PLANOS)}" target="_top">Gostei! Quero usar com meus kits</a><button class="btn contorno cheio" id="demo-reset">Recomeçar a demonstração</button>`
       : dados.MODO_DEMO ? `<section class="cartao coluna"><h2>Testar situações (só na demonstração)</h2>
-          ${[['normal', 'Assinatura ativa (normal)'], ['teste', 'Conta nova em teste de 7 dias'], ['teste_fim', 'Teste de 7 dias acabou'], ['pix', 'Pagamento pendente com Pix'], ['email', 'Pagamento pendente sem Pix'], ['suspensa', 'Assinatura suspensa'], ['cancelada', 'Cliente cancelou']]
+          ${[['normal', 'Assinatura ativa (normal)'], ['nova', 'Conta nova vazia (primeiros passos)'], ['teste', 'Em teste de 7 dias'], ['teste_fim', 'Teste de 7 dias acabou'], ['pix', 'Pagamento pendente com Pix'], ['email', 'Pagamento pendente sem Pix'], ['suspensa', 'Assinatura suspensa'], ['cancelada', 'Cliente cancelou']]
             .map(([k, t]) => `<button class="btn contorno cheio" data-simular="${k}">${t}</button>`).join('')}
           <button class="btn contorno cheio" id="demo-reset">Recomeçar a demonstração</button></section>` : ''}
-    ${DEMO_SITE ? '' : '<button class="btn perigo cheio" id="sair">Sair do app</button>'}
-    <p class="pequeno centro">Dica: no celular, use "Adicionar à tela inicial" no menu do navegador para abrir como aplicativo.</p>`;
-  $('#copiar', tela).onclick = async () => {
-    try { await navigator.clipboard.writeText(link); aviso('Link copiado!'); }
-    catch (e) { prompt('Copie o link:', link); }
-  };
+    ${DEMO_SITE ? '' : '<button class="btn perigo cheio" id="sair">Sair do app</button>'}`;
+  const inst = $('#instalar', tela); if (inst) inst.onclick = instalarApp;
+  const vbf = $('#ver-bf', tela); if (vbf) vbf.onclick = popupBlackFriday;
+  const mc = $('#meu-contrato', tela); if (mc) mc.onclick = painelContrato;
+  $('#copiar', tela).onclick = () => copiarMeuLink();
   $('#meus-dados', tela).onclick = painelNegocio;
   $('#mensagens', tela).onclick = painelMensagens;
   const sairBtn = $('#sair', tela);
@@ -1638,6 +1958,7 @@ function abrirReserva(id) {
       ${r.status === 'concluida' ? resumoChecklist('Devolução', r.checklist_devolucao) : ''}
       ${r.avaria_obs || Number(r.avaria_valor) > 0 ? `<div class="pequeno" style="color: var(--destaque-escuro)"><b>Avaria:</b> ${esc(r.avaria_obs || '')} ${Number(r.avaria_valor) > 0 ? `(${reais(r.avaria_valor)})` : ''}</div>` : ''}
     </div>
+    ${r.status !== 'cancelada' ? '<section class="cartao coluna ct" id="ct-reserva"><div class="pequeno">Carregando contrato…</div></section>' : ''}
     <div class="cartao coluna anotacao">
       <label class="campo" style="margin:0">📝 Observação
         <textarea id="obs-reserva" maxlength="500" rows="3" placeholder="Anote o que precisar: horário de entrega, pedido especial, endereço do salão…" ${ed ? '' : 'disabled'}>${esc(r.obs || '')}</textarea>
@@ -1645,6 +1966,7 @@ function abrirReserva(id) {
       ${ed ? '<button class="btn claro mini oculto" id="salvar-obs" style="align-self:flex-end">Salvar observação</button>' : ''}
     </div>
     <div class="coluna">${botoes.join('')}</div>`, (p) => {
+    desenharCartaoContrato($('#ct-reserva', p), r);
     const obs = $('#obs-reserva', p), salvarObs = $('#salvar-obs', p);
     if (salvarObs) {
       obs.oninput = () => salvarObs.classList.toggle('oculto', obs.value.trim() === (r.obs || ''));

@@ -23,6 +23,8 @@ export const WHATSAPP_SUPORTE = '51982316117';
 // Links de pagamento da Cakto (usados no aviso de pagamento e na tela de assinatura)
 export const LINK_MENSAL = 'https://pay.cakto.com.br/3bnawbt_1255298';
 export const LINK_ANUAL = 'https://pay.cakto.com.br/65irjr2';
+// Anual com desconto (R$ 167/ano): fim do teste grátis e Black Friday das assinantes do mensal no Pix
+export const LINK_ANUAL_PROMO = 'https://pay.cakto.com.br/mjrcoxc';
 
 // Demonstração pública no site (pegueemonte.com/demo). Deixe false no app de verdade.
 export const DEMO_SITE = false;
