@@ -4,7 +4,7 @@
 // - Sem configurar: MODO DEMONSTRAÇÃO, com dados de exemplo guardados
 //   só neste navegador. Serve para ver e testar o app antes de tudo.
 // =====================================================================
-import { SUPABASE_URL, SUPABASE_ANON_KEY, DEMO_SITE } from './config.js?v=20261117a';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, DEMO_SITE } from './config.js?v=20261117c';
 
 export const MODO_DEMO = !/^https:\/\/.+\.supabase\.co\/?$/.test(SUPABASE_URL);
 
@@ -404,6 +404,12 @@ export async function apagarGasto(id) {
 }
 
 // ---------- Link público ----------
+// Conta uma visita no link de reservas (só número por dia; sem dados de quem visitou)
+export async function registrarVisita(slug, instagram) {
+  if (MODO_DEMO) return;
+  const s = await cliente();
+  await s.rpc('registrar_visita', { p_slug: slug, p_instagram: !!instagram });
+}
 export async function catalogoPublico(slug) {
   if (MODO_DEMO) {
     const n = D().negocio;
@@ -481,6 +487,164 @@ export async function adminResumo() {
   const s = await cliente();
   return ok(s.rpc('admin_resumo'));
 }
+// ---------- CRM do teste grátis ----------
+function demoCrm() {
+  const lojas = ['Festas da Lu', 'Doce Decor', 'Ateliê Mimos', 'Brilho Kids', 'Pegue & Decore', 'Encanto Festas', 'Sonho de Festa',
+    'Kids Pegue&Monte', 'Festa Fácil', 'Arte em Festa', 'Pegue Já', 'Mini Mesa Chic', 'Bella Festa', 'Mundo Kids', 'Decora Mais',
+    'Festa na Caixa', 'Lá em Casa Festas', 'Toque de Festa', 'Mesa Posta', 'Cia da Festa', 'Ateliê Bia', 'Pequenos Momentos',
+    'Casa da Festa', 'Festejar', 'Mimo Kids', 'Encantar', 'Doce Mesa', 'Kit & Festa', 'Rosa Chá', 'Pegue Fest', 'Festinha Boa',
+    'Viva Festas', 'Sorrir Festas', 'Mesa de Sonho', 'Alegria Kits', 'Decor da Ju', 'Festa Linda', 'Nuvem Kids', 'Brincar Festas', 'Céu Azul Kits'];
+  const camp = ['CJ_MULHERES_VIDEOS', 'CJ_MULHERES_IMAGENS', null];
+  const dia = 864e5, agora = Date.now();
+  // etapa e dias desde o início de cada pessoa (fixos para a demonstração ficar estável)
+  const plano = [[2,1],[2,4],[3,3],[1,1],[2,6],[3,2],[4,5],[5,6],[5,6],[6,5],[7,6],[1,3],[2,2],[3,4],[4,3],
+    [2,9],[1,10],[3,12],[2,15],[4,11],[5,9],[3,20],[2,18],[6,14],[7,16],[4,22],[1,25],[3,13],[5,17],[6,21],[2,26],[7,24],[3,9],[4,27],[1,12],[6,10],[2,28],[5,23],[3,29],[7,19]];
+  return plano.map(([etapa, d], i) => {
+    const ini = agora - d * dia - (i % 5) * 3600e3;
+    const fim = ini + 7 * dia;
+    const acabou = fim < agora;
+    const assinou = acabou ? (etapa >= 6 ? i % 3 !== 0 : etapa >= 4 ? i % 3 === 0 : false) : (etapa === 7 && i % 2 === 0);
+    const semUso = [0, 0, 1, 2, 4, 0, 3, 1, 0, 0, 0, 5, 2, 1, 0][i % 15];
+    return {
+      email: `cliente${i + 1}@exemplo.com`, telefone: `5199${String(1000000 + i * 7919).slice(0, 7)}`,
+      status: assinou ? 'ativa' : 'teste', plano: assinou ? (i % 2 ? 'mensal' : 'anual') : null,
+      teste_inicio: new Date(ini).toISOString(), teste_ate: new Date(fim).toISOString(),
+      campanha: camp[i % 3], fonte: camp[i % 3] ? 'FB' : null,
+      assinou_em: assinou ? new Date(Math.min(agora, fim - dia)).toISOString() : null, etapa_na_assinatura: assinou ? etapa : null,
+      conta_em: new Date(ini).toISOString(), negocio_id: etapa >= 2 ? `n${i}` : null, loja: etapa >= 2 ? lojas[i] : null,
+      slug: etapa >= 2 ? `loja-${i}` : null, loja_em: etapa >= 2 ? new Date(ini + 3600e3).toISOString() : null,
+      link_copiado_em: etapa >= 5 ? new Date(ini + 2 * dia).toISOString() : null,
+      ultimo_uso: new Date(Math.min(agora, acabou ? ini + Math.min(6, (i % 7) + 1) * dia : agora - semUso * dia)).toISOString(),
+      kits: etapa >= 3 ? (etapa >= 4 ? 2 + (i % 5) : 1) : 0, kits_foto: etapa >= 4 ? 2 + (i % 4) : 0,
+      primeiro_kit_em: etapa >= 3 ? new Date(ini + (0.3 + (i % 4) * 0.6) * dia).toISOString() : null,
+      reservas: etapa >= 6 ? 1 + (i % 5) : etapa >= 3 ? i % 2 : 0,
+      primeira_reserva_real_em: etapa >= 6 ? new Date(ini + 3 * dia).toISOString() : null,
+      visitas: etapa >= 5 ? 6 + (i * 3) % 40 : 0, visitas_instagram: etapa >= 5 && i % 3 !== 1 ? 2 + (i * 5) % 20 : 0,
+      etapa,
+      ...demoInteracoes(i, ini, etapa, assinou),
+    };
+  });
+}
+function demoInteracoes(i, ini, etapa, assinou) {
+  const dia = 864e5, l = [];
+  const add = (popup, acao, detalhe, d) => { if (ini + d * dia < Date.now()) l.push({ popup, acao, detalhe, quando: new Date(ini + d * dia).toISOString() }); };
+  if (i % 4 !== 3) { add('promo_dia2', 'viu', null, 1.1); add('promo_dia2', i % 3 ? 'fechou' : 'olhou_10s', null, 1.12); }
+  if (etapa >= 4 && i % 2 === 0) { add('assinar_agora', 'viu', null, 3.5); add('assinar_agora', 'olhou_10s', null, 3.51); }
+  if ((etapa >= 5 && i % 3 !== 1) || assinou) add('assinar_agora', 'checkout', 'anual_promo', 3.52);
+  if (etapa >= 6) add('comemoracao_link', 'viu', null, 3);
+  l.sort((a, b) => b.quando.localeCompare(a.quando));
+  const ck = l.find((x) => x.acao === 'checkout');
+  return { interacoes: l, checkout_em: ck ? ck.quando : null };
+}
+export async function adminSaude() {
+  if (MODO_DEMO) return demoSaude();
+  const s = await cliente();
+  return ok(s.rpc('admin_saude'));
+}
+function demoSaude() {
+  const dia = 864e5, agora = Date.now();
+  // [meses desde a 1ª compra, saiu depois de quantos meses (null = ativa), plano, recusas, recuperados]
+  const base = [[5, null, 'mensal', 0, 0], [4, null, 'mensal', 1, 1], [4, 1, 'mensal', 1, 0], [3, null, 'anual', 0, 0], [3, null, 'mensal', 0, 0],
+    [3, 2, 'mensal', 2, 1], [2, null, 'mensal', 0, 0], [2, null, 'mensal', 0, 0], [2, 1, 'mensal', 1, 0], [2, null, 'anual', 0, 0],
+    [1, null, 'mensal', 0, 0], [1, null, 'mensal', 0, 0], [1, 0, 'mensal', 0, 0], [1, null, 'mensal', 1, 1], [1, null, 'anual', 0, 0],
+    [0, null, 'mensal', 0, 0], [0, null, 'mensal', 0, 0], [0, null, 'anual', 0, 0], [5, 3, 'mensal', 1, 0], [4, null, 'mensal', 0, 0]];
+  return base.map(([m, saiu, plano, rec, recup], i) => {
+    const ini = agora - (m * 30.4 + 5 + i) * dia;
+    const fimMeses = saiu == null ? m : saiu;
+    const pag = plano === 'anual' ? 1 : fimMeses + 1;
+    return {
+      email: `assinante${i + 1}@exemplo.com`, primeira_compra: new Date(ini).toISOString(),
+      ultimo_pagamento: new Date(ini + (pag - 1) * 30.4 * dia).toISOString(), pagamentos: pag, renovacoes: pag - 1,
+      recusas: rec, recuperados: recup, saiu_em: saiu == null ? null : new Date(ini + (saiu * 30.4 + 20) * dia).toISOString(),
+      total_liquido: plano === 'anual' ? 150.3 : pag * 27.41, plano, status: saiu == null ? 'ativa' : 'cancelada',
+      teste_inicio: i % 3 ? new Date(ini - 6 * dia).toISOString() : null, etapa_na_assinatura: i % 3 ? [6, 5, 7, 4, 6][i % 5] : null, ativa: saiu == null,
+    };
+  });
+}
+export async function adminLogos() {
+  if (MODO_DEMO) return { 'maria@festasdamaria.com': true };
+  const s = await cliente();
+  return ok(s.rpc('admin_logos'));
+}
+export async function adminEditarCliente(email, campos) {
+  if (MODO_DEMO) throw new Error('Na demonstração não dá para alterar os dados de uma cliente.');
+  const s = await cliente();
+  return ok(s.rpc('admin_editar_cliente', {
+    p_email: email, p_nome: campos.nome ?? null, p_email_novo: campos.email ?? null,
+    p_telefone: campos.telefone ?? null, p_whatsapp_loja: campos.whatsapp_loja ?? null,
+  }));
+}
+export async function adminHistoricoCliente(email) {
+  if (MODO_DEMO) return [];
+  const s = await cliente();
+  return ok(s.rpc('admin_historico_cliente', { p_email: email }));
+}
+export async function adminCrmMensagens() {
+  if (MODO_DEMO) { try { return JSON.parse(localStorage.getItem('apm-demo-crm-msgs') || '{}'); } catch (e) { return {}; } }
+  const s = await cliente();
+  return ok(s.rpc('admin_crm_mensagens'));
+}
+export async function adminSalvarMensagemCrm(etapa, texto) {
+  if (MODO_DEMO) {
+    let m = {};
+    try { m = JSON.parse(localStorage.getItem('apm-demo-crm-msgs') || '{}'); } catch (e) { /* segue */ }
+    if (String(texto || '').trim()) m[etapa] = String(texto).trim(); else delete m[etapa];
+    try { localStorage.setItem('apm-demo-crm-msgs', JSON.stringify(m)); } catch (e) { /* segue */ }
+    return { ok: true };
+  }
+  const s = await cliente();
+  return ok(s.rpc('admin_salvar_mensagem_crm', { p_etapa: etapa, p_texto: texto || '' }));
+}
+export async function adminCrmContato(email, nota) {
+  if (MODO_DEMO) {
+    const k = 'apm-demo-crm-contatos';
+    let m = {};
+    try { m = JSON.parse(localStorage.getItem(k) || '{}'); } catch (e) { /* segue */ }
+    (m[email] = m[email] || []).unshift({ quando: new Date().toISOString(), nota: nota || null });
+    try { localStorage.setItem(k, JSON.stringify(m)); } catch (e) { /* segue */ }
+    return { ok: true };
+  }
+  const s = await cliente();
+  return ok(s.rpc('admin_crm_contato', { p_email: email, p_nota: nota || '' }));
+}
+export async function adminCrm() {
+  if (MODO_DEMO) {
+    let m = {};
+    try { m = JSON.parse(localStorage.getItem('apm-demo-crm-contatos') || '{}'); } catch (e) { /* segue */ }
+    return demoCrm().map((p, i) => {
+      const c = m[p.email] || (i === 1 ? [{ quando: new Date(Date.now() - 864e5).toISOString(), nota: 'Disse que manda as fotos à noite.' }] : []);
+      return { ...p, whatsapp_loja: p.telefone, contatos: c, ultimo_contato_em: c[0] ? c[0].quando : null };
+    });
+  }
+  const s = await cliente();
+  return ok(s.rpc('admin_crm'));
+}
+export async function registrarInteracao(popup, acao, detalhe) {
+  if (MODO_DEMO) return;
+  const s = await cliente();
+  await s.rpc('registrar_interacao', { p_popup: popup, p_acao: acao, p_detalhe: detalhe || null });
+}
+export async function adminPopups(dias) {
+  if (MODO_DEMO) return demoPopups();
+  const s = await cliente();
+  return ok(s.rpc('admin_popups', { p_dias: Number(dias) || 0 }));
+}
+function demoPopups() {
+  return [
+    { popup: 'fim_teste', viram: 64, clicaram: 22, olharam: 30, fecharam: 31, checkout: 18, checkout_anual_promo: 13, checkout_anual: 0, checkout_mensal: 5, assinaram: 7 },
+    { popup: 'promo_dia2', viram: 71, clicaram: 15, olharam: 24, fecharam: 56, checkout: 11, checkout_anual_promo: 11, checkout_anual: 0, checkout_mensal: 0, assinaram: 3 },
+    { popup: 'assinar_agora', viram: 39, clicaram: 9, olharam: 21, fecharam: 27, checkout: 9, checkout_anual_promo: 6, checkout_anual: 0, checkout_mensal: 3, assinaram: 2 },
+    { popup: 'aviso_promo', viram: 18, clicaram: 4, olharam: 9, fecharam: 12, checkout: 4, checkout_anual_promo: 4, checkout_anual: 0, checkout_mensal: 0, assinaram: 1 },
+    { popup: 'comemoracao_link', viram: 10, clicaram: 4, olharam: 0, fecharam: 6, checkout: 3, checkout_anual_promo: 3, checkout_anual: 0, checkout_mensal: 0, assinaram: 2 },
+    { popup: 'black_friday', viram: 8, clicaram: 3, olharam: 4, fecharam: 5, checkout: 3, checkout_anual_promo: 3, checkout_anual: 0, checkout_mensal: 0, assinaram: 0 },
+  ];
+}
+export async function registrarUso() {
+  if (MODO_DEMO) return;
+  const s = await cliente();
+  await s.rpc('registrar_uso');
+}
+
 export async function adminClientes() {
   if (MODO_DEMO) return demoAdmin().clientes;
   const s = await cliente();

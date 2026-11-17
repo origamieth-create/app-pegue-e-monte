@@ -2,8 +2,8 @@
 // App Pegue e Monte — app da dona
 // Abas: Hoje, Agenda, Kits, Mais
 // =====================================================================
-import * as dados from './dados.js?v=20261117a';
-import { PERMITIR_CADASTRO, EMAIL_SUPORTE, WHATSAPP_SUPORTE, LINK_MENSAL, LINK_ANUAL, LINK_ANUAL_PROMO, DEMO_SITE, LINK_PLANOS, SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=20261117a';
+import * as dados from './dados.js?v=20261117c';
+import { PERMITIR_CADASTRO, EMAIL_SUPORTE, WHATSAPP_SUPORTE, LINK_MENSAL, LINK_ANUAL, LINK_ANUAL_PROMO, DEMO_SITE, LINK_PLANOS, SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=20261117c';
 
 const { hojeISO, somaDias, cruza } = dados;
 
@@ -157,6 +157,36 @@ function abrirPainel(titulo, corpo, aoMontar, voltar) {
   if (aoMontar) aoMontar($('.painel', p));
 }
 // Janela por cima da tela (usa o mesmo controle do botão voltar do celular).
+// ---------------------------------------------------------------------
+// Medição dos popups e ofertas (o que a pessoa viu e fez; nada pessoal)
+// ---------------------------------------------------------------------
+let popupAtual = null, popupTimer = null, popupFoiCheckout = false;
+function rastrear(popup, acao, detalhe) {
+  if (estado.suporte || DEMO_SITE) return;
+  dados.registrarInteracao(popup, acao, detalhe).catch(() => {});
+}
+function popupMedido(nome) {
+  popupAtual = nome; popupFoiCheckout = false;
+  rastrear(nome, 'viu');
+  clearTimeout(popupTimer);
+  popupTimer = setTimeout(() => { if (popupAtual === nome) rastrear(nome, 'olhou_10s'); }, 10000);
+}
+function fimDoPopupMedido() {
+  if (popupAtual && !popupFoiCheckout) rastrear(popupAtual, 'fechou');
+  popupAtual = null; clearTimeout(popupTimer);
+}
+// Qualquer botão de assinar (checkout da Cakto) conta como "foi ao checkout"
+document.addEventListener('click', (e) => {
+  const a = e.target.closest && e.target.closest('a[href]');
+  if (!a) return;
+  const h = a.getAttribute('href');
+  const detalhe = h === LINK_ANUAL_PROMO ? 'anual_promo' : h === LINK_ANUAL ? 'anual' : h === LINK_MENSAL ? 'mensal' : null;
+  if (!detalhe) return;
+  const nome = popupAtual || (a.closest('#bloqueio') ? 'fim_teste' : a.closest('#faixa') ? 'faixa' : 'outro');
+  popupFoiCheckout = true;
+  rastrear(nome, 'checkout', detalhe);
+}, true);
+
 function abrirPopup(corpo, aoMontar) {
   const p = $('#painel');
   if (!painelAberto) { history.pushState({ painel: true }, ''); painelAberto = true; }
@@ -213,6 +243,7 @@ function voltarPainel() {
 }
 function fecharPainel(vindoDoCelular) {
   if (!painelAberto) return;
+  fimDoPopupMedido();
   painelAberto = false;
   voltarAtual = null;
   $('#painel').innerHTML = '';
@@ -273,6 +304,7 @@ async function carregarTudo() {
   estado.suporte = await dados.suporteAtual().catch(() => null);
   [estado.negocio, estado.assinatura] = await Promise.all([dados.meuNegocio(), dados.minhaAssinatura()]);
   marcarRelogio();
+  dados.registrarUso().catch(() => {}); // só marca a data de uso; nunca atrapalha o app
   const a = estado.assinatura || {};
   if (estado.suporte && !estado.negocio) { await dados.suporteSair().catch(() => {}); location.href = 'admin.html'; return; }
   if (!estado.suporte && !a.cortesia && !a.encontrada) {
@@ -371,7 +403,7 @@ function popupPagamento() {
       catch (e) { prompt('Copie o código Pix:', a.pix_codigo); }
     };
     try {
-      const { default: qrcode } = await import('./qrcode.mjs?v=20261117a');
+      const { default: qrcode } = await import('./qrcode.mjs?v=20261117c');
       const q = qrcode(0, 'M'); q.addData(a.pix_codigo); q.make();
       $('#pix-qr', p).innerHTML = q.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
     } catch (e) { $('#pix-qr', p).remove(); }
@@ -453,7 +485,7 @@ function blocoResumoTeste(titulo) {
   return t ? `<div class="resumo-teste"><b>${esc(titulo)}</b><span>${esc(t)}</span></div>` : '';
 }
 // Durante o teste: escolher o plano a qualquer momento.
-function popupPlanosTeste() {
+function popupPlanosTeste(origem = 'assinar_agora') {
   const a = estado.assinatura || {};
   abrirPopup(`
     ${BANDEIRINHAS}
@@ -465,6 +497,7 @@ function popupPlanosTeste() {
     <button class="link-btn" id="planos-fechar">Agora não</button>`, (p) => {
     $('#planos-fechar', p).onclick = () => fecharPainel();
     ligarRelogioOferta(p);
+    popupMedido(origem);
   });
 }
 // 2º dia do teste: mostra a promoção do anual uma vez. Depois ela fica no "Assinar agora".
@@ -483,6 +516,7 @@ function mostrarPromoDoTeste() {
     <p class="centro pequeno" style="margin:0">A oferta fica guardada no botão <b>"Assinar agora"</b>, no topo do app.</p>
     <button class="link-btn" id="promo-fechar">Continuar testando</button>`, (p) => {
     $('#promo-fechar', p).onclick = () => fecharPainel();
+    popupMedido('promo_dia2');
   });
 }
 
@@ -514,7 +548,8 @@ function comemorarReservaPeloLink() {
     <button class="link-btn" id="cl-ok">Fechar</button>`, (p) => {
     $('#cl-ok', p).onclick = () => fecharPainel();
     $('#cl-ver', p).onclick = () => abrirReserva(r.id);
-    const pl = $('#cl-planos', p); if (pl) pl.onclick = () => popupPlanosTeste();
+    const pl = $('#cl-planos', p); if (pl) pl.onclick = () => { rastrear('comemoracao_link', 'clicou'); popupFoiCheckout = true; popupPlanosTeste('comemoracao_link'); };
+    popupMedido('comemoracao_link');
   });
 }
 
@@ -545,7 +580,8 @@ function bloqueioFimDoTeste() {
   const normal = $('#demo-normal', caixa);
   if (normal) normal.onclick = async () => { dados.demoSimular('normal'); caixa.remove(); document.body.style.overflow = ''; await recarregar(); montarApp(); };
   $('#teste-sair', caixa).onclick = async () => { await dados.sair(); caixa.remove(); document.body.style.overflow = ''; telaLogin('entrar'); };
-  $('#teste-olhar', caixa).onclick = () => { clearInterval(relogioOferta); caixa.remove(); document.body.style.overflow = ''; try { sessionStorage.setItem('apm-fim-teste-visto', '1'); } catch (e) { /* segue */ } };
+  if (popupAtual !== 'fim_teste') popupMedido('fim_teste');
+  $('#teste-olhar', caixa).onclick = () => { fimDoPopupMedido(); clearInterval(relogioOferta); caixa.remove(); document.body.style.overflow = ''; try { sessionStorage.setItem('apm-fim-teste-visto', '1'); } catch (e) { /* segue */ } };
   ligarRelogioOferta(caixa);
 }
 
@@ -595,7 +631,7 @@ function desenharFaixaAssinatura() {
         <div>🎁 <b>Seu teste grátis termina ${dias === 1 ? 'amanhã' : `em ${dias} dias`}.</b> ${textoResumoTeste() ? `Você já tem ${esc(textoResumoTeste())}.` : 'Assine com este mesmo e-mail e continue com tudo que cadastrou.'}</div>
         <button class="btn mini" id="faixa-planos">Assinar agora</button>
       </div>`;
-    $('#faixa-planos', faixa).onclick = popupPlanosTeste;
+    $('#faixa-planos', faixa).onclick = () => popupPlanosTeste('assinar_agora');
     return;
   }
   if (sit === 'teste_fim') {
@@ -1018,7 +1054,7 @@ function abrirPeloAviso() {
   if (!reserva && !planos) return false;
   try { history.replaceState(null, '', location.pathname + location.hash); } catch (e) { /* segue */ }
   if (reserva && (estado.reservas || []).some((r) => r.id === reserva)) { setTimeout(() => abrirReserva(reserva), 300); return true; }
-  if (planos && situacaoAssinatura() === 'teste') { setTimeout(popupPlanosTeste, 300); return true; }
+  if (planos && situacaoAssinatura() === 'teste') { setTimeout(() => popupPlanosTeste('aviso_promo'), 300); return true; }
   return false;
 }
 
@@ -1050,6 +1086,7 @@ function popupBlackFriday() {
     </div>`, (p) => {
     p.classList.add('bf-fundo');
     $('#bf-fechar', p).onclick = () => fecharPainel();
+    popupMedido('black_friday');
   });
 }
 function mostrarBlackFriday() {
@@ -2015,7 +2052,7 @@ function abaMais(tela) {
     </section>
     <section class="cartao coluna">
       <h2>Precisa de ajuda?</h2>
-      <button class="btn contorno cheio" id="ver-video">▶ Assistir o vídeo passo a passo (2 min)</button>
+      <button class="btn contorno cheio" id="ver-video">▶ Ver vídeo passo a passo</button>
       ${WHATSAPP_SUPORTE ? `<a class="btn verde cheio" href="${esc(linkZap(WHATSAPP_SUPORTE, 'Oi! Sou cliente do App Pegue e Monte e tenho uma dúvida.'))}" target="_blank" rel="noopener">${ICONE.zap} Falar com o suporte no WhatsApp</a>` : ''}
       <a class="btn contorno cheio" href="mailto:${esc(EMAIL_SUPORTE)}?subject=${encodeURIComponent('Ajuda no App Pegue e Monte')}">Enviar e-mail para o suporte</a>
       <p class="dica centro">${esc(EMAIL_SUPORTE)}</p>

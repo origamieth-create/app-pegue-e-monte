@@ -2,7 +2,7 @@
 // App Pegue e Monte — link público de reservas (a cliente final usa)
 // Endereço: reservar.html?l=<link-do-negocio>
 // =====================================================================
-import * as dados from './dados.js?v=20261117a';
+import * as dados from './dados.js?v=20261117c';
 
 // Demonstração do site: botões de WhatsApp mostram um aviso em vez de abrir conversa.
 if (dados.DEMONSTRACAO_SITE) {
@@ -90,11 +90,22 @@ const ICONE_INSTA = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"
 function recadoPadrao(loja) {
   return `🎉 Que bom ter você aqui na ${loja}!\n\nNossos kits são pensados com carinho para deixar a sua festa linda e cheia de alegria. 💖\n\nVeja os kits, escolha a data livre e garanta a sua reserva com antecedência.\n\nVamos celebrar juntos esse momento especial! 🥳`;
 }
+// Uma visita por pessoa por dia; marca se veio pelo Instagram (navegador do Instagram ou link com ?o=ig)
+function contarVisita(slug) {
+  try {
+    const chave = `apm-visita-${slug}-${new Date().toISOString().slice(0, 10)}`;
+    if (localStorage.getItem(chave)) return;
+    localStorage.setItem(chave, '1');
+  } catch (e) { /* segue mesmo assim */ }
+  const ig = /Instagram/i.test(navigator.userAgent) || new URLSearchParams(location.search).get('o') === 'ig';
+  dados.registrarVisita(slug, ig).catch(() => {});
+}
 async function iniciar() {
   const raiz = $('#raiz');
   if (!slug) { raiz.innerHTML = '<div class="erro">Link incompleto. Peça o link de reservas para a loja.</div>'; return; }
   try {
     loja = await dados.catalogoPublico(slug);
+    if (loja) contarVisita(slug);
   } catch (e) {
     raiz.innerHTML = `<div class="erro">${esc(e.message)}</div>`; return;
   }
