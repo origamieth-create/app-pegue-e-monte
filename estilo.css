@@ -304,47 +304,6 @@ label.campo { display: flex; flex-direction: column; gap: 6px; font-weight: 700;
 /* Botões do topo do link de reservas */
 .botoes-loja { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
 .btn.insta { background: linear-gradient(45deg, #F58529, #DD2A7B 55%, #8134AF); color: #fff; border: 0; gap: 6px; }
-/* Versão para computador (telas largas). No celular nada muda. */
-@media (min-width: 1024px) {
-  body { padding-bottom: 0; padding-left: 248px; }
-  nav.abas { top: 0; bottom: 0; right: auto; width: 248px; display: flex; flex-direction: column; gap: 4px; padding: 96px 14px 20px; border-top: 0; border-right: 1px solid var(--linha); }
-  nav.abas::before { content: ''; position: absolute; left: 22px; top: 26px; width: 40px; height: 40px; background: url(icone.svg) center/contain no-repeat; }
-  nav.abas::after { content: 'Pegue e Monte'; position: absolute; left: 72px; top: 32px; font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 19px; color: var(--tinta); }
-  nav.abas button { flex-direction: row; justify-content: flex-start; gap: 12px; min-height: 50px; padding: 0 16px; border-radius: 14px; font-size: 16px; }
-  nav.abas button:hover { background: var(--lilas); }
-  nav.abas button.ativa { background: #FCE9EB; }
-  nav.abas .contador { position: static; margin-left: auto; border: 0; }
-  .topo { padding: 18px 32px 12px; border-bottom: 1px solid var(--linha); }
-  .topo .marca svg, .topo .marca img { display: none; }
-  .topo .marca { font-size: 22px; }
-  main { max-width: 1120px; padding: 24px 32px 40px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px 24px; align-items: start; }
-  main > * { grid-column: 1 / -1; }
-  main > .fin, main > .metade { grid-column: auto; }
-  .kits-grade { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
-  .cal button { min-height: 64px; aspect-ratio: auto; height: 76px; font-size: 17px; }
-  .painel-fundo { left: 248px; background: rgba(42,27,61,.35); padding: 28px; }
-  .painel { max-width: 760px; min-height: auto; border-radius: 24px; background: var(--fundo); box-shadow: 0 30px 60px rgba(42,27,61,.25); padding: 0 28px 28px; }
-  .painel-barra { margin: 0 -28px; padding-left: 16px; padding-right: 28px; border-radius: 24px 24px 0 0; }
-}
-@media (min-width: 1024px) {
-  main:has(> .fin) > .fin { grid-column: 1; grid-row: 2 / span 5; }
-  main:has(> .fin) > h2, main:has(> .fin) > section.coluna:not(.primeiros) { grid-column: 2; }
-  main > .primeiros { grid-column: 1 / -1; }
-  main > h2 { margin-top: 0; }
-  main > .primeiros { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; }
-  main > .primeiros > *:not(.passo):not([class*=passo]) { grid-column: 1 / -1; }
-}
-@media (min-width: 1024px) {
-  main:has(.cal) { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); }
-  main:has(.cal) > .linha-flex { grid-column: 1; }
-  main:has(.cal) > .cartao { grid-column: 1; }
-  main:has(.cal) > section.coluna { grid-column: 2; grid-row: 1 / span 2; }
-  main:has(.cal) .cal button { height: 64px; }
-}
-@media (min-width: 1024px) {
-  main:has(> .bf-card) > section.cartao, main:has(> .instalar) > section.cartao { grid-column: auto; }
-  main:has(> .instalar) > .btn.cheio { grid-column: 1; justify-self: start; width: auto; }
-}
 /* Conversão do teste */
 .resumo-teste { display: flex; flex-direction: column; gap: 4px; align-items: center; text-align: center; background: #EAF7EF; border: 2px solid #BFE3CD; border-radius: 16px; padding: 12px 14px; }
 .resumo-teste b { font-size: 15px; color: #1F7A52; }
