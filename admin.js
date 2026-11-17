@@ -3,8 +3,8 @@
 // Só abre para e-mails cadastrados na tabela "administradores".
 // Quem confere é o banco de dados: esta página só mostra o resultado.
 // =====================================================================
-import * as dados from './dados.js?v=20261116a';
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=20261116a';
+import * as dados from './dados.js?v=20261117a';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=20261117a';
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -316,7 +316,7 @@ async function ativarAvisos(botao) {
   botao.disabled = true; botao.textContent = 'Ativando…';
   try {
     if (dados.MODO_DEMO) throw new Error('Na demonstração as notificações não são enviadas.');
-    const reg = await navigator.serviceWorker.register('sw.js?v=1', { scope: './' });
+    const reg = await navigator.serviceWorker.register('sw.js?v=2', { scope: './' });
     await navigator.serviceWorker.ready;
     const perm = await Notification.requestPermission();
     if (perm !== 'granted') throw new Error('Você não permitiu as notificações. Dá para liberar depois nas configurações do navegador.');
@@ -337,7 +337,20 @@ async function ativarAvisos(botao) {
     botao.disabled = false; botao.textContent = texto;
   }
 }
+// Registro dos acessos do modo suporte (só aparece aqui no painel).
+async function desenharLogSuporte(tela) {
+  let log = [];
+  try { log = await dados.adminSuporteLog(); } catch (e) { return; }
+  if (!log || !log.length) return;
+  const quando = (iso) => new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  const sec = document.createElement('section');
+  sec.className = 'cartao coluna';
+  sec.innerHTML = `<h3 style="margin:0">Acessos do modo suporte</h3>
+    ${log.slice(0, 15).map((x) => `<div class="linha-flex entre pequeno"><span>${esc(x.loja)}</span><b>${esc(quando(x.inicio))} até ${esc(new Date(x.fim).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }))}</b></div>`).join('')}`;
+  tela.appendChild(sec);
+}
 function ligarResumoExtras(tela) {
+  desenharLogSuporte(tela);
   const at = $('#ativar-avisos', tela);
   if (at) at.onclick = () => ativarAvisos(at);
   const te = $('#testar-avisos', tela);
@@ -455,6 +468,7 @@ function cartaoPessoa(c) {
     ${origem}
     <div class="infos">${infos.map(([k, v]) => `<div>${esc(k)}<br><b>${esc(v)}</b></div>`).join('')}</div>
     <div class="acoes">
+      ${c.slug ? `<button class="btn mini principal" data-suporte="1">Entrar na loja para ajudar</button>` : ''}
       ${tel ? `<a class="btn mini verde" href="${esc(linkZap(tel, msg))}" target="_blank" rel="noopener">WhatsApp</a>` : ''}
       <a class="btn mini contorno" href="mailto:${esc(c.email)}">E-mail</a>
       ${c.slug ? `<a class="btn mini contorno" href="reservar.html?l=${encodeURIComponent(c.slug)}" target="_blank" rel="noopener">Ver link</a>` : ''}
@@ -483,6 +497,19 @@ function desenharLista() {
       if (ja) { ja.remove(); return; }
       caixa.insertAdjacentHTML('beforeend', `<div class="lista-msgs coluna">${MSGS_TESTE.map(([, rot, txt]) => `
         <a class="msg-pronta" href="${esc(linkZap(tel, txt(n ? ', ' + n : '')))}" target="_blank" rel="noopener"><b>${esc(rot)}</b><span>${esc(txt(n ? ', ' + n : ''))}</span></a>`).join('')}</div>`);
+    };
+  });
+  $$('[data-suporte]', lista).forEach((b) => {
+    b.onclick = async () => {
+      const email = b.closest('[data-email]').dataset.email;
+      b.disabled = true; b.textContent = 'Entrando…';
+      try {
+        await dados.adminEntrarLoja(email);
+        location.href = 'index.html';
+      } catch (e) {
+        aviso(e.message || 'Não deu para entrar na loja.');
+        b.disabled = false; b.textContent = 'Entrar na loja para ajudar';
+      }
     };
   });
   $$('[data-acao]', lista).forEach((b) => {

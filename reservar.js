@@ -2,7 +2,7 @@
 // App Pegue e Monte — link público de reservas (a cliente final usa)
 // Endereço: reservar.html?l=<link-do-negocio>
 // =====================================================================
-import * as dados from './dados.js?v=20261116a';
+import * as dados from './dados.js?v=20261117a';
 
 // Demonstração do site: botões de WhatsApp mostram um aviso em vez de abrir conversa.
 if (dados.DEMONSTRACAO_SITE) {
@@ -86,6 +86,10 @@ function fechar(vindoDoCelular) {
 }
 window.addEventListener('popstate', () => fechar(true));
 
+const ICONE_INSTA = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor"/></svg>';
+function recadoPadrao(loja) {
+  return `🎉 Que bom ter você aqui na ${loja}!\n\nNossos kits são pensados com carinho para deixar a sua festa linda e cheia de alegria. 💖\n\nVeja os kits, escolha a data livre e garanta a sua reserva com antecedência.\n\nVamos celebrar juntos esse momento especial! 🥳`;
+}
 async function iniciar() {
   const raiz = $('#raiz');
   if (!slug) { raiz.innerHTML = '<div class="erro">Link incompleto. Peça o link de reservas para a loja.</div>'; return; }
@@ -101,9 +105,12 @@ async function iniciar() {
     <header class="cabeca">
       ${loja.logo_url ? `<img src="${esc(loja.logo_url)}" alt="Logo de ${esc(loja.nome)}">` : ''}
       <h1>${esc(loja.nome)}</h1>
-      ${loja.recado ? `<p class="recado-loja">${esc(loja.recado)}</p>` : ''}
+      <p class="recado-loja">${esc(loja.recado || recadoPadrao(loja.nome))}</p>
       <p class="pequeno">Escolha o kit e veja as datas livres. A reserva é confirmada depois do sinal.</p>
-      <a class="btn verde mini" href="${esc(linkZap(loja.whatsapp, 'Oi! Vim pelo link de reservas e tenho uma dúvida.'))}" target="_blank" rel="noopener">Dúvidas? Fale no WhatsApp</a>
+      <div class="botoes-loja">
+        <a class="btn verde mini" href="${esc(linkZap(loja.whatsapp, 'Oi! Vim pelo link de reservas e tenho uma dúvida.'))}" target="_blank" rel="noopener">Dúvidas? Fale no WhatsApp</a>
+        ${loja.instagram ? `<a class="btn insta mini" href="https://instagram.com/${encodeURIComponent(loja.instagram)}" target="_blank" rel="noopener">${ICONE_INSTA} Instagram</a>` : ''}
+      </div>
     </header>
     ${categorias.length > 1 ? `
     <div class="busca-kits">
@@ -202,7 +209,7 @@ async function escolherData(kit) {
     <form id="form" class="coluna oculto" novalidate>
       <div class="cartao" style="background: var(--lilas)"><div class="pequeno">Data da festa</div><b id="data-escolhida"></b></div>
       <label class="campo">Seu nome<input name="nome" maxlength="80" autocomplete="name" required></label>
-      <label class="campo">Seu WhatsApp (com DDD)<input name="zap" inputmode="tel" autocomplete="tel" placeholder="(51) 99999-0000" required></label>
+      <label class="campo">Seu WhatsApp<div class="campo-pre"><span>+55</span><input name="zap" inputmode="tel" autocomplete="tel" placeholder="(51) 99999-0000" required></div></label>
       <div class="erro oculto" id="erro"></div>
       <button class="btn principal cheio" type="submit">Pedir reserva</button>
       <p class="dica centro">Seu pedido segura a data até a loja confirmar o sinal.</p>
@@ -215,10 +222,11 @@ async function escolherData(kit) {
       const erro = $('#erro', p);
       erro.classList.add('oculto');
       const nome = form.nome.value.trim();
-      const zap = form.zap.value.replace(/\D/g, '');
+      let zap = form.zap.value.replace(/\D/g, '').replace(/^0+/, '');
+      if (zap.length > 11 && zap.startsWith('55')) zap = zap.slice(2);
       if (!escolhida) { erro.textContent = 'Escolha a data da festa no calendário.'; erro.classList.remove('oculto'); return; }
       if (nome.length < 2) { erro.textContent = 'Digite seu nome.'; erro.classList.remove('oculto'); return; }
-      if (zap.length < 10 || zap.length > 13) { erro.textContent = 'Digite seu WhatsApp com DDD.'; erro.classList.remove('oculto'); return; }
+      if (zap.length < 10 || zap.length > 11) { erro.textContent = 'Confira seu WhatsApp: digite o DDD e o número, por exemplo (51) 99999-0000.'; erro.classList.remove('oculto'); return; }
       const b = $('button[type=submit]', form);
       b.disabled = true; b.textContent = 'Enviando…';
       try {

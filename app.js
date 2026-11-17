@@ -2,8 +2,8 @@
 // App Pegue e Monte — app da dona
 // Abas: Hoje, Agenda, Kits, Mais
 // =====================================================================
-import * as dados from './dados.js?v=20261116a';
-import { PERMITIR_CADASTRO, EMAIL_SUPORTE, WHATSAPP_SUPORTE, LINK_MENSAL, LINK_ANUAL, LINK_ANUAL_PROMO, DEMO_SITE, LINK_PLANOS } from './config.js?v=20261116a';
+import * as dados from './dados.js?v=20261117a';
+import { PERMITIR_CADASTRO, EMAIL_SUPORTE, WHATSAPP_SUPORTE, LINK_MENSAL, LINK_ANUAL, LINK_ANUAL_PROMO, DEMO_SITE, LINK_PLANOS, SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=20261117a';
 
 const { hojeISO, somaDias, cruza } = dados;
 
@@ -33,7 +33,34 @@ function paraData(iso) { const [a, m, d] = iso.split('-').map(Number); return ne
 function dataCurta(iso) { return paraData(iso).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' }).replace('.', ''); }
 function maiuscula(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 function dataLonga(iso) { return maiuscula(paraData(iso).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })); }
+function recadoPadrao(loja) {
+  return `🎉 Que bom ter você aqui na ${loja}!\n\nNossos kits são pensados com carinho para deixar a sua festa linda e cheia de alegria. 💖\n\nVeja os kits, escolha a data livre e garanta a sua reserva com antecedência.\n\nVamos celebrar juntos esse momento especial! 🥳`;
+}
 function soDigitos(v) { return String(v || '').replace(/\D/g, ''); }
+// WhatsApp: aceita com ou sem 55/+55/0 na frente e guarda só DDD + número.
+function normalizarZap(v) {
+  let d = soDigitos(v).replace(/^0+/, '');
+  if (d.length > 11 && d.startsWith('55')) d = d.slice(2);
+  return d;
+}
+function campoZap(nome, valor) {
+  return `<div class="campo-pre"><span>+55</span><input name="${nome}" inputmode="tel" autocomplete="tel" value="${esc(valor ? zapFormatado(valor) : '')}" placeholder="(51) 99999-0000" required></div>
+    <span class="dica zap-dica">Só o DDD e o número. O +55 do Brasil já está aqui.</span>`;
+}
+function ligarCampoZap(input) {
+  if (!input) return;
+  const dica = input.closest('label').querySelector('.zap-dica');
+  input.addEventListener('input', () => {
+    const d = normalizarZap(input.value).slice(0, 11);
+    input.value = d.length > 6 ? `(${d.slice(0, 2)}) ${d.slice(2, d.length - 4)}-${d.slice(-4)}` : d.length > 2 ? `(${d.slice(0, 2)}) ${d.slice(2)}` : d;
+    const ok = d.length === 0 || d.length === 10 || d.length === 11;
+    dica.textContent = ok ? 'Só o DDD e o número. O +55 do Brasil já está aqui.' : `Faltam números: digite DDD + número (${d.length} de 11).`;
+    dica.classList.toggle('alerta', !ok);
+  });
+}
+function limparInstagram(v) {
+  return String(v || '').trim().replace(/^https?:\/\/(www\.)?instagram\.com\//i, '').replace(/^@+/, '').replace(/[/?#].*$/, '').toLowerCase();
+}
 function zapFormatado(n) {
   const d = soDigitos(n).replace(/^55(?=\d{10,11}$)/, '');
   if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
@@ -58,7 +85,7 @@ function linkPublico(slug) {
 // Nomes que não podem virar link (já são páginas do app)
 const LINKS_RESERVADOS = ['admin', 'reservar', 'index', 'app', 'api', 'manifest', 'icone', 'login', 'suporte', 'ajuda', 'www'];
 function kitDe(id) { return estado.kits.find((k) => k.id === id) || { nome: 'Kit removido', pecas: [] }; }
-function podeEditar() { return !!(estado.assinatura && estado.assinatura.liberado); }
+function podeEditar() { return !!estado.suporte || !!(estado.assinatura && estado.assinatura.liberado); }
 
 const STATUS = {
   aguardando_sinal: 'Aguardando sinal',
@@ -145,16 +172,14 @@ function abrirPopup(corpo, aoMontar) {
 // dona abre o app depois que os arquivos novos forem publicados.
 // ---------------------------------------------------------------------
 const NOVIDADES = {
-  versao: '2026-11-17',
-  desde: '2026-11-16T18:00:00Z', // contas criadas depois disso já nascem com tudo
+  versao: '2026-11-18',
+  desde: '2026-11-17T21:00:00Z', // contas criadas depois disso já nascem com tudo
   itens: [
-    ['📄', 'Contrato pronto em cada reserva', 'Em Mais > Meu contrato, ajuste o seu modelo uma vez. Na reserva, toque em "Gerar contrato" e mande o link: a cliente lê e aceita pelo celular.'],
-    ['📲', 'Instale o app no celular', 'Em Mais, toque em "Instalar o app na tela inicial" e abra direto pelo ícone, como um aplicativo.'],
-    ['📷', 'Até 5 fotos por kit, sem cortes', 'Em Kits, toque no kit e em "Adicionar fotos". Você ajusta o recorte antes de enviar (ou usa a foto inteira), e no seu link a cliente passa as fotos com o dedo.'],
-    ['💬', 'Suas mensagens do WhatsApp', 'Em Mais > Mensagens do WhatsApp, escreva do seu jeito os textos de sinal, confirmação, retirada e devolução.'],
-    ['🎨', 'Sua logo e um recado no link', 'Em Mais > Meus dados, coloque a sua logo e um recado que aparece no topo do seu link de reservas.'],
-    ['🗂️', 'Categorias, peças e observações', 'Escolha a categoria de cada kit (a cliente filtra no seu link), cadastre as peças uma em cada linha e anote o que precisar em cada reserva.'],
-    ['🙋', 'Suporte pelo WhatsApp', 'Ficou com dúvida? Em Mais > Precisa de ajuda, fale com a gente direto no WhatsApp.'],
+    ['📸', 'Instagram no seu link', 'Em Mais > Meus dados, coloque o @ do seu Instagram: as clientes veem um botão para o seu perfil no topo do link de reservas.'],
+    ['📱', 'WhatsApp sem erro', 'O +55 do Brasil já vem pronto. É só digitar o DDD e o número, e o app avisa se faltar algum número.'],
+    ['💻', 'App no computador', 'Abrindo pelo computador, o app agora usa a tela inteira: menu na lateral, agenda maior e mais kits por linha.'],
+    ['🔔', 'Avisos de reservas no celular', 'Em Mais, toque em "Ativar avisos neste celular" e receba um aviso na hora em que uma cliente reservar pelo seu link, mesmo com o app fechado.'],
+    ['💌', 'Recado pronto no link', 'Se você ainda não escreveu o recado do seu link, ele mostra um texto de boas-vindas com o nome da sua loja.'],
   ],
 };
 function mostrarNovidades() {
@@ -175,11 +200,11 @@ function mostrarNovidades() {
       ${NOVIDADES.itens.map(([ic, t, d]) => `
         <div class="novidade"><span class="novidade-ic">${ic}</span><div><b>${esc(t)}</b><p class="pequeno">${esc(d)}</p></div></div>`).join('')}
     </div>
-    <button class="btn principal cheio" id="nov-msg">Ajustar meu contrato</button>
+    <button class="btn principal cheio" id="nov-msg">Colocar meu Instagram</button>
     <button class="btn contorno cheio" id="nov-ok">Entendi</button>`, (p) => {
     marcar();
     $('#nov-ok', p).onclick = () => fecharPainel();
-    $('#nov-msg', p).onclick = () => painelContrato();
+    $('#nov-msg', p).onclick = () => painelNegocio();
   });
 }
 
@@ -245,10 +270,12 @@ async function iniciar() {
 }
 
 async function carregarTudo() {
+  estado.suporte = await dados.suporteAtual().catch(() => null);
   [estado.negocio, estado.assinatura] = await Promise.all([dados.meuNegocio(), dados.minhaAssinatura()]);
   marcarRelogio();
   const a = estado.assinatura || {};
-  if (!a.cortesia && !a.encontrada) {
+  if (estado.suporte && !estado.negocio) { await dados.suporteSair().catch(() => {}); location.href = 'admin.html'; return; }
+  if (!estado.suporte && !a.cortesia && !a.encontrada) {
     // Conta nova sem compra: ganha 7 dias de teste grátis (uma vez por e-mail).
     try { await dados.iniciarTeste(); estado.assinatura = await dados.minhaAssinatura(); marcarRelogio(); } catch (e) { /* segue para a tela de assinatura */ }
     if (!estado.assinatura.encontrada) return telaSemAssinatura();
@@ -344,14 +371,154 @@ function popupPagamento() {
       catch (e) { prompt('Copie o código Pix:', a.pix_codigo); }
     };
     try {
-      const { default: qrcode } = await import('./qrcode.mjs?v=20261116a');
+      const { default: qrcode } = await import('./qrcode.mjs?v=20261117a');
       const q = qrcode(0, 'M'); q.addData(a.pix_codigo); q.make();
       $('#pix-qr', p).innerHTML = q.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
     } catch (e) { $('#pix-qr', p).remove(); }
   });
 }
 
-// Fim do teste grátis: aviso na frente de tudo, sem fechar. Os dados ficam guardados.
+// ---------------------------------------------------------------------
+// Conversão do teste grátis
+// ---------------------------------------------------------------------
+const HORAS_OFERTA_FIM = 48; // anual com desconto fica 48 h depois que o teste acaba
+function resumoDoTeste() {
+  const res = (estado.reservas || []).filter((r) => r.status !== 'cancelada');
+  return {
+    kits: (estado.kits || []).length,
+    reservas: res.length,
+    total: res.reduce((t, r) => t + (Number(r.valor_total) || 0), 0),
+    peloLink: res.filter((r) => r.origem === 'link').length,
+  };
+}
+function textoResumoTeste() {
+  const x = resumoDoTeste();
+  if (!x.kits && !x.reservas) return '';
+  const partes = [];
+  if (x.kits) partes.push(`${x.kits} ${x.kits === 1 ? 'kit cadastrado' : 'kits cadastrados'}`);
+  if (x.reservas) partes.push(`${x.reservas} ${x.reservas === 1 ? 'reserva organizada' : 'reservas organizadas'}`);
+  if (x.peloLink) partes.push(`${x.peloLink} pelo seu link`);
+  return partes.join(' · ') + (x.total ? ` · ${reais(x.total)} em festas` : '');
+}
+function fimDaOfertaAnual() {
+  const a = estado.assinatura || {};
+  return a.teste_ate ? new Date(a.teste_ate).getTime() + HORAS_OFERTA_FIM * 3600e3 : 0;
+}
+// A promoção do anual libera no 2º dia do teste e vai até 48 h depois que o teste acaba.
+function inicioDaPromo() {
+  const a = estado.assinatura || {};
+  return a.teste_ate ? new Date(a.teste_ate).getTime() - 6 * 864e5 : 0; // teste de 7 dias: começa no 2º dia
+}
+function promoAnualLiberada() {
+  const agora = agoraServidor();
+  return !!inicioDaPromo() && agora >= inicioDaPromo() && agora < fimDaOfertaAnual();
+}
+function planosHtml() {
+  const fim = fimDaOfertaAnual();
+  const promo = promoAnualLiberada();
+  const anual = promo
+    ? `<div class="plano anual"><span class="fita">${agoraServidor() < fim - HORAS_OFERTA_FIM * 3600e3 ? 'PROMOÇÃO DO TESTE GRÁTIS' : 'OFERTA DE FIM DE TESTE'}</span><span class="desc">53% OFF</span>
+        <div class="nome">Plano anual</div>
+        <div class="de">De R$ 358,80</div>
+        <div class="por">R$ 167 <small>por 12 meses</small></div>
+        <div class="mes">Sai por R$ 13,92 por mês · ou parcele no cartão</div>
+        ${fim - agoraServidor() <= HORAS_OFERTA_FIM * 3600e3 ? `<div class="contagem-oferta">Oferta termina em <b id="oferta-relogio">${tempoRestante(fim - agoraServidor())}</b></div>` : ''}
+        <a class="btn verde cheio" style="min-height:52px;font-size:17px" href="${esc(LINK_ANUAL_PROMO)}" target="_blank" rel="noopener">Quero o anual com desconto</a>
+      </div>`
+    : `<div class="plano anual"><div class="nome">Plano anual</div>
+        <div class="por">R$ 269 <small>por 12 meses</small></div>
+        <div class="mes">ou 12x de R$ 27,79 no cartão</div>
+        <a class="btn verde cheio" style="min-height:52px;font-size:17px" href="${esc(LINK_ANUAL)}" target="_blank" rel="noopener">Assinar o anual</a>
+      </div>`;
+  return `<div class="planos">${anual}
+      <div class="plano mensal">
+        <div class="nome">Plano mensal</div>
+        <div class="por">R$ 29,90 <small>por mês</small></div>
+        <a class="btn contorno cheio" href="${esc(LINK_MENSAL)}" target="_blank" rel="noopener">Assinar o mensal</a>
+      </div>
+    </div>`;
+}
+let relogioOferta = null;
+function ligarRelogioOferta(raiz) {
+  clearInterval(relogioOferta);
+  relogioOferta = setInterval(() => {
+    const el = $('#oferta-relogio', raiz);
+    if (!el || !document.body.contains(el)) { clearInterval(relogioOferta); return; }
+    const falta = fimDaOfertaAnual() - agoraServidor();
+    el.textContent = falta > 0 ? tempoRestante(falta) : 'agora';
+  }, 1000);
+}
+function blocoResumoTeste(titulo) {
+  const t = textoResumoTeste();
+  return t ? `<div class="resumo-teste"><b>${esc(titulo)}</b><span>${esc(t)}</span></div>` : '';
+}
+// Durante o teste: escolher o plano a qualquer momento.
+function popupPlanosTeste() {
+  const a = estado.assinatura || {};
+  abrirPopup(`
+    ${BANDEIRINHAS}
+    <h2 class="centro" style="font-size:24px;margin:0">Garanta seu acesso</h2>
+    ${blocoResumoTeste('O que você já montou no app')}
+    <p class="centro pequeno" style="margin:0">A cobrança começa no dia em que você assina. Tudo o que você cadastrou continua aqui.</p>
+    ${planosHtml()}
+    <div class="nota-amarela pequeno">Assine com o <b>mesmo e-mail do teste</b> (<b>${esc(a.email || '')}</b>) para não perder nada do que já cadastrou.</div>
+    <button class="link-btn" id="planos-fechar">Agora não</button>`, (p) => {
+    $('#planos-fechar', p).onclick = () => fecharPainel();
+    ligarRelogioOferta(p);
+  });
+}
+// 2º dia do teste: mostra a promoção do anual uma vez. Depois ela fica no "Assinar agora".
+function mostrarPromoDoTeste() {
+  if (situacaoAssinatura() !== 'teste' || !promoAnualLiberada() || painelAberto || !estado.negocio) return;
+  const chave = `apm-promo-teste-vista-${estado.negocio.id}`;
+  try { if (localStorage.getItem(chave)) return; localStorage.setItem(chave, '1'); } catch (e) { return; }
+  const a = estado.assinatura || {};
+  abrirPopup(`
+    ${BANDEIRINHAS}
+    <h2 class="centro" style="font-size:24px;margin:0">Um presente do seu teste grátis 🎁</h2>
+    ${blocoResumoTeste('O que você já montou no app')}
+    <p class="centro pequeno" style="margin:0">Liberamos o plano anual com <b>53% de desconto</b> para quem está testando. A cobrança começa no dia em que você assina.</p>
+    ${planosHtml()}
+    <div class="nota-amarela pequeno">Assine com o <b>mesmo e-mail do teste</b> (<b>${esc(a.email || '')}</b>) para não perder nada do que já cadastrou.</div>
+    <p class="centro pequeno" style="margin:0">A oferta fica guardada no botão <b>"Assinar agora"</b>, no topo do app.</p>
+    <button class="link-btn" id="promo-fechar">Continuar testando</button>`, (p) => {
+    $('#promo-fechar', p).onclick = () => fecharPainel();
+  });
+}
+
+// Primeira reserva feita pela cliente no link: comemora uma vez.
+const COMEMORAR_LINK_DESDE = '2026-11-17T00:00:00Z';
+function comemorarReservaPeloLink() {
+  if (painelAberto || $('#bloqueio') || !estado.negocio) return;
+  const chave = `apm-link-comemorado-${estado.negocio.id}`;
+  let ja = '';
+  try { ja = localStorage.getItem(chave) || ''; } catch (e) { return; }
+  if (ja) return;
+  // Só reserva de cliente de verdade: ignora a reserva de teste feita no app e quando a dona testa o próprio link.
+  const zapLoja = normalizarZap(estado.negocio.whatsapp);
+  const r = (estado.reservas || []).find((x) => x.origem === 'link'
+    && String(x.criado_em || '') >= COMEMORAR_LINK_DESDE
+    && normalizarZap(x.cliente_whatsapp) !== zapLoja
+    && !/teste/i.test(x.cliente_nome || ''));
+  if (!r) return;
+  try { localStorage.setItem(chave, '1'); } catch (e) { /* segue */ }
+  const emTeste = situacaoAssinatura() === 'teste';
+  abrirPopup(`
+    ${BANDEIRINHAS}
+    <div class="centro" style="font-size:44px;line-height:1">🎉</div>
+    <h2 class="centro" style="font-size:24px;margin:0">Uma cliente reservou sozinha pelo seu link!</h2>
+    <p class="centro" style="margin:0"><b>${esc(r.cliente_nome || 'Uma cliente')}</b> escolheu o kit <b>${esc((kitDe(r.kit_id) || {}).nome || '')}</b> para ${esc(dataLonga(r.data_festa))}.</p>
+    <p class="centro pequeno" style="margin:0">É isso que o app faz por você todo dia: a cliente escolhe o kit e a data livre, e o pedido chega pronto.</p>
+    <button class="btn principal cheio" id="cl-ver">Ver a reserva</button>
+    ${emTeste ? '<button class="btn verde cheio" id="cl-planos">Garantir meu acesso</button>' : ''}
+    <button class="link-btn" id="cl-ok">Fechar</button>`, (p) => {
+    $('#cl-ok', p).onclick = () => fecharPainel();
+    $('#cl-ver', p).onclick = () => abrirReserva(r.id);
+    const pl = $('#cl-planos', p); if (pl) pl.onclick = () => popupPlanosTeste();
+  });
+}
+
+// Fim do teste grátis: escolhe o plano ou continua só olhando (sem criar nem alterar). Os dados ficam guardados.
 function bloqueioFimDoTeste() {
   const a = estado.assinatura || {};
   let caixa = $('#bloqueio');
@@ -359,23 +526,12 @@ function bloqueioFimDoTeste() {
   caixa.innerHTML = `<div class="popup-fundo bloqueio"><div class="popup" role="dialog" aria-modal="true">
     ${BANDEIRINHAS}
     <h2 class="centro" style="font-size:24px;margin:0">Seu teste grátis terminou</h2>
+    ${blocoResumoTeste('Não perca o que você já montou')}
     <p class="centro pequeno" style="margin:0">Escolha seu plano e continue de onde parou. Seus kits, fotos e reservas estão guardados.</p>
-    <div class="planos">
-      <div class="plano anual"><span class="fita">OFERTA DE FIM DE TESTE</span><span class="desc">53% OFF</span>
-        <div class="nome">Plano anual</div>
-        <div class="de">De R$ 358,80</div>
-        <div class="por">R$ 167 <small>por 12 meses</small></div>
-        <div class="mes">Sai por R$ 13,92 por mês · ou parcele no cartão</div>
-        <a class="btn verde cheio" style="min-height:52px;font-size:17px" href="${esc(LINK_ANUAL_PROMO)}" target="_blank" rel="noopener">Quero o anual com desconto</a>
-      </div>
-      <div class="plano mensal">
-        <div class="nome">Plano mensal</div>
-        <div class="por">R$ 29,90 <small>por mês</small></div>
-        <a class="btn contorno cheio" href="${esc(LINK_MENSAL)}" target="_blank" rel="noopener">Assinar o mensal</a>
-      </div>
-    </div>
+    ${planosHtml()}
     <div class="nota-amarela pequeno">Assine com o <b>mesmo e-mail do teste</b> (<b>${esc(a.email || '')}</b>) para não perder nada do que já cadastrou.</div>
     <button class="btn contorno cheio" id="teste-verificar">Já assinei, verificar</button>
+    <button class="btn contorno cheio" id="teste-olhar">Só ver minhas reservas por enquanto</button>
     ${botaoZapSuporte('Oi! Meu teste do App Pegue e Monte terminou e tenho uma dúvida.')}
     <button class="link-btn" id="teste-sair">Sair do app</button>
     ${dados.MODO_DEMO && !DEMO_SITE ? '<button class="btn contorno cheio" id="demo-normal">Demonstração: voltar ao normal</button>' : ''}
@@ -389,6 +545,8 @@ function bloqueioFimDoTeste() {
   const normal = $('#demo-normal', caixa);
   if (normal) normal.onclick = async () => { dados.demoSimular('normal'); caixa.remove(); document.body.style.overflow = ''; await recarregar(); montarApp(); };
   $('#teste-sair', caixa).onclick = async () => { await dados.sair(); caixa.remove(); document.body.style.overflow = ''; telaLogin('entrar'); };
+  $('#teste-olhar', caixa).onclick = () => { clearInterval(relogioOferta); caixa.remove(); document.body.style.overflow = ''; try { sessionStorage.setItem('apm-fim-teste-visto', '1'); } catch (e) { /* segue */ } };
+  ligarRelogioOferta(caixa);
 }
 
 let relogioFaixa = null;
@@ -397,11 +555,34 @@ function ajustarAlturaFaixa() {
   const f = $('#faixa');
   document.documentElement.style.setProperty('--altura-faixa', (f ? f.offsetHeight : 0) + 'px');
 }
+// Modo suporte: faixa só para o administrador, com o tempo que falta e "Sair".
+function desenharFaixaSuporte(faixa, base) {
+  const fim = new Date(estado.suporte.ate).getTime();
+  const resto = () => tempoRestante(fim - agoraServidor());
+  faixa.innerHTML = base + `
+    <div class="faixa-suporte" role="status">
+      <span class="selo">MODO SUPORTE</span>
+      <span class="t">Loja: <b>${esc(estado.suporte.nome || estado.negocio.nome)}</b> · <span id="suporte-resto">${resto()}</span></span>
+      <button class="btn mini" id="suporte-sair">Sair</button>
+    </div>`;
+  $('#suporte-sair', faixa).onclick = async (e) => {
+    e.currentTarget.disabled = true;
+    await dados.suporteSair().catch(() => {});
+    location.href = 'admin.html?aba=clientes';
+  };
+  relogioFaixa = setInterval(() => {
+    const el = $('#suporte-resto');
+    if (fim - agoraServidor() <= 0) { clearInterval(relogioFaixa); location.href = 'admin.html?aba=clientes'; return; }
+    if (el) el.textContent = resto();
+  }, 30000);
+}
+
 function desenharFaixaAssinatura() {
   clearInterval(relogioFaixa);
   setTimeout(ajustarAlturaFaixa, 0);
   const faixa = $('#faixa');
   const base = dados.MODO_DEMO ? faixaDemo() : '';
+  if (estado.suporte) { desenharFaixaSuporte(faixa, base); return; }
   const sit = situacaoAssinatura();
   if (sit !== 'teste_fim' && $('#bloqueio')) { $('#bloqueio').remove(); document.body.style.overflow = ''; }
   if (!sit) { faixa.innerHTML = base; return; }
@@ -411,12 +592,24 @@ function desenharFaixaAssinatura() {
     const dias = Math.max(1, Math.ceil((new Date(a.teste_ate).getTime() - agoraServidor()) / 864e5));
     faixa.innerHTML = base + `
       <div class="faixa-pagamento teste" role="status">
-        <div>🎁 <b>Seu teste grátis termina ${dias === 1 ? 'amanhã' : `em ${dias} dias`}.</b> Assine com este mesmo e-mail e continue com tudo que cadastrou.</div>
-        <a class="btn mini" href="${esc(LINK_MENSAL)}" target="_blank" rel="noopener">Assinar agora</a>
+        <div>🎁 <b>Seu teste grátis termina ${dias === 1 ? 'amanhã' : `em ${dias} dias`}.</b> ${textoResumoTeste() ? `Você já tem ${esc(textoResumoTeste())}.` : 'Assine com este mesmo e-mail e continue com tudo que cadastrou.'}</div>
+        <button class="btn mini" id="faixa-planos">Assinar agora</button>
       </div>`;
+    $('#faixa-planos', faixa).onclick = popupPlanosTeste;
     return;
   }
-  if (sit === 'teste_fim') { faixa.innerHTML = base; bloqueioFimDoTeste(); return; }
+  if (sit === 'teste_fim') {
+    faixa.innerHTML = base + `
+      <div class="faixa-pagamento" role="alert">
+        <div><b>Seu teste grátis terminou.</b> Você ainda vê suas reservas, mas não pode criar nem alterar nada, e seu link de reservas está pausado.</div>
+        <button class="btn mini" id="faixa-fim-planos">Ver planos</button>
+      </div>`;
+    $('#faixa-fim-planos', faixa).onclick = () => bloqueioFimDoTeste();
+    let visto = '';
+    try { visto = sessionStorage.getItem('apm-fim-teste-visto') || ''; } catch (e) { /* segue */ }
+    if (!visto) bloqueioFimDoTeste();
+    return;
+  }
 
   if (sit === 'cancelada') {
     const ainda = a.liberado && a.carencia_ate;
@@ -645,6 +838,10 @@ function telaNovaSenha() {
 // =====================================================================
 // Configuração inicial e dados do negócio
 // =====================================================================
+function campoInstagram(n) {
+  return `<label class="campo">Instagram da loja (opcional)<div class="campo-pre"><span>@</span><input name="instagram" maxlength="60" value="${esc(n.instagram || '')}" placeholder="sualoja" autocapitalize="off" autocomplete="off"></div>
+      <span class="dica">Aparece como botão no seu link de reservas.</span></label>`;
+}
 function camposNegocio(n, inicial) {
   return `
     <label class="campo">Nome do seu negócio<input name="nome" maxlength="80" value="${esc(n.nome || '')}" placeholder="Ex.: Festas da Maria" required></label>
@@ -652,7 +849,8 @@ function camposNegocio(n, inicial) {
       <input name="slug" maxlength="40" value="${esc(n.slug || '')}" placeholder="festas-da-maria" autocapitalize="off" required>
       <span class="dica" id="previa-link">${esc(linkPublico(n.slug || 'seu-link'))}</span>
     </label>
-    <label class="campo">Seu WhatsApp (com DDD)<input name="whatsapp" inputmode="tel" value="${esc(n.whatsapp ? zapFormatado(n.whatsapp) : '')}" placeholder="(51) 99999-0000" required></label>
+    <label class="campo">Seu WhatsApp${campoZap('whatsapp', n.whatsapp)}</label>
+    ${inicial ? campoInstagram(n) : ''}
     <label class="campo">Chave Pix para o sinal<input name="chave_pix" maxlength="120" value="${esc(n.chave_pix || '')}" placeholder="E-mail, CPF, CNPJ, celular ou chave aleatória"></label>
     ${inicial ? '' : `
     <div class="grade-2">
@@ -666,9 +864,11 @@ function lerCamposNegocio(form, inicial) {
   const c = {
     nome: form.nome.value.trim(),
     slug: slugDe(form.slug.value),
-    whatsapp: soDigitos(form.whatsapp.value).replace(/^55(?=\d{10,11}$)/, ''),
+    whatsapp: normalizarZap(form.whatsapp.value),
     chave_pix: form.chave_pix.value.trim() || null,
+    instagram: limparInstagram(form.instagram.value) || null,
   };
+  if (c.instagram && !/^[a-z0-9._]{1,30}$/.test(c.instagram)) throw new Error('Confira o @ do Instagram: só letras, números, ponto e _.');
   if (!inicial) {
     c.dias_antes = Math.min(7, Math.max(0, parseInt(form.dias_antes.value, 10) || 0));
     c.dias_depois = Math.min(7, Math.max(0, parseInt(form.dias_depois.value, 10) || 0));
@@ -676,7 +876,7 @@ function lerCamposNegocio(form, inicial) {
   if (c.nome.length < 2) throw new Error('Digite o nome do seu negócio.');
   if (!/^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/.test(c.slug)) throw new Error('O link precisa ter de 3 a 40 letras ou números, sem espaços.');
   if (LINKS_RESERVADOS.includes(c.slug)) throw new Error('Esse link é reservado pelo app. Escolha outro, como o nome da sua loja.');
-  if (c.whatsapp.length < 10 || c.whatsapp.length > 11) throw new Error('Digite o WhatsApp com DDD, só números.');
+  if (c.whatsapp.length < 10 || c.whatsapp.length > 11) throw new Error('Confira o WhatsApp: digite o DDD e o número, por exemplo (51) 99999-0000.');
   return c;
 }
 
@@ -702,7 +902,7 @@ function telaConfiguracaoInicial() {
       <button type="button" class="link-btn" id="sair">Sair</button>
     </form></div>`;
   const form = $('form');
-  ligarPreviaLink(form);
+  ligarPreviaLink(form); ligarCampoZap(form.whatsapp); if (form.instagram) form.instagram.addEventListener("input", () => { form.instagram.value = form.instagram.value.replace(/^@+/, "").replace(/\s/g, ""); });
   $('#sair').onclick = async () => { await dados.sair(); telaLogin('entrar'); };
   form.onsubmit = async (e) => {
     e.preventDefault();
@@ -722,9 +922,9 @@ function telaConfiguracaoInicial() {
 function painelNegocio() {
   const n = estado.negocio;
   let logo = n.logo_url || null;
-  abrirPainel('Meus dados', `<form class="coluna" novalidate>${camposNegocio(n, false)}
+  abrirPainel('Meus dados', `<form class="coluna" novalidate>
       <section class="cartao coluna">
-        <div><h3>Seu link de reservas</h3><span class="dica">É assim que as suas clientes veem o topo do seu link.</span></div>
+        <div><h3>Seu perfil no link de reservas</h3><span class="dica">É assim que as suas clientes veem o topo do seu link.</span></div>
         <div class="linha-flex" style="gap:14px">
           <div id="logo-area" class="logo-prev"></div>
           <div class="coluna" style="gap:6px; flex:1">
@@ -733,14 +933,18 @@ function painelNegocio() {
           </div>
         </div>
         <label class="campo">Recado para as clientes (opcional)
-          <textarea name="recado_link" maxlength="300" rows="3" placeholder="Ex.: Kits completos para festas inesquecíveis 🎈 Retirada no Centro. Atendemos de segunda a sábado.">${esc(n.recado_link || '')}</textarea>
+          <textarea name="recado_link" maxlength="300" rows="3" placeholder="${esc(recadoPadrao(n.nome || 'sua loja'))}">${esc(n.recado_link || '')}</textarea>
           <span class="dica" id="recado-conta"></span>
+          <span class="dica">Se deixar em branco, o seu link mostra o recado de exemplo acima.</span>
         </label>
+        ${campoInstagram(n)}
       </section>
+      <h3 style="margin:6px 0 0">Dados da loja</h3>
+      ${camposNegocio(n, false)}
       <div class="erro oculto" id="erro-neg"></div>
       <button class="btn principal cheio" type="submit">Salvar</button></form>`, (p) => {
     const form = $('form', p);
-    ligarPreviaLink(form);
+    ligarPreviaLink(form); ligarCampoZap(form.whatsapp); if (form.instagram) form.instagram.addEventListener("input", () => { form.instagram.value = form.instagram.value.replace(/^@+/, "").replace(/\s/g, ""); });
     const area = $('#logo-area', p);
     const tirar = $('#tirar-logo', p);
     const desenharLogo = (txt) => {
@@ -798,8 +1002,24 @@ function montarApp() {
   atualizarAoVoltar();
   const deHash = location.hash.replace('#', '');
   irPara(['hoje', 'agenda', 'kits', 'mais'].includes(deHash) ? deHash : 'hoje');
+  if (abrirPeloAviso()) return;
+  if (estado.suporte) return; // no modo suporte não aparece nenhum aviso da dona
   setTimeout(mostrarNovidades, 600);
   setTimeout(mostrarBlackFriday, 1200);
+  setTimeout(comemorarReservaPeloLink, 1800);
+  setTimeout(mostrarPromoDoTeste, 2400);
+}
+
+// Quando a dona toca numa notificação: abre a reserva ou os planos.
+function abrirPeloAviso() {
+  const q = new URLSearchParams(location.search);
+  const reserva = q.get('reserva');
+  const planos = q.get('planos');
+  if (!reserva && !planos) return false;
+  try { history.replaceState(null, '', location.pathname + location.hash); } catch (e) { /* segue */ }
+  if (reserva && (estado.reservas || []).some((r) => r.id === reserva)) { setTimeout(() => abrirReserva(reserva), 300); return true; }
+  if (planos && situacaoAssinatura() === 'teste') { setTimeout(popupPlanosTeste, 300); return true; }
+  return false;
 }
 
 // ---------------------------------------------------------------------
@@ -960,7 +1180,7 @@ async function desenharCartaoContrato(caixa, r) {
   try { c = await dados.contratoDaReserva(r.id); } catch (e) { caixa.innerHTML = '<div class="pequeno">Não consegui carregar o contrato.</div>'; return; }
   const situacao = c && c.aceito_em ? '<span class="st ok">Aceito ✓</span>' : c ? '<span class="st esp">Aguardando aceite</span>' : '<span class="st esp">Não enviado</span>';
   const primeiro = r.cliente_nome.split(' ')[0];
-  const msg = c ? `Oi, ${primeiro}! Segue o contrato da sua reserva do kit ${(kitDe(r.kit_id) || {}).nome || ''}. É só abrir, conferir e tocar em "Aceitar contrato": ${linkContrato(c.token)}` : '';
+  const msg = c ? `Oi, ${primeiro}! Segue o contrato da sua reserva do ${kitComPalavra((kitDe(r.kit_id) || {}).nome)}. É só abrir, conferir e tocar em "Aceitar contrato": ${linkContrato(c.token)}` : '';
   caixa.innerHTML = `
     <div class="linha-flex entre"><h3 style="margin:0">📄 Contrato</h3>${situacao}</div>
     ${c && c.aceito_em
@@ -1068,6 +1288,7 @@ function guardado(chave, valor) {
 function passosFeitos() {
   const n = estado.negocio || {};
   return {
+    perfil: !!n.logo_url,
     kit: estado.kits.length > 0,
     reserva: estado.reservas.length > 0,
     link: !!(n.link_copiado_em || guardado(`apm-link-copiado-${n.id}`)),
@@ -1098,29 +1319,44 @@ async function copiarMeuLink() {
 }
 function cartaoPassos() {
   const f = passosFeitos();
-  const feitos = [f.kit, f.reserva, f.link].filter(Boolean).length;
+  const feitos = [f.perfil, f.kit, f.reserva, f.link].filter(Boolean).length;
   const passo = (n, ok, titulo, texto, botao, id, principal) => `
     <div class="passo ${ok ? 'feito' : ''}">
       <div class="bola">${ok ? '✓' : n}</div>
       <div><b>${titulo}</b><span>${texto}</span>${ok ? '' : `<div><button class="btn ${principal ? 'principal' : 'contorno'} mini" id="${id}">${botao}</button></div>`}</div>
     </div>`;
-  const proximo = !f.kit ? 1 : !f.reserva ? 2 : 3;
+  const proximo = !f.perfil ? 1 : !f.kit ? 2 : !f.reserva ? 3 : 4;
   return `<section class="cartao coluna primeiros">
-    <div class="linha-flex entre"><h2>🚀 Comece em 3 passos</h2><b class="pequeno">${feitos} de 3</b></div>
-    <div class="prog"><i style="width:${Math.max(4, Math.round((feitos / 3) * 100))}%"></i></div>
-    ${passo(1, f.kit, 'Cadastre seu primeiro kit', 'Com foto e lista de peças. Leva 2 minutos.', 'Cadastrar kit', 'passo-kit', proximo === 1)}
-    ${passo(2, f.reserva, 'Crie uma reserva', 'Pode ser uma de teste, para ver a agenda funcionando.', 'Criar reserva', 'passo-reserva', proximo === 2)}
-    ${passo(3, f.link, 'Coloque seu link no Instagram', 'Suas clientes escolhem o kit e a data sozinhas.', 'Copiar meu link', 'passo-link', proximo === 3)}
+    <div class="linha-flex entre"><h2>🚀 Comece em 4 passos</h2><b class="pequeno">${feitos} de 4</b></div>
+    <div class="prog"><i style="width:${Math.max(4, Math.round((feitos / 4) * 100))}%"></i></div>
+    <button class="btn-video" id="passos-video"><span class="play" aria-hidden="true">▶</span><span>Prefere ver como faz? <b>Assista ao vídeo passo a passo (2 min)</b></span></button>
+    ${passo(1, f.perfil, 'Coloque sua logo e o seu Instagram', 'Eles aparecem no topo do seu link de reservas.', 'Completar perfil', 'passo-perfil', proximo === 1)}
+    ${passo(2, f.kit, 'Cadastre seu primeiro kit', 'Com foto e lista de peças. Leva 2 minutos.', 'Cadastrar kit', 'passo-kit', proximo === 2)}
+    ${passo(3, f.reserva, 'Crie uma reserva', 'Pode ser uma de teste, para ver a agenda funcionando.', 'Criar reserva', 'passo-reserva', proximo === 3)}
+    ${passo(4, f.link, 'Coloque seu link no Instagram', 'Suas clientes escolhem o kit e a data sozinhas.', 'Copiar meu link', 'passo-link', proximo === 4)}
     <div class="linha-flex entre" style="flex-wrap:wrap;gap:6px">
       ${WHATSAPP_SUPORTE ? `<a class="link-btn" href="${esc(linkZap(WHATSAPP_SUPORTE, 'Oi! Comecei a usar o App Pegue e Monte e preciso de ajuda com os primeiros passos.'))}" target="_blank" rel="noopener">Precisa de ajuda? WhatsApp</a>` : '<span></span>'}
       <button class="link-btn" id="passos-ocultar" style="color:var(--texto2)">Não mostrar mais</button>
     </div>
   </section>`;
 }
+// Vídeo passo a passo (fica no próprio app; só carrega quando a pessoa toca em assistir)
+function abrirVideoTutorial() {
+  abrirPopup(`
+    <h2 class="centro" style="font-size:22px;margin:0">Como usar o app</h2>
+    <video class="video-tutorial" src="tutorial.mp4?v=1" controls playsinline preload="metadata" poster="tutorial-capa.jpg?v=1"></video>
+    <button class="btn contorno cheio" id="video-fechar">Fechar</button>`, (p) => {
+    const v = $('video', p);
+    try { v.play().catch(() => {}); } catch (e) { /* toca quando ela apertar o play */ }
+    $('#video-fechar', p).onclick = () => { try { v.pause(); } catch (e) { /* segue */ } fecharPainel(); };
+  });
+}
 function ligarPassos(tela) {
   const liga = (id, fn) => { const b = $('#' + id, tela); if (b) b.onclick = fn; };
+  liga('passo-perfil', () => painelNegocio());
+  liga('passos-video', abrirVideoTutorial);
   liga('passo-kit', () => formKit(null));
-  liga('passo-reserva', () => (estado.kits.length ? formReserva({}) : aviso('Cadastre um kit primeiro (passo 1).')));
+  liga('passo-reserva', () => (estado.kits.length ? formReserva({}) : aviso('Cadastre um kit primeiro (passo 2).')));
   liga('passo-link', async () => { await copiarMeuLink(); desenharAba(); });
   liga('passos-ocultar', () => { guardado(`apm-passos-ocultos-${estado.negocio.id}`, '1'); desenharAba(); });
 }
@@ -1655,12 +1891,111 @@ function formKit(kit) {
 // ---------------------------------------------------------------------
 // MAIS
 // ---------------------------------------------------------------------
+// ---------------------------------------------------------------------
+// Avisos de reservas no celular da dona (notificações)
+// ---------------------------------------------------------------------
+function avisosSuportados() { return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
+function avisosLigados() {
+  let v = '';
+  try { v = localStorage.getItem(`apm-avisos-loja-${estado.negocio.id}`) || ''; } catch (e) { /* segue */ }
+  return !!v && avisosSuportados() && Notification.permission === 'granted';
+}
+function cartaoAvisosLoja() {
+  if (DEMO_SITE || estado.suporte) return '';
+  if (avisosLigados()) {
+    return `<section class="cartao coluna avisos-loja ligados">
+      <div class="linha-flex" style="gap:12px;align-items:center"><span style="font-size:30px" aria-hidden="true">✅</span><div><b style="font-size:17px">Avisos ligados neste celular</b><div class="pequeno">Você recebe um aviso a cada nova reserva pelo link, o resumo do dia às 8h e os lembretes da sua assinatura.</div></div></div>
+      <div class="linha-flex" style="gap:8px;flex-wrap:wrap"><button class="btn contorno mini" id="avisos-testar">Enviar aviso de teste</button><button class="btn contorno mini" id="avisos-desligar">Desligar</button></div>
+    </section>`;
+  }
+  return `<section class="cartao coluna avisos-loja">
+    <div class="linha-flex" style="gap:12px;align-items:center"><span style="font-size:30px" aria-hidden="true">🔔</span><div><b style="font-size:17px">Avisos de reservas no celular</b><div class="pequeno">Receba um aviso na hora em que uma cliente reservar pelo seu link, mesmo com o app fechado.</div></div></div>
+    <button class="btn principal cheio" id="avisos-ativar">Ativar avisos neste celular</button>
+  </section>`;
+}
+function chaveParaBytes(b64) {
+  const p = '='.repeat((4 - (b64.length % 4)) % 4);
+  const bin = atob((b64 + p).replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from(bin, (c) => c.charCodeAt(0));
+}
+function explicarAvisosIphone() {
+  const passo = (n, t) => `<div class="passo-inst"><b>${n}</b><span>${t}</span></div>`;
+  abrirPopup(`
+    <h2 class="centro" style="font-size:23px;margin:0">Avisos no iPhone</h2>
+    <p class="centro pequeno" style="margin:0">No iPhone, os avisos só funcionam com o app instalado na tela inicial.</p>
+    ${passo(1, 'Instale o app: toque em <b>Compartilhar</b> <span class="ic-compart">⇧</span> no Safari e depois em <b>"Adicionar à Tela de Início"</b>.')}
+    ${passo(2, 'Abra o app <b>pelo ícone</b> na tela inicial.')}
+    ${passo(3, 'Vá em <b>Mais</b> e toque em <b>"Ativar avisos neste celular"</b>.')}
+    <button class="btn principal cheio" id="av-ok">Entendi</button>`, (p) => { $('#av-ok', p).onclick = () => fecharPainel(); });
+}
+async function ativarAvisosLoja(botao) {
+  if (ehIphone() && !appInstalado()) { explicarAvisosIphone(); return; }
+  if (!avisosSuportados()) { aviso('Este navegador não aceita avisos. No Android, use o Chrome.'); return; }
+  const texto = botao.textContent;
+  botao.disabled = true; botao.textContent = 'Ativando…';
+  try {
+    if (dados.MODO_DEMO) throw new Error('Na demonstração os avisos não são enviados.');
+    const reg = await navigator.serviceWorker.register('sw.js?v=2', { scope: './' });
+    await navigator.serviceWorker.ready;
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') throw new Error('Você não permitiu os avisos. Dá para liberar depois nas configurações do celular.');
+    const r = await fetch(`${SUPABASE_URL}/functions/v1/notificar-admin?acao=chave`);
+    const { publica } = await r.json();
+    if (!publica) throw new Error('Não consegui ligar os avisos agora. Tente de novo em instantes.');
+    let inscricao = await reg.pushManager.getSubscription();
+    if (!inscricao) inscricao = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: chaveParaBytes(publica) });
+    const token = await dados.salvarPushLoja(inscricao.endpoint);
+    const cache = await caches.open('apm-avisos');
+    await cache.put('/apm-avisos/token-loja', new Response(String(token)));
+    await cache.put('/apm-avisos/cfg', new Response(JSON.stringify({ url: SUPABASE_URL, chave: SUPABASE_ANON_KEY })));
+    try { localStorage.setItem(`apm-avisos-loja-${estado.negocio.id}`, '1'); } catch (e) { /* segue */ }
+    aviso('Avisos ligados neste celular!');
+    desenharAba();
+  } catch (e) {
+    aviso(e.message || 'Não deu certo. Tente de novo.');
+    botao.disabled = false; botao.textContent = texto;
+  }
+}
+async function desligarAvisosLoja(botao) {
+  botao.disabled = true;
+  try {
+    const reg = await navigator.serviceWorker.getRegistration('./');
+    const inscricao = reg && (await reg.pushManager.getSubscription());
+    if (inscricao) await dados.removerPushLoja(inscricao.endpoint).catch(() => {});
+    const cache = await caches.open('apm-avisos');
+    await cache.delete('/apm-avisos/token-loja');
+    // Só cancela a inscrição do celular se ele não for também o celular do administrador.
+    const adm = await cache.match('/apm-avisos/token');
+    if (inscricao && !adm) await inscricao.unsubscribe().catch(() => {});
+  } catch (e) { /* segue */ }
+  try { localStorage.removeItem(`apm-avisos-loja-${estado.negocio.id}`); } catch (e) { /* segue */ }
+  aviso('Avisos desligados neste celular.');
+  desenharAba();
+}
+function ligarAvisosLoja(tela) {
+  const at = $('#avisos-ativar', tela); if (at) at.onclick = () => ativarAvisosLoja(at);
+  const de = $('#avisos-desligar', tela); if (de) de.onclick = () => desligarAvisosLoja(de);
+  const te = $('#avisos-testar', tela);
+  if (te) te.onclick = async () => {
+    te.disabled = true;
+    try { await dados.lojaTestarPush(); aviso('Pronto! O aviso de teste chega em alguns segundos.'); }
+    catch (e) { aviso(e.message); }
+    te.disabled = false;
+  };
+}
+
 function abaMais(tela) {
   const link = linkPublico(estado.negocio.slug);
   const mostrarInstalar = !DEMO_SITE && !appInstalado();
   tela.innerHTML = `
     <h1>Mais</h1>
+    <button class="cartao clicavel perfil-topo" id="meus-dados">
+      <span class="perfil-logo">${estado.negocio.logo_url ? `<img src="${esc(estado.negocio.logo_url)}" alt="">` : esc((estado.negocio.nome || '?').trim().charAt(0).toUpperCase())}</span>
+      <span class="perfil-txt"><b>${esc(estado.negocio.nome)}</b><span class="pequeno">Meus dados: logo, Instagram, recado do link, WhatsApp, Pix e dias de retirada</span></span>
+      <span class="perfil-seta" aria-hidden="true">›</span>
+    </button>
     ${temOfertaBF() ? `<div class="bf-card"><div style="font-size:30px" aria-hidden="true">🏷️</div><div class="t"><b>Black Friday: anual por R$ 167</b><span>53% OFF · só até 29/11</span></div><button class="btn principal mini" id="ver-bf">Ver oferta</button></div>` : ''}
+    ${cartaoAvisosLoja()}
     ${mostrarInstalar ? `<section class="cartao coluna instalar">
       <div style="display:flex;gap:12px;align-items:center"><div style="font-size:36px" aria-hidden="true">📲</div><div><b style="font-size:17px">Instale o app no seu celular</b><div class="pequeno">Abra direto pela tela inicial, como um aplicativo.</div></div></div>
       <button class="btn verde cheio" id="instalar">Instalar o app na tela inicial</button></section>` : ''}
@@ -1674,13 +2009,13 @@ function abaMais(tela) {
       </div>
     </section>
     <section class="coluna">
-      <button class="cartao clicavel" id="meus-dados"><div class="nome" style="font-weight:800">Meus dados</div><div class="pequeno">Nome, logo, recado do link, WhatsApp, Pix e dias de retirada</div></button>
       <button class="cartao clicavel" id="mensagens"><div style="font-weight:800">Mensagens do WhatsApp</div><div class="pequeno">Escreva seus textos de sinal, confirmação, retirada e devolução</div></button>
-      ${DEMO_SITE ? '' : '<button class="cartao clicavel" id="meu-contrato"><div style="font-weight:800">📄 Meu contrato</div><div class="pequeno">Seu modelo de contrato para enviar em cada reserva</div></button>'}
+      ${DEMO_SITE ? '' : '<button class="cartao clicavel" id="meu-contrato"><div style="font-weight:800">Meu contrato</div><div class="pequeno">Seu modelo de contrato para enviar em cada reserva</div></button>'}
       ${estado.assinatura && estado.assinatura.admin ? '<a class="cartao clicavel" style="text-decoration:none; background: var(--tinta); color: #fff; border-color: var(--tinta)" href="admin.html"><div style="font-weight:800">Painel do administrador</div><div class="pequeno" style="color:#D9CFE6">Clientes, renovações, leads e acessos</div></a>' : ''}
     </section>
     <section class="cartao coluna">
       <h2>Precisa de ajuda?</h2>
+      <button class="btn contorno cheio" id="ver-video">▶ Assistir o vídeo passo a passo (2 min)</button>
       ${WHATSAPP_SUPORTE ? `<a class="btn verde cheio" href="${esc(linkZap(WHATSAPP_SUPORTE, 'Oi! Sou cliente do App Pegue e Monte e tenho uma dúvida.'))}" target="_blank" rel="noopener">${ICONE.zap} Falar com o suporte no WhatsApp</a>` : ''}
       <a class="btn contorno cheio" href="mailto:${esc(EMAIL_SUPORTE)}?subject=${encodeURIComponent('Ajuda no App Pegue e Monte')}">Enviar e-mail para o suporte</a>
       <p class="dica centro">${esc(EMAIL_SUPORTE)}</p>
@@ -1692,6 +2027,8 @@ function abaMais(tela) {
           <button class="btn contorno cheio" id="demo-reset">Recomeçar a demonstração</button></section>` : ''}
     ${DEMO_SITE ? '' : '<button class="btn perigo cheio" id="sair">Sair do app</button>'}`;
   const inst = $('#instalar', tela); if (inst) inst.onclick = instalarApp;
+  ligarAvisosLoja(tela);
+  const vv = $('#ver-video', tela); if (vv) vv.onclick = abrirVideoTutorial;
   const vbf = $('#ver-bf', tela); if (vbf) vbf.onclick = popupBlackFriday;
   const mc = $('#meu-contrato', tela); if (mc) mc.onclick = painelContrato;
   $('#copiar', tela).onclick = () => copiarMeuLink();
@@ -1721,36 +2058,50 @@ const TIPOS_MSG = [
   { tipo: 'devolucao', campo: 'msg_devolucao', titulo: 'Lembrete de devolução', quando: 'Para lembrar o dia de devolver o kit' },
 ];
 const MARCADORES = [
-  ['{nome}', 'primeiro nome da cliente'], ['{kit}', 'nome do kit'], ['{festa}', 'data da festa'],
-  ['{retirada}', 'data da retirada'], ['{devolucao}', 'data da devolução'], ['{sinal}', 'valor do sinal'],
-  ['{total}', 'valor total'], ['{restante}', 'valor que falta'], ['{pix}', 'sua chave Pix'], ['{loja}', 'nome do seu negócio'],
+  ['{nome da cliente}', 'Ana'], ['{kit}', 'kit Safári'], ['{data da festa}', '20/12'],
+  ['{retirada}', '19/12'], ['{devolução}', '21/12'], ['{valor do sinal}', 'R$ 100,00'],
+  ['{valor total}', 'R$ 350,00'], ['{valor que falta}', 'R$ 250,00'], ['{chave pix}', 'sua chave Pix'], ['{nome da loja}', 'o nome da sua loja'],
 ];
 function textoPadrao(tipo, n) {
   switch (tipo) {
     case 'sinal':
-      return 'Oi, {nome}! Recebi seu pedido do kit {kit} para a festa de {festa}. Para confirmar a reserva, o sinal é de {sinal}'
-        + ((n && n.chave_pix) ? '. Chave Pix: {pix}' : '') + '. Quando fizer, me manda o comprovante por aqui.';
+      return 'Oi, {nome da cliente}! Recebi seu pedido do {kit} para a festa de {data da festa}. Para confirmar a reserva, o sinal é de {valor do sinal}'
+        + ((n && n.chave_pix) ? '. Chave Pix: {chave pix}' : '') + '. Quando fizer, me manda o comprovante por aqui.';
     case 'confirmacao':
-      return 'Oi, {nome}! Sua reserva do kit {kit} está confirmada. Festa: {festa}. Retirada: {retirada}. Devolução: {devolucao}. Qualquer dúvida é só chamar!';
+      return 'Oi, {nome da cliente}! Sua reserva do {kit} está confirmada. Festa: {data da festa}. Retirada: {retirada}. Devolução: {devolução}. Qualquer dúvida é só chamar!';
     case 'retirada':
-      return 'Oi, {nome}! Lembrete: a retirada do kit {kit} é {retirada}. Te espero!';
+      return 'Oi, {nome da cliente}! Lembrete: a retirada do {kit} é {retirada}. Te espero!';
     case 'devolucao':
-      return 'Oi, {nome}! Espero que a festa tenha sido linda! A devolução do kit {kit} é {devolucao}.';
+      return 'Oi, {nome da cliente}! Espero que a festa tenha sido linda! A devolução do {kit} é {devolução}.';
     default:
-      return 'Oi, {nome}!';
+      return 'Oi, {nome da cliente}!';
   }
+}
+// "kit Safári" (sem repetir "kit" quando o nome já começa com Kit)
+function kitComPalavra(nome) {
+  const t = String(nome || '').trim();
+  return /^kit\b/i.test(t) ? t : `kit ${t}`;
 }
 function preencher(texto, r) {
   const k = kitDe(r.kit_id);
   const n = estado.negocio || {};
   const dia = (iso) => (iso === hojeISO() ? 'hoje' : dataCurta(iso));
-  const valores = {
-    nome: String(r.cliente_nome || '').split(' ')[0], kit: k.nome, festa: dataCurta(r.data_festa),
+  const v = {
+    nome: String(r.cliente_nome || '').split(' ')[0], kit: kitComPalavra(k.nome), festa: dataCurta(r.data_festa),
     retirada: dia(r.data_retirada), devolucao: dia(r.data_devolucao), sinal: reais(r.valor_sinal),
     total: reais(r.valor_total), restante: reais(Math.max(0, Number(r.valor_total || 0) - Number(r.valor_sinal || 0))),
     pix: n.chave_pix || '', loja: n.nome || '',
   };
-  return texto.replace(/\{(nome|kit|festa|retirada|devolucao|sinal|total|restante|pix|loja)\}/g, (_, m) => valores[m]);
+  // Nomes novos e antigos dos marcadores (textos já salvos continuam funcionando)
+  const mapa = {
+    'nome da cliente': v.nome, nome: v.nome, kit: v.kit, 'nome do kit': v.kit,
+    'data da festa': v.festa, festa: v.festa, retirada: v.retirada, 'devolução': v.devolucao, devolucao: v.devolucao,
+    'valor do sinal': v.sinal, sinal: v.sinal, 'valor total': v.total, total: v.total,
+    'valor que falta': v.restante, restante: v.restante, 'chave pix': v.pix, pix: v.pix, 'nome da loja': v.loja, loja: v.loja,
+  };
+  return String(texto)
+    .replace(/\bkit\s+\{(kit|nome do kit)\}/gi, '{kit}') // evita "kit kit Safári" nos textos antigos
+    .replace(/\{([^{}]{2,20})\}/g, (todo, m) => (Object.prototype.hasOwnProperty.call(mapa, m.toLowerCase()) ? mapa[m.toLowerCase()] : todo));
 }
 function mensagem(tipo, r) {
   const info = TIPOS_MSG.find((t) => t.tipo === tipo);
@@ -1766,9 +2117,13 @@ function painelMensagens() {
     valor_total: (estado.kits[0] || {}).preco || 350, valor_sinal: (estado.kits[0] || {}).sinal || 100,
   };
   abrirPainel('Mensagens do WhatsApp', `
-    <p class="pequeno">Escreva do seu jeito. O app troca os marcadores pelos dados de cada reserva na hora de enviar. Toque num marcador para colocá-lo no texto.</p>
-    <div class="marcadores">${MARCADORES.map(([m, d]) => `<button type="button" class="marcador" data-m="${m}" title="${esc(d)}">${m}</button>`).join('')}</div>
-    <p class="dica" style="margin-top:-6px">${MARCADORES.map(([m, d]) => `<b>${m}</b> ${esc(d)}`).join(' · ')}</p>
+    <div class="explica-msg">
+      <b>Como funciona</b>
+      <p>Estas são as mensagens que o app já deixa prontas no seu WhatsApp. Você só confere e envia.</p>
+      <p>As palavras entre chaves <b>{ }</b> são trocadas sozinhas pelos dados de cada reserva. Por exemplo, <b>{nome da cliente}</b> vira <b>Ana</b> e <b>{kit}</b> vira <b>kit Safári</b>.</p>
+      <p>Pode mudar o resto do texto como quiser. Para colocar um dado, toque no lugar do texto e depois no botão dele:</p>
+    </div>
+    <div class="marcadores">${MARCADORES.map(([m, d]) => `<button type="button" class="marcador" data-m="${m}" title="vira: ${esc(d)}">${m.replace(/[{}]/g, '')}</button>`).join('')}</div>
     <form class="coluna" novalidate>
       ${TIPOS_MSG.map((t) => `
         <section class="cartao coluna" style="gap:8px">
@@ -1832,7 +2187,7 @@ function formReserva(pre, existente) {
       </div>
       <div id="disp"></div>
       <label class="campo">Nome da cliente<input name="nome" maxlength="80" value="${esc(r.cliente_nome || '')}" autocomplete="off" required></label>
-      <label class="campo">WhatsApp da cliente<input name="zap" inputmode="tel" value="${esc(r.cliente_whatsapp ? zapFormatado(r.cliente_whatsapp) : '')}" placeholder="(51) 99999-0000" required></label>
+      <label class="campo">WhatsApp da cliente${campoZap('zap', r.cliente_whatsapp)}</label>
       <div class="grade-2">
         <label class="campo">Valor total (R$)<input name="valor" inputmode="decimal" value="${esc(String(r.valor_total ?? kit0.preco).replace('.', ','))}"></label>
         <label class="campo">Sinal (R$)<input name="sinal" inputmode="decimal" value="${esc(String(r.valor_sinal ?? kit0.sinal).replace('.', ','))}"></label>
@@ -1843,6 +2198,7 @@ function formReserva(pre, existente) {
       <button class="btn principal cheio" type="submit">${existente ? 'Salvar alterações' : 'Criar reserva'}</button>
     </form>`, (p) => {
     const form = $('form', p);
+    ligarCampoZap(form.zap);
     const checar = () => {
       const kitId = form.kit.value;
       const ini = form.retirada.value; const fim = form.devolucao.value;
@@ -1873,7 +2229,7 @@ function formReserva(pre, existente) {
       e.preventDefault();
       const caixa = $('#erro-res', p);
       caixa.classList.add('oculto');
-      const zap = soDigitos(form.zap.value).replace(/^55(?=\d{10,11}$)/, '');
+      const zap = normalizarZap(form.zap.value);
       const campos = {
         kit_id: form.kit.value,
         data_festa: form.festa.value,

@@ -4,7 +4,7 @@
 // - Sem configurar: MODO DEMONSTRAÇÃO, com dados de exemplo guardados
 //   só neste navegador. Serve para ver e testar o app antes de tudo.
 // =====================================================================
-import { SUPABASE_URL, SUPABASE_ANON_KEY, DEMO_SITE } from './config.js?v=20261116a';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, DEMO_SITE } from './config.js?v=20261117a';
 
 export const MODO_DEMO = !/^https:\/\/.+\.supabase\.co\/?$/.test(SUPABASE_URL);
 
@@ -174,7 +174,50 @@ export async function aoMudarLogin(fn) {
 export async function meuNegocio() {
   if (MODO_DEMO) return D().negocio;
   const s = await cliente();
-  return ok(s.from('negocios').select('*').maybeSingle());
+  const sup = await suporteAtual().catch(() => null);
+  if (sup && sup.negocio_id) return ok(s.from('negocios').select('*').eq('id', sup.negocio_id).maybeSingle());
+  const { data: u } = await s.auth.getUser();
+  if (!u || !u.user) return null;
+  return ok(s.from('negocios').select('*').eq('dono', u.user.id).maybeSingle());
+}
+
+// ---------- Modo suporte (administrador dentro da loja de uma cliente) ----------
+export async function suporteAtual() {
+  if (MODO_DEMO) return null;
+  const s = await cliente();
+  return ok(s.rpc('suporte_atual'));
+}
+export async function suporteSair() {
+  if (MODO_DEMO) return { ok: true };
+  const s = await cliente();
+  return ok(s.rpc('suporte_sair'));
+}
+export async function adminEntrarLoja(email) {
+  if (MODO_DEMO) throw new Error('Na demonstração não dá para entrar na loja de uma cliente.');
+  const s = await cliente();
+  return ok(s.rpc('admin_entrar_loja', { p_email: email }));
+}
+export async function adminSuporteLog() {
+  if (MODO_DEMO) return [];
+  const s = await cliente();
+  return ok(s.rpc('admin_suporte_log'));
+}
+
+// ---------- Avisos no celular da loja ----------
+export async function salvarPushLoja(endpoint) {
+  if (MODO_DEMO) return 'demo-token';
+  const s = await cliente();
+  return ok(s.rpc('salvar_push_loja', { p_endpoint: endpoint }));
+}
+export async function removerPushLoja(endpoint) {
+  if (MODO_DEMO) return { ok: true };
+  const s = await cliente();
+  return ok(s.rpc('remover_push_loja', { p_endpoint: endpoint }));
+}
+export async function lojaTestarPush() {
+  if (MODO_DEMO) return { ok: true };
+  const s = await cliente();
+  return ok(s.rpc('loja_testar_push'));
 }
 export async function linkDisponivel(slug) {
   if (MODO_DEMO) return true;
@@ -365,7 +408,7 @@ export async function catalogoPublico(slug) {
   if (MODO_DEMO) {
     const n = D().negocio;
     if (slug !== n.slug) return null;
-    return { nome: n.nome, whatsapp: n.whatsapp, chave_pix: n.chave_pix, logo_url: n.logo_url, recado: n.recado_link || null,
+    return { nome: n.nome, whatsapp: n.whatsapp, chave_pix: n.chave_pix, logo_url: n.logo_url, recado: n.recado_link || null, instagram: n.instagram || null,
       dias_antes: n.dias_antes, dias_depois: n.dias_depois,
       kits: D().kits.filter((k) => k.ativo).map(({ id, nome, preco, sinal, foto_url, fotos, categoria }) => ({ id, nome, preco, sinal, foto_url, fotos: fotos || [], categoria: categoria || null })) };
   }

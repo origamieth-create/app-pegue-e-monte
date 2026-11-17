@@ -294,3 +294,81 @@ label.campo { display: flex; flex-direction: column; gap: 6px; font-weight: 700;
 .folha .aceite { margin-top: 18px; padding-top: 10px; border-top: 1px solid #333; font-family: inherit; font-size: 13px; }
 .so-impressao { display: none; }
 @media print { .so-impressao { display: block; } }
+
+/* ===== Atualização V.0.0.5 ===== */
+/* WhatsApp com +55 fixo e Instagram com @ fixo */
+.campo-pre { display: flex; align-items: stretch; }
+.campo-pre > span { display: flex; align-items: center; padding: 0 12px; border: 2px solid var(--linha); border-right: 0; border-radius: 14px 0 0 14px; background: var(--lilas); color: var(--tinta); font-weight: 800; font-size: 16px; }
+.campo-pre > input { flex: 1; min-width: 0; border-radius: 0 14px 14px 0 !important; }
+.dica.alerta { color: #B42318; }
+/* Botões do topo do link de reservas */
+.botoes-loja { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.btn.insta { background: linear-gradient(45deg, #F58529, #DD2A7B 55%, #8134AF); color: #fff; border: 0; gap: 6px; }
+/* Versão para computador (telas largas). No celular nada muda. */
+@media (min-width: 1024px) {
+  body { padding-bottom: 0; padding-left: 248px; }
+  nav.abas { top: 0; bottom: 0; right: auto; width: 248px; display: flex; flex-direction: column; gap: 4px; padding: 96px 14px 20px; border-top: 0; border-right: 1px solid var(--linha); }
+  nav.abas::before { content: ''; position: absolute; left: 22px; top: 26px; width: 40px; height: 40px; background: url(icone.svg) center/contain no-repeat; }
+  nav.abas::after { content: 'Pegue e Monte'; position: absolute; left: 72px; top: 32px; font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 19px; color: var(--tinta); }
+  nav.abas button { flex-direction: row; justify-content: flex-start; gap: 12px; min-height: 50px; padding: 0 16px; border-radius: 14px; font-size: 16px; }
+  nav.abas button:hover { background: var(--lilas); }
+  nav.abas button.ativa { background: #FCE9EB; }
+  nav.abas .contador { position: static; margin-left: auto; border: 0; }
+  .topo { padding: 18px 32px 12px; border-bottom: 1px solid var(--linha); }
+  .topo .marca svg, .topo .marca img { display: none; }
+  .topo .marca { font-size: 22px; }
+  main { max-width: 1120px; padding: 24px 32px 40px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px 24px; align-items: start; }
+  main > * { grid-column: 1 / -1; }
+  main > .fin, main > .metade { grid-column: auto; }
+  .kits-grade { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+  .cal button { min-height: 64px; aspect-ratio: auto; height: 76px; font-size: 17px; }
+  .painel-fundo { left: 248px; background: rgba(42,27,61,.35); padding: 28px; }
+  .painel { max-width: 760px; min-height: auto; border-radius: 24px; background: var(--fundo); box-shadow: 0 30px 60px rgba(42,27,61,.25); padding: 0 28px 28px; }
+  .painel-barra { margin: 0 -28px; padding-left: 16px; padding-right: 28px; border-radius: 24px 24px 0 0; }
+}
+@media (min-width: 1024px) {
+  main:has(> .fin) > .fin { grid-column: 1; grid-row: 2 / span 5; }
+  main:has(> .fin) > h2, main:has(> .fin) > section.coluna:not(.primeiros) { grid-column: 2; }
+  main > .primeiros { grid-column: 1 / -1; }
+  main > h2 { margin-top: 0; }
+  main > .primeiros { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; }
+  main > .primeiros > *:not(.passo):not([class*=passo]) { grid-column: 1 / -1; }
+}
+@media (min-width: 1024px) {
+  main:has(.cal) { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); }
+  main:has(.cal) > .linha-flex { grid-column: 1; }
+  main:has(.cal) > .cartao { grid-column: 1; }
+  main:has(.cal) > section.coluna { grid-column: 2; grid-row: 1 / span 2; }
+  main:has(.cal) .cal button { height: 64px; }
+}
+@media (min-width: 1024px) {
+  main:has(> .bf-card) > section.cartao, main:has(> .instalar) > section.cartao { grid-column: auto; }
+  main:has(> .instalar) > .btn.cheio { grid-column: 1; justify-self: start; width: auto; }
+}
+/* Conversão do teste */
+.resumo-teste { display: flex; flex-direction: column; gap: 4px; align-items: center; text-align: center; background: #EAF7EF; border: 2px solid #BFE3CD; border-radius: 16px; padding: 12px 14px; }
+.resumo-teste b { font-size: 15px; color: #1F7A52; }
+.resumo-teste span { font-weight: 800; font-size: 16px; color: var(--tinta); }
+.contagem-oferta { font-size: 14px; font-weight: 700; color: #B42318; background: #FDECEC; border-radius: 999px; padding: 6px 12px; text-align: center; }
+/* Modo suporte (só o administrador vê) */
+.faixa-suporte { background: #2A1B3D; color: #fff; display: flex; align-items: center; gap: 10px; padding: calc(10px + env(safe-area-inset-top)) 14px 10px; font-size: 14px; font-weight: 700; flex-wrap: wrap; }
+.faixa-suporte .selo { background: #FFC94A; color: #2A1B3D; border-radius: 999px; padding: 3px 10px; font-weight: 800; font-size: 12px; }
+.faixa-suporte .t { flex: 1; min-width: 160px; }
+.faixa-suporte .btn { background: #fff; color: #2A1B3D; }
+/* Avisos no celular */
+.avisos-loja { border: 2px solid #5B3A99; background: #F4EEFC; gap: 10px; }
+.avisos-loja.ligados { border-color: #1F7A52; background: #EAF7EF; }
+/* Perfil no topo de Mais */
+button.cartao.perfil-topo { display: flex; flex-direction: row; align-items: center; gap: 12px; text-align: left; border: 2px solid var(--linha); width: 100%; }
+.perfil-logo { width: 54px; height: 54px; flex: none; border-radius: 50%; background: var(--lilas); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 22px; color: var(--tinta); overflow: hidden; border: 2px solid var(--linha); }
+.perfil-logo img { width: 100%; height: 100%; object-fit: contain; background: #fff; }
+.perfil-txt { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.perfil-txt b { font-size: 17px; }
+.perfil-seta { font-size: 28px; color: var(--texto2); }
+/* Vídeo passo a passo */
+.btn-video { display: flex; align-items: center; gap: 10px; width: 100%; background: #fff; border: 2px dashed #C9B6EC; border-radius: 14px; padding: 10px 12px; font-size: 14px; color: var(--tinta); cursor: pointer; text-align: left; min-height: 48px; }
+.btn-video .play { width: 32px; height: 32px; flex: none; border-radius: 50%; background: var(--coral, #E4505C); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; }
+.video-tutorial { width: 100%; max-height: 70vh; border-radius: 16px; background: #000; aspect-ratio: 9 / 16; }
+/* Explicação das mensagens */
+.explica-msg { background: #F4EEFC; border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; font-size: 15px; }
+.explica-msg p { margin: 0; }
