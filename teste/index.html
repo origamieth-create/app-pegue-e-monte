@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="../icone-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito+Sans:wght@400;600;700;800&display=swap">
-<link rel="stylesheet" href="../estilo.css?v=20261113b">
+<link rel="stylesheet" href="../estilo.css?v=20261117a">
 <style>
   body { background: #FFFBF7; margin: 0; padding-bottom: calc(90px + env(safe-area-inset-bottom)); }
   .lp { max-width: 480px; margin: 0 auto; padding: 0 18px 30px; display: flex; flex-direction: column; gap: 22px; }
@@ -77,7 +77,7 @@
   <p class="chamada">Gostou? Crie sua conta e teste agora 👇</p>
   <form class="form" id="cadastro" novalidate>
     <label class="campo">Seu e-mail<input type="email" name="email" autocomplete="email" inputmode="email" placeholder="voce@email.com" required></label>
-    <label class="campo">Seu WhatsApp<input name="whatsapp" inputmode="tel" autocomplete="tel" placeholder="(51) 99999-0000" required></label>
+    <label class="campo">Seu WhatsApp<div class="campo-pre"><span>+55</span><input name="whatsapp" inputmode="tel" autocomplete="tel" placeholder="(51) 99999-0000" required></div></label>
     <label class="campo">Crie uma senha<input type="password" name="senha" autocomplete="new-password" minlength="6" placeholder="mínimo 6 caracteres" required></label>
     <div class="erro oculto" id="erro" role="alert"></div>
     <button class="btn verde cheio btn-grande" type="submit">Começar meu teste grátis</button>
@@ -121,6 +121,6 @@
     });
   })();
 </script>
-<script type="module" src="teste.js?v=20261113c"></script>
+<script type="module" src="teste.js?v=20261117a"></script>
 </body>
 </html>

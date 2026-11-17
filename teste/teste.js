@@ -92,7 +92,9 @@ if ('IntersectionObserver' in window) {
 
 // Máscara simples do WhatsApp: (51) 99999-0000
 form.whatsapp.addEventListener('input', () => {
-  const d = form.whatsapp.value.replace(/\D/g, '').slice(0, 11);
+  let d = form.whatsapp.value.replace(/\D/g, '').replace(/^0+/, '');
+  if (d.length > 11 && d.startsWith('55')) d = d.slice(2);
+  d = d.slice(0, 11);
   form.whatsapp.value = d.length > 6 ? `(${d.slice(0, 2)}) ${d.slice(2, d.length - 4)}-${d.slice(-4)}` : d.length > 2 ? `(${d.slice(0, 2)}) ${d.slice(2)}` : d;
 });
 
@@ -104,10 +106,11 @@ form.onsubmit = async (e) => {
   const mostrar = (html) => { erro.innerHTML = html; erro.classList.remove('oculto'); };
   erro.classList.add('oculto');
   const email = form.email.value.trim().toLowerCase();
-  const zap = form.whatsapp.value.replace(/\D/g, '');
+  let zap = form.whatsapp.value.replace(/\D/g, '').replace(/^0+/, '');
+  if (zap.length > 11 && zap.startsWith('55')) zap = zap.slice(2);
   const senha = form.senha.value;
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { mostrar('Digite um e-mail válido.'); form.email.focus(); return; }
-  if (zap.length < 10 || zap.length > 11) { mostrar('Digite seu WhatsApp com DDD, por exemplo (51) 99999-0000.'); form.whatsapp.focus(); return; }
+  if (zap.length < 10 || zap.length > 11) { mostrar('Confira seu WhatsApp: digite o DDD e o número, por exemplo (51) 99999-0000.'); form.whatsapp.focus(); return; }
   if (senha.length < 6) { mostrar('A senha precisa ter pelo menos 6 caracteres.'); form.senha.focus(); return; }
 
   botao.disabled = true;
