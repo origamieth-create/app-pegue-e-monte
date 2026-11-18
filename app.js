@@ -288,11 +288,24 @@ function ligarDemoSite() {
 async function iniciar() {
   if (DEMO_SITE) ligarDemoSite();
   if (dados.MODO_DEMO) $('#faixa').innerHTML = faixaDemo();
+  // Link "Esqueci minha senha": o Supabase entra logado e apaga o endereço do link logo ao iniciar,
+  // então lemos o tipo ANTES e não deixamos a tela inicial cobrir a tela de nova senha.
+  const hashLink = location.hash || '';
+  let recuperandoSenha = hashLink.includes('type=recovery');
+  const linkVencido = /error_code=otp_expired|error=access_denied/.test(hashLink);
   await dados.aoMudarLogin((evento) => {
-    if (evento === 'PASSWORD_RECOVERY') telaNovaSenha();
+    if (evento === 'PASSWORD_RECOVERY') { recuperandoSenha = true; telaNovaSenha(); }
   });
   try {
     const sessao = await dados.sessaoAtual();
+    if (recuperandoSenha && sessao) return telaNovaSenha();
+    if (linkVencido && !sessao) {
+      history.replaceState(null, '', location.pathname);
+      telaLogin('entrar');
+      const caixaErro = $('#erro-login');
+      if (caixaErro) { caixaErro.textContent = 'Esse link de senha venceu ou já foi usado. Toque em "Esqueci minha senha" e use o e-mail mais novo.'; caixaErro.classList.remove('oculto'); }
+      return;
+    }
     if (!sessao) return telaLogin(new URLSearchParams(location.search).has('bemvinda') && PERMITIR_CADASTRO ? 'criar' : 'entrar');
     await carregarTudo();
   } catch (e) {
