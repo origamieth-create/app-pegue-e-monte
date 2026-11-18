@@ -2,7 +2,7 @@
 // App Pegue e Monte — link público de reservas (a cliente final usa)
 // Endereço: reservar.html?l=<link-do-negocio>
 // =====================================================================
-import * as dados from './dados.js?v=20261118b';
+import * as dados from './dados.js?v=20261119a';
 
 // Demonstração do site: botões de WhatsApp mostram um aviso em vez de abrir conversa.
 if (dados.DEMONSTRACAO_SITE) {
@@ -91,8 +91,16 @@ function recadoPadrao(loja) {
   return `🎉 Que bom ter você aqui na ${loja}!\n\nNossos kits são pensados com carinho para deixar a sua festa linda e cheia de alegria. 💖\n\nVeja os kits, escolha a data livre e garanta a sua reserva com antecedência.\n\nVamos celebrar juntos esse momento especial! 🥳`;
 }
 // Uma visita por pessoa por dia; marca se veio pelo Instagram (navegador do Instagram ou link com ?o=ig)
+// A dona abriu pelo app ("Ver como a cliente vê"): faixa para voltar ao app (a cliente nunca vê).
+const VENDO_COMO_DONA = !!new URLSearchParams(location.search).get('dona');
+if (VENDO_COMO_DONA) {
+  const faixa = document.createElement('div');
+  faixa.className = 'faixa-dona';
+  faixa.innerHTML = '<a class="faixa-dona-btn" href="index.html?link=1">‹ Voltar ao app</a><span>👀 Você está vendo sua loja como a cliente vê</span>';
+  document.body.prepend(faixa);
+}
 function contarVisita(slug) {
-  if (new URLSearchParams(location.search).get('adm')) return; // o administrador olhando não conta como visita
+  if (new URLSearchParams(location.search).get('adm') || VENDO_COMO_DONA) return; // o administrador ou a dona olhando não conta como visita
   try {
     const chave = `apm-visita-${slug}-${new Date().toISOString().slice(0, 10)}`;
     if (localStorage.getItem(chave)) return;

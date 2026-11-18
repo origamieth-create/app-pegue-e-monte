@@ -20,6 +20,7 @@ const LOJA = {
   mensagem: [null, 'Toque para ver no app.', () => 'index.html'],
   pagamento: ['Pagamento não aprovado', 'Não conseguimos cobrar sua assinatura. Toque para regularizar.', () => 'index.html'],
   teste: ['Avisos funcionando', 'Você vai receber um aviso a cada nova reserva pelo link.', () => 'index.html'],
+  ia_pronto: ['Seu catálogo está pronto para conferir ✨', 'A IA terminou de organizar seus kits. Toque para conferir e aprovar.', () => 'index.html?ia=1'],
 };
 
 self.addEventListener('install', () => self.skipWaiting());

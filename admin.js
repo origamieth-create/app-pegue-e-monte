@@ -3,7 +3,7 @@
 // Só abre para e-mails cadastrados na tabela "administradores".
 // Quem confere é o banco de dados: esta página só mostra o resultado.
 // =====================================================================
-import * as dados from './dados.js?v=20261118b';
+import * as dados from './dados.js?v=20261119a';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=20261117c';
 
 const $ = (sel, el = document) => el.querySelector(sel);

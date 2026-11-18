@@ -2,7 +2,7 @@
 // App Pegue e Monte — app da dona
 // Abas: Hoje, Agenda, Kits, Mais
 // =====================================================================
-import * as dados from './dados.js?v=20261118b';
+import * as dados from './dados.js?v=20261119a';
 import { PERMITIR_CADASTRO, EMAIL_SUPORTE, WHATSAPP_SUPORTE, LINK_MENSAL, LINK_ANUAL, LINK_ANUAL_PROMO, DEMO_SITE, LINK_PLANOS, SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=20261117c';
 
 const { hojeISO, somaDias, cruza } = dados;
@@ -345,7 +345,7 @@ async function carregarTudo() {
     if (!estado.assinatura.encontrada) return telaSemAssinatura();
   }
   if (!estado.negocio) return telaConfiguracaoInicial();
-  [estado.kits, estado.reservas, estado.gastos, estado.montagem] = await Promise.all([dados.listarKits(), dados.listarReservas(), dados.listarGastos().catch(() => []), estado.suporte ? null : dados.minhaMontagem().catch(() => null)]);
+  [estado.kits, estado.reservas, estado.gastos, estado.montagem, estado.ia] = await Promise.all([dados.listarKits(), dados.listarReservas(), dados.listarGastos().catch(() => []), estado.suporte ? null : dados.minhaMontagem().catch(() => null), estado.suporte ? null : dados.iaSituacao().catch(() => null)]);
   estado.carregadoEm = Date.now();
   montarApp();
 }
@@ -499,6 +499,7 @@ function planosHtml() {
         <div class="de">De R$ 358,80</div>
         <div class="por">R$ 167 <small>por 12 meses</small></div>
         <div class="mes">Sai por R$ 13,92 por mês · ou parcele no cartão</div>
+        ${estado.ia && estado.ia.disponivel ? '<div class="ia-plano-item">✨ IA monta seu catálogo: ilimitado</div>' : ''}
         ${montagem ? '<div class="montagem-extra">✓ Nossa equipe cadastra até <b>50 kits</b> para você</div>' : ''}
         ${fim - agoraServidor() <= HORAS_OFERTA_FIM * 3600e3 ? `<div class="contagem-oferta">Oferta termina em <b id="oferta-relogio">${tempoRestante(fim - agoraServidor())}</b></div>` : ''}
         <a class="btn verde cheio" style="min-height:52px;font-size:17px" href="${esc(LINK_ANUAL_PROMO)}" target="_blank" rel="noopener">${montagem ? 'Quero o anual com a loja montada' : 'Quero o anual com desconto'}</a>
@@ -506,12 +507,14 @@ function planosHtml() {
     : `<div class="plano anual"><div class="nome">Plano anual</div>
         <div class="por">R$ 269 <small>por 12 meses</small></div>
         <div class="mes">ou 12x de R$ 27,79 no cartão</div>
+        ${estado.ia && estado.ia.disponivel ? '<div class="ia-plano-item">✨ IA monta seu catálogo: ilimitado</div>' : ''}
         <a class="btn verde cheio" style="min-height:52px;font-size:17px" href="${esc(LINK_ANUAL)}" target="_blank" rel="noopener">Assinar o anual</a>
       </div>`;
   return `<div class="planos">${anual}
       <div class="plano mensal">
         <div class="nome">Plano mensal</div>
         <div class="por">R$ 29,90 <small>por mês</small></div>
+        ${estado.ia && estado.ia.disponivel ? '<div class="ia-plano-item">✨ IA monta seu catálogo: ilimitado</div>' : ''}
         ${montagem ? '<div class="mes">Você mesma cadastra seus kits</div>' : ''}
         <a class="btn contorno cheio" href="${esc(LINK_MENSAL)}" target="_blank" rel="noopener">Assinar o mensal</a>
       </div>
@@ -1159,6 +1162,7 @@ function abrirPeloAviso() {
   if (q.get('instalar')) { try { history.replaceState(null, '', location.pathname); } catch (e) { /* segue */ } setTimeout(convidarInstalacao, 500); return true; }
   if (q.get('video')) { try { history.replaceState(null, '', location.pathname); } catch (e) { /* segue */ } setTimeout(abrirVideoTutorial, 400); return true; }
   if (q.get('link')) { try { history.replaceState(null, '', location.pathname); } catch (e) { /* segue */ } irPara('kits'); return true; }
+  if (q.get('ia')) { try { history.replaceState(null, '', location.pathname); } catch (e) { /* segue */ } irPara('kits'); setTimeout(iaAbrirPendente, 400); return true; }
   if (!reserva && !planos) return false;
   try { history.replaceState(null, '', location.pathname + location.hash); } catch (e) { /* segue */ }
   if (reserva && (estado.reservas || []).some((r) => r.id === reserva)) { setTimeout(() => abrirReserva(reserva), 300); return true; }
@@ -1818,8 +1822,9 @@ function abaKits(tela) {
       <div class="vitrine-nome">${esc(n.nome)}</div>
       <p class="vitrine-recado">${esc(n.recado_link || recadoPadrao(n.nome))}</p>
       ${insta}
-      <div class="vitrine-links"><a href="${esc(linkPublico(n.slug))}" target="_blank" rel="noopener">👀 Ver como a cliente vê</a><button class="link-btn" id="vitrine-copiar">🔗 Copiar link da loja</button></div>
+      <div class="vitrine-links"><a href="${esc(linkDona())}">👀 Ver como a cliente vê</a><button class="link-btn" id="vitrine-copiar">🔗 Copiar link da loja</button></div>
     </section>
+    <div id="ia-caixa" class="coluna" style="gap:10px">${cartaoIA()}</div>
     <div class="secao-titulo"><h1>Meus kits</h1>${podeEditar() ? `<button class="btn principal mini" id="novo-kit">${ICONE.mais1} Novo kit</button>` : ''}</div>
     ${estado.kits.length ? `<div class="kits-grade">${cartoes}</div>` : '<p class="vazio-txt">Nenhum kit ainda. Cadastre o primeiro: foto, nome, preço e a lista de peças.</p>'}`;
   const novo = $('#novo-kit', tela);
@@ -1829,6 +1834,9 @@ function abaKits(tela) {
   $('#vitrine-copiar', tela).onclick = () => copiarMeuLink();
   $$('[data-kit]', tela).forEach((b) => (b.onclick = () => formKit(estado.kits.find((k) => k.id === b.dataset.kit))));
   $$('[data-compartilhar]', tela).forEach((b) => (b.onclick = (e) => { e.stopPropagation(); compartilharKit(estado.kits.find((k) => k.id === b.dataset.compartilhar)); }));
+  ligarCartaoIA(tela);
+  // Situação da IA atualizada (ex.: terminou de organizar enquanto a dona estava em outra aba)
+  if (!estado.suporte) atualizarIA().then(() => { if (estado.aba === 'kits') redesenharCartaoIA(); });
 }
 
 // Compartilhar um kit: o link abre o link de reservas direto nesse kit.
@@ -1852,6 +1860,699 @@ function compartilharKit(k) {
     const mais = $('#ck-mais', p);
     if (mais) mais.onclick = () => navigator.share({ title: k.nome, text: `${k.nome} · ${estado.negocio.nome}`, url: link }).catch(() => {});
   });
+}
+
+// =====================================================================
+// MONTAR CATÁLOGO COM IA
+// A IA só organiza: não mexe nas fotos (sempre inteiras no quadro) e não
+// inventa nada. Nome, preço, sinal, peças e opções só vêm do que estiver
+// ESCRITO no material. A dona confere e aprova kit por kit.
+// Teste grátis: até 5 kits (os outros ficam guardados). Pago: ilimitado.
+// =====================================================================
+const PDFJS = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.2.108/build/';
+const IA_MAX_FOTOS = dados.MODO_DEMO ? 12 : 40;
+const IA_MAX_PRINTS = 6;
+const IA_MAX_PAGINAS = 15;
+
+async function atualizarIA() {
+  if (estado.suporte) { estado.ia = null; return null; }
+  try { estado.ia = await dados.iaSituacao(); } catch (e) { estado.ia = null; }
+  return estado.ia;
+}
+function iaLigada() { return !!(estado.ia && estado.ia.disponivel && !estado.suporte && podeEditar()); }
+function linkDona() {
+  const base = linkPublico(estado.negocio.slug);
+  return base + (base.includes('?') ? '&' : '?') + 'dona=1';
+}
+function plural(n, um, varios) { return `${n} ${n === 1 ? um : varios}`; }
+
+function cartaoIA() {
+  const ia = estado.ia;
+  if (!iaLigada()) return '';
+  if (ia.processando) {
+    return `<section class="ia-cartao">
+      <span class="ia-selo">⏳ Organizando agora</span>
+      <p class="ia-t">✨ A IA está organizando seu catálogo</p>
+      <p class="ia-p">Leva de 1 a 3 minutos. Pode usar o app normalmente: avisamos quando estiver pronto.</p>
+      <button class="ia-bt" data-ia="andamento">Ver andamento</button></section>`;
+  }
+  let topo = '';
+  if (ia.lote && ia.pendentes) {
+    topo = ia.liberados
+      ? `<button class="ia-pronto verde" data-ia="conferir"><span class="ia-pronto-ic">🎁</span><span><b>${plural(ia.liberados, 'kit liberado', 'kits liberados')}!</b><small>Os kits que a IA guardou no seu teste estão prontos para você conferir.</small></span><span class="ia-pronto-bt">Conferir</span></button>`
+      : `<button class="ia-pronto" data-ia="conferir"><span class="ia-pronto-ic">✨</span><span><b>${plural(ia.pendentes, 'kit pronto', 'kits prontos')} para conferir</b><small>A IA terminou. Confira e aprove um por um.</small></span><span class="ia-pronto-bt">Conferir</span></button>`;
+  }
+  const erro = ia.erro ? `<p class="ia-erro">A última tentativa não deu certo: ${esc(ia.erro)}</p>` : '';
+  if (ia.plano === 'teste' && !ia.restante) {
+    return `${topo}<section class="ia-cartao cinza">
+      <span class="ia-selo">Teste grátis · 0 de ${ia.limite} kits restantes</span>
+      <p class="ia-t">✨ Você usou os ${ia.limite} kits da IA</p>
+      <p class="ia-p">${ia.guardados ? `${plural(ia.guardados, 'kit está guardado', 'kits estão guardados')} esperando. ` : ''}Assine e a IA monta o resto do seu catálogo, sem limite.</p>
+      <button class="ia-bt coral" data-ia="assinar">Assinar e liberar ilimitado</button></section>`;
+  }
+  const pago = ia.plano === 'pago';
+  return `${topo}<section class="ia-cartao">
+    <span class="ia-selo">${pago ? '✓ Ilimitado no seu plano' : `Teste grátis · restam ${ia.restante} de ${ia.limite} kits`}</span>
+    <p class="ia-t">✨ ${pago && estado.kits.length ? 'Adicionar kits com IA' : 'Montar meu catálogo com IA'}</p>
+    <p class="ia-p">${pago && estado.kits.length ? 'Mande fotos, PDF ou lista de preços quantas vezes quiser. Kits novos, de temporada ou o catálogo inteiro.' : 'Mande suas fotos, PDF ou lista de preços. A IA separa os kits e você só confere e aprova.'}</p>
+    ${erro}
+    <button class="ia-bt" data-ia="comecar">Começar</button></section>`;
+}
+function ligarCartaoIA(raiz) {
+  $$('[data-ia]', raiz).forEach((b) => (b.onclick = () => {
+    const a = b.dataset.ia;
+    if (a === 'comecar') iaEnviar();
+    else if (a === 'conferir') iaConferir(estado.ia.lote);
+    else if (a === 'andamento') iaAndamento(estado.ia.processando);
+    else if (a === 'assinar') popupPlanosTeste('ia_limite');
+  }));
+}
+function redesenharCartaoIA() {
+  const caixa = $('#ia-caixa');
+  if (!caixa) return;
+  caixa.innerHTML = cartaoIA();
+  ligarCartaoIA(caixa);
+}
+async function iaAbrirPendente() {
+  await atualizarIA();
+  if (!iaLigada()) { irPara('kits'); return; }
+  if (estado.ia.lote && estado.ia.pendentes) iaConferir(estado.ia.lote);
+  else if (estado.ia.processando) iaAndamento(estado.ia.processando);
+  else irPara('kits');
+}
+
+// ----- 2. Enviar o material -----
+function iaEnviar() {
+  if (!iaLigada()) return;
+  const mat = { fotos: [], pdfs: [], prints: [], drive: [], texto: '' };
+  const ia = estado.ia;
+  abrirPainel('Montar com IA', `
+    <p class="pequeno" style="margin-top:-4px">Mande o que você tiver: só as fotos, só o PDF ou tudo junto.${ia.plano === 'teste' ? ` No teste grátis a IA monta até <b>${ia.restante} ${ia.restante === 1 ? 'kit' : 'kits'}</b>.` : ''}</p>
+    <label class="ia-fonte" id="ia-f-fotos"><span class="ia-fonte-ic">🖼️</span><span class="ia-fonte-tx"><b>Fotos da galeria</b><small>Fotos dos kits montados (até ${IA_MAX_FOTOS} por vez)</small><span class="ia-thumbs"></span></span><span class="ia-ck"></span>
+      <input type="file" accept="image/*" multiple class="oculto" id="ia-in-fotos"></label>
+    <label class="ia-fonte" id="ia-f-pdf"><span class="ia-fonte-ic">📄</span><span class="ia-fonte-tx"><b>Catálogo em PDF</b><small>A IA lê os nomes, preços e as fotos de dentro do PDF</small><span class="ia-nomes"></span></span><span class="ia-ck"></span>
+      <input type="file" accept="application/pdf" multiple class="oculto" id="ia-in-pdf"></label>
+    <div class="ia-fonte coluna-fonte" id="ia-f-drive"><div class="linha-flex" style="gap:11px;align-items:flex-start"><span class="ia-fonte-ic">🔗</span><span class="ia-fonte-tx"><b>Link de pasta do Google Drive</b><small>A pasta precisa estar como <b>“Qualquer pessoa com o link”</b></small></span><span class="ia-ck"></span></div>
+      <div class="ia-drive-linha"><input id="ia-drive" inputmode="url" placeholder="Cole aqui o link da pasta" autocomplete="off"><button type="button" class="btn claro mini" id="ia-drive-ok">Buscar</button></div>
+      <span class="dica" id="ia-drive-msg"></span></div>
+    <div class="ia-fonte coluna-fonte" id="ia-f-lista"><div class="linha-flex" style="gap:11px;align-items:flex-start"><span class="ia-fonte-ic">💬</span><span class="ia-fonte-tx"><b>Lista de preços</b><small>Cole o texto do WhatsApp ou mande um print</small></span><span class="ia-ck"></span></div>
+      <textarea id="ia-texto" rows="4" maxlength="15000" placeholder="Ex.: Kit Safari R$ 350 (sinal R$ 100)&#10;Kit Princesa: mesa P R$ 290, mesa G R$ 380"></textarea>
+      <label class="btn contorno mini" style="cursor:pointer;align-self:flex-start">📷 Mandar print da lista<input type="file" accept="image/*" multiple class="oculto" id="ia-in-prints"></label>
+      <span class="ia-thumbs" id="ia-prints-th"></span></div>
+    <div class="ia-aviso"><b>Como a IA trabalha:</b><br>• Não corta nem altera suas fotos.<br>• Só preenche o que estiver <b>escrito</b> no seu material (nome, preço, sinal, peças).<br>• O que não achar, fica em branco para você preencher.<br>• Nada vai para o catálogo sem você aprovar.</div>
+    <div class="erro oculto" id="ia-erro"></div>
+    <div class="ia-prog oculto" id="ia-prog"><div class="ia-barra"><i></i></div><span id="ia-prog-tx">Preparando…</span></div>
+    <button class="btn principal cheio" id="ia-ir" disabled>✨ Organizar com IA</button>`, (p) => {
+    const btn = $('#ia-ir', p);
+    const caixaErro = $('#ia-erro', p);
+    const atualizar = () => {
+      mat.texto = $('#ia-texto', p).value;
+      const marca = (id, ok, txt) => { const el = $(id, p); el.classList.toggle('ok', ok); $('.ia-ck', el).textContent = ok ? txt : ''; };
+      marca('#ia-f-fotos', mat.fotos.length > 0, `${mat.fotos.length} ✓`);
+      marca('#ia-f-pdf', mat.pdfs.length > 0, '✓');
+      marca('#ia-f-drive', mat.drive.length > 0, `${mat.drive.length} ✓`);
+      marca('#ia-f-lista', !!mat.texto.trim() || mat.prints.length > 0, '✓');
+      $('#ia-f-fotos .ia-thumbs', p).innerHTML = miniaturas(mat.fotos);
+      $('#ia-prints-th', p).innerHTML = miniaturas(mat.prints);
+      $('#ia-f-pdf .ia-nomes', p).textContent = mat.pdfs.map((f) => f.name).join(', ');
+      btn.disabled = !(mat.fotos.length || mat.pdfs.length || mat.drive.length || mat.prints.length || mat.texto.trim());
+    };
+    const lerArquivos = (input, lista, max, aviso1) => {
+      input.onchange = () => {
+        const novos = [...input.files];
+        input.value = '';
+        lista.push(...novos);
+        if (lista.length > max) { aviso(aviso1); lista.length = max; }
+        atualizar();
+      };
+    };
+    lerArquivos($('#ia-in-fotos', p), mat.fotos, IA_MAX_FOTOS, `Até ${IA_MAX_FOTOS} fotos por vez. O resto você manda num próximo envio.`);
+    lerArquivos($('#ia-in-pdf', p), mat.pdfs, 3, 'Até 3 PDFs por vez.');
+    lerArquivos($('#ia-in-prints', p), mat.prints, IA_MAX_PRINTS, `Até ${IA_MAX_PRINTS} prints por vez.`);
+    $('#ia-texto', p).addEventListener('input', atualizar);
+    $('#ia-drive-ok', p).onclick = (e) => acao(e.currentTarget, async () => {
+      const msg = $('#ia-drive-msg', p);
+      msg.classList.remove('alerta');
+      try {
+        const arquivos = await dados.iaDriveListar($('#ia-drive', p).value.trim());
+        mat.drive = arquivos;
+        const nf = arquivos.filter((a) => a.tipo !== 'pdf').length, np = arquivos.filter((a) => a.tipo === 'pdf').length;
+        msg.textContent = `Encontrei ${[nf ? plural(nf, 'foto', 'fotos') : '', np ? plural(np, 'PDF', 'PDFs') : ''].filter(Boolean).join(' e ') || plural(arquivos.length, 'arquivo', 'arquivos')} na pasta.`;
+      } catch (err) { mat.drive = []; msg.textContent = err.message; msg.classList.add('alerta'); }
+      atualizar();
+    });
+    btn.onclick = async () => {
+      caixaErro.classList.add('oculto');
+      btn.disabled = true;
+      const prog = $('#ia-prog', p);
+      prog.classList.remove('oculto');
+      const mostrar = (txt, frac) => { $('#ia-prog-tx', p).textContent = txt; if (frac != null) $('.ia-barra i', p).style.width = Math.round(frac * 100) + '%'; };
+      try {
+        const material = await prepararMaterial(mat, mostrar);
+        if (!material.imagens.length && !material.paginas.length && !material.prints.length && !material.texto) throw new Error(material.avisos[0] || 'Não consegui ler nenhum arquivo. Tente com outras fotos.');
+        mostrar('Mandando para a IA…', 1);
+        const { lote } = await dados.iaOrganizar({ pasta: material.pasta, imagens: material.imagens, prints: material.prints, paginas: material.paginas, texto: material.texto });
+        material.avisos.forEach((a, i) => setTimeout(() => aviso(a), 600 + i * 3400));
+        await atualizarIA();
+        iaAndamento(lote, { fotos: material.imagens.length, paginas: material.paginas.length, prints: material.prints.length, texto: !!material.texto });
+      } catch (e) {
+        caixaErro.textContent = e.message || 'Não deu certo. Tente de novo.';
+        caixaErro.classList.remove('oculto');
+        prog.classList.add('oculto');
+        btn.disabled = false;
+      }
+    };
+    atualizar();
+  });
+}
+function miniaturas(arquivos) {
+  if (!arquivos.length) return '';
+  const mostrar = arquivos.slice(0, 4).map((f) => { try { return `<img src="${esc(URL.createObjectURL(f))}" alt="">`; } catch (e) { return ''; } }).join('');
+  return mostrar + (arquivos.length > 4 ? `<span>+${arquivos.length - 4}</span>` : '');
+}
+
+// Reduz as fotos, lê os PDFs e envia tudo para a pasta do envio.
+async function emParalelo(tarefas, n) {
+  let i = 0;
+  await Promise.all(Array.from({ length: Math.min(n, tarefas.length) }, async () => { while (i < tarefas.length) { const t = tarefas[i++]; await t(); } }));
+}
+async function prepararMaterial(mat, mostrar) {
+  const pasta = (crypto.randomUUID && crypto.randomUUID()) || String(Date.now()) + Math.random().toString(36).slice(2);
+  const fotos = mat.fotos.map((f) => ({ arq: f, origem: 'galeria', nome: f.name }));
+  const pdfs = mat.pdfs.map((f) => ({ arq: f, nome: f.name }));
+  const avisos = [];
+  for (let i = 0; i < mat.drive.length; i++) {
+    const d = mat.drive[i];
+    mostrar(`Baixando do Google Drive (${i + 1} de ${mat.drive.length})…`, i / mat.drive.length * 0.2);
+    try {
+      const { blob, nome } = await dados.iaDriveBaixar(d.id);
+      const nm = d.tipo === '?' ? (nome || d.nome) : d.nome;
+      if (/pdf/i.test(blob.type) || /\.pdf$/i.test(nm)) pdfs.push({ arq: blob, nome: nm });
+      else fotos.push({ arq: blob, origem: 'drive', nome: nm });
+    } catch (e) { if (!avisos.includes(e.message)) avisos.push(e.message); }
+  }
+  const paginas = [];
+  for (const pdf of pdfs) {
+    if (paginas.length >= IA_MAX_PAGINAS) { avisos.push(`A IA lê até ${IA_MAX_PAGINAS} páginas de PDF por vez. Mande o resto num próximo envio.`); break; }
+    try {
+      const r = await lerPdf(pdf.arq, pdf.nome, IA_MAX_PAGINAS - paginas.length, (tx) => mostrar(tx, 0.25));
+      paginas.push(...r.paginas);
+      fotos.push(...r.fotos);
+      if (r.total > r.paginas.length) avisos.push(`O PDF "${pdf.nome}" tem ${r.total} páginas: a IA leu as ${r.paginas.length} primeiras.`);
+    } catch (e) { avisos.push(`Não consegui abrir o PDF "${pdf.nome}".`); }
+  }
+  if (fotos.length > IA_MAX_FOTOS) { avisos.push(`Mandamos as ${IA_MAX_FOTOS} primeiras fotos. O resto você manda num próximo envio.`); fotos.length = IA_MAX_FOTOS; }
+  const imagens = [], prints = [], pags = [];
+  let feitos = 0, falhas = 0;
+  const total = fotos.length + mat.prints.length + paginas.length;
+  const passo = () => mostrar(`Preparando o material (${++feitos} de ${total})…`, 0.3 + 0.7 * feitos / Math.max(1, total));
+  const demo = dados.MODO_DEMO;
+  const tarefas = [
+    ...fotos.map((f, i) => async () => {
+      const id = 'F' + (i + 1);
+      try {
+        const grande = await dados.reduzirFoto(f.arq, demo ? 480 : 1200, demo ? 0.6 : 0.85);
+        const url = await dados.iaEnviarImagem(grande, pasta, id);
+        const mini = demo ? url : await dados.iaEnviarImagem(await dados.reduzirFoto(grande, 512, 0.7), pasta, id + '-m');
+        imagens[i] = { id, url, mini, origem: f.origem, arquivo: (f.nome || '').slice(0, 80), pagina: f.pagina };
+      } catch (e) { falhas++; }
+      passo();
+    }),
+    ...mat.prints.map((f, i) => async () => {
+      const id = 'P' + (i + 1);
+      try { prints[i] = { id, mini: await dados.iaEnviarImagem(await dados.reduzirFoto(f, demo ? 480 : 1400, 0.75), pasta, id) }; } catch (e) { falhas++; }
+      passo();
+    }),
+    ...paginas.map((g, i) => async () => {
+      const id = 'G' + (i + 1);
+      try { pags[i] = { id, n: g.n, arquivo: g.arquivo, texto: g.texto, mini: demo ? '' : await dados.iaEnviarImagem(g.blob, pasta, id) }; } catch (e) { falhas++; }
+      passo();
+    }),
+  ];
+  await emParalelo(tarefas, 3);
+  if (falhas) avisos.push(`${plural(falhas, 'arquivo não pôde ser lido', 'arquivos não puderam ser lidos')} (o formato HEIC do iPhone às vezes não abre no Android). Se faltar algum kit, mande essas fotos de novo como JPG.`);
+  return { pasta, imagens: imagens.filter(Boolean), prints: prints.filter(Boolean), paginas: pags.filter(Boolean), texto: mat.texto.trim(), avisos };
+}
+let pdfjsCarregado = null;
+function carregarPdfjs() {
+  if (!pdfjsCarregado) {
+    pdfjsCarregado = import(PDFJS + 'pdf.min.mjs').then((m) => { m.GlobalWorkerOptions.workerSrc = PDFJS + 'pdf.worker.min.mjs'; return m; })
+      .catch((e) => { pdfjsCarregado = null; throw e; });
+  }
+  return pdfjsCarregado;
+}
+async function lerPdf(arq, nome, maxPaginas, mostrar) {
+  const pdfjs = await carregarPdfjs();
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(await arq.arrayBuffer()) }).promise;
+  const paginas = [], fotos = [], vistas = new Set();
+  const n = Math.min(doc.numPages, maxPaginas);
+  for (let i = 1; i <= n; i++) {
+    mostrar(`Lendo o PDF (página ${i} de ${n})…`);
+    const page = await doc.getPage(i);
+    const tc = await page.getTextContent();
+    const texto = tc.items.map((it) => (it.str || '') + (it.hasEOL ? '\n' : ' ')).join('').replace(/[ \t]+/g, ' ').trim().slice(0, 4000);
+    const vp0 = page.getViewport({ scale: 1 });
+    const vp = page.getViewport({ scale: Math.min(2.5, 1000 / vp0.width) });
+    const c = document.createElement('canvas');
+    c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+    await page.render({ canvasContext: ctx, canvas: c, viewport: vp }).promise;
+    const blob = await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.72));
+    paginas.push({ blob, n: i, arquivo: nome, texto });
+    // As fotos que estão dentro da página (do jeito que foram colocadas no PDF, inteiras)
+    try {
+      const ops = await page.getOperatorList();
+      for (let j = 0; j < ops.fnArray.length; j++) {
+        if (ops.fnArray[j] !== pdfjs.OPS.paintImageXObject) continue;
+        const idObj = ops.argsArray[j][0];
+        if (typeof idObj !== 'string' || vistas.has(idObj)) continue;
+        vistas.add(idObj);
+        const img = await objetoPdf(page, idObj);
+        const b = img && await imagemPdfParaBlob(img);
+        if (b) fotos.push({ arq: b, origem: 'pdf', nome, pagina: i });
+      }
+    } catch (e) { /* segue só com o texto e a imagem da página */ }
+    page.cleanup && page.cleanup();
+  }
+  return { paginas, fotos, total: doc.numPages };
+}
+function objetoPdf(page, id) {
+  const lugar = id.startsWith('g_') ? page.commonObjs : page.objs;
+  return new Promise((res) => {
+    const t = setTimeout(() => res(null), 5000);
+    const fim = (v) => { clearTimeout(t); res(v || null); };
+    try { if (lugar.has(id)) fim(lugar.get(id)); else lugar.get(id, fim); } catch (e) { fim(null); }
+  });
+}
+async function imagemPdfParaBlob(img) {
+  const w = img.width, h = img.height;
+  // ignora ícones, logos pequenas e faixas decorativas
+  if (!w || !h || w < 300 || h < 300 || w * h < 150000 || w / h > 4 || h / w > 4) return null;
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+  if (img.bitmap) ctx.drawImage(img.bitmap, 0, 0);
+  else if (img.data) {
+    const dados_ = ctx.createImageData(w, h);
+    const d = dados_.data, s = img.data;
+    if (s.length === w * h * 4) d.set(s);
+    else if (s.length === w * h * 3) { for (let a = 0, b = 0; a < s.length; a += 3, b += 4) { d[b] = s[a]; d[b + 1] = s[a + 1]; d[b + 2] = s[a + 2]; d[b + 3] = 255; } }
+    else return null;
+    ctx.putImageData(dados_, 0, 0);
+  } else return null;
+  return new Promise((r) => c.toBlob(r, 'image/jpeg', 0.9));
+}
+
+// ----- 3. A IA organizando -----
+function iaAndamento(loteId, fontes) {
+  let parar = false;
+  const inicio = Date.now();
+  abrirPainel('Montar com IA', `
+    <div class="cartao centro coluna" style="gap:10px;padding:20px 16px">
+      <div style="font-size:40px" aria-hidden="true">✨</div>
+      <h2>Organizando seu catálogo…</h2>
+      <div class="ia-barra"><i id="ia-and-barra" style="width:8%"></i></div>
+      <p class="pequeno" id="ia-and-fontes">${fontes ? esc([fontes.fotos ? plural(fontes.fotos, 'foto', 'fotos') : '', fontes.paginas ? plural(fontes.paginas, 'página de PDF', 'páginas de PDF') : '', fontes.prints ? plural(fontes.prints, 'print', 'prints') : '', fontes.texto ? 'lista de preços' : ''].filter(Boolean).join(' · ')) : ''}</p>
+    </div>
+    <div class="cartao ia-etapas" id="ia-etapas"></div>
+    <div class="erro oculto" id="ia-and-erro"></div>
+    <p class="dica centro">Leva de 1 a 3 minutos. Você pode fechar esta tela: o cartão na aba Kits mostra quando estiver pronto${avisosLigados() ? ' e chega um aviso no celular' : ''}.</p>
+    <button class="btn contorno cheio" id="ia-and-fechar">Continuar usando o app</button>`, (p) => {
+    $('#ia-and-fechar', p).onclick = () => { parar = true; fecharPainel(); desenharAba(); };
+    const etapas = ['Lendo o material', 'Agrupando as fotos por kit', 'Procurando nomes, preços e sinais', 'Preparando para você conferir'];
+    const desenharEtapas = (atual) => {
+      const el = $('#ia-etapas', p);
+      if (!el) return;
+      el.innerHTML = etapas.map((t, i) => `<div class="ia-linha ${i < atual ? 'feita' : i === atual ? 'agora' : ''}">${i < atual ? '✅' : i === atual ? '⏳' : '○'} ${t}</div>`).join('');
+    };
+    const tique = async () => {
+      if (parar || !document.body.contains(p)) return;
+      const seg = (Date.now() - inicio) / 1000;
+      desenharEtapas(seg < 8 ? 0 : seg < 30 ? 1 : seg < 70 ? 2 : 3);
+      const barra = $('#ia-and-barra', p); if (barra) barra.style.width = Math.min(92, 8 + seg * 0.8) + '%';
+      let l = null;
+      try { l = await dados.iaLote(loteId); } catch (e) { /* tenta de novo */ }
+      if (parar || !document.body.contains(p)) return;
+      if (l && l.status === 'pronto') {
+        await atualizarIA();
+        desenharEtapas(4);
+        setTimeout(() => { if (!parar && document.body.contains(p)) iaConferir(loteId); }, 500);
+        return;
+      }
+      if (l && l.status === 'erro') {
+        await atualizarIA();
+        const caixa = $('#ia-and-erro', p);
+        caixa.innerHTML = `${esc(l.erro || 'Não deu certo.')}`;
+        caixa.classList.remove('oculto');
+        $('#ia-and-fechar', p).textContent = 'Tentar de novo';
+        $('#ia-and-fechar', p).onclick = () => { parar = true; iaEnviar(); };
+        return;
+      }
+      setTimeout(tique, 4000);
+    };
+    tique();
+  }, () => { parar = true; fecharPainel(); desenharAba(); });
+}
+
+// ----- 4 e 5. Conferir 1 a 1 -----
+function numOuNada(v) { return String(v ?? '').trim() === '' ? null : numero(v); }
+function iaConferir(loteId, posInicial) {
+  let lote = null, lista = [], pos = 0, editando = false, fotoAtual = 0;
+  abrirPainel('Conferir kits', '<div id="ia-conf" class="coluna"><div class="carregando">Carregando…</div></div>', async (p) => {
+    const raiz = $('#ia-conf', p);
+    try { lote = await dados.iaLote(loteId); }
+    catch (e) { raiz.innerHTML = `<div class="erro">${esc(e.message)}</div>`; return; }
+    lista = lote.kits.map((k, i) => i).filter((i) => ['conferir', 'aprovado', 'descartado'].includes(lote.kits[i].situacao));
+    if (!lista.length) { iaResumo(lote); return; }
+    pos = posInicial != null ? posInicial : Math.max(0, lista.findIndex((i) => lote.kits[i].situacao === 'conferir'));
+    const guardados = lote.kits.filter((k) => k.situacao === 'guardado').length;
+
+    const desenhar = () => {
+      const k = lote.kits[lista[pos]];
+      const fotos = k.fotos || [];
+      if (fotoAtual >= fotos.length) fotoAtual = 0;
+      const vars = k.variacoes || [];
+      const o = k.origem || {};
+      const de = (t) => (t ? `<span class="ia-de">${esc(t)}</span>` : '<span class="ia-de nao">não estava no material</span>');
+      const editar = (falta) => editando || falta;
+      const pontos = lista.map((i, n) => {
+        const s = lote.kits[i].situacao;
+        return `<i class="${n === pos ? 'agora' : s === 'aprovado' ? 'ok' : s === 'descartado' ? 'fora' : ''}"></i>`;
+      }).join('');
+      const campoValor = (nome, rotulo, v, falta) => editar(falta)
+        ? `<label class="ia-val ${falta ? 'falta' : ''}"><small>${rotulo}</small><input name="${nome}" inputmode="decimal" value="${v == null ? '' : esc(String(v).replace('.', ','))}" placeholder="${falta ? 'Preencha' : ''}"></label>`
+        : `<div class="ia-val"><small>${rotulo}</small><b>${reais(v)}</b></div>`;
+      const precoBox = vars.length ? '' : `
+        <div class="ia-preco">
+          <p class="ia-preco-t">💰 Preço e sinal: confira com atenção</p>
+          <div class="grade-2">${campoValor('preco', 'Preço', k.preco, k.preco == null)}${campoValor('sinal', 'Sinal', k.sinal, k.sinal == null)}</div>
+          <p class="ia-trecho">${k.preco == null && k.sinal == null ? 'Não encontrei o preço nem o sinal no seu material. Digite para poder aprovar.'
+            : k.preco == null ? 'Não encontrei o preço no seu material. Digite para poder aprovar.'
+            : k.sinal == null ? 'Não encontrei o valor do sinal no seu material. Digite o sinal para poder aprovar.'
+            : `Li ${o.preco ? `em: ${esc(o.preco)}` : 'no seu material'}${o.trecho ? `: “${esc(o.trecho)}”` : ''}`}</p>
+        </div>`;
+      const opcoes = !vars.length ? '' : `
+        <div class="ia-preco">
+          <p class="ia-preco-t">💰 Opções do kit: confira preço e sinal de cada uma</p>
+          ${vars.map((v, i) => `<div class="ia-opcao" data-v="${i}">
+            ${editar(!v.nome) ? `<input class="v-nome" value="${esc(v.nome || '')}" placeholder="Nome da opção" maxlength="60">` : `<b>${esc(v.nome)}</b>`}
+            <div class="grade-2">${campoValor('vp' + i, 'Preço', v.preco, v.preco == null)}${campoValor('vs' + i, 'Sinal', v.sinal, v.sinal == null)}</div>
+            ${(v.extras || []).length ? `<span class="dica">Peças extras: ${esc(v.extras.join(', '))}</span>` : ''}
+          </div>`).join('')}
+          <p class="ia-trecho">Li ${o.variacoes ? `em: ${esc(o.variacoes)}` : 'no seu material'}${o.trecho ? `: “${esc(o.trecho)}”` : ''}</p>
+        </div>`;
+      const avisoTeste = pos === 0 && lote.teste && guardados
+        ? `<div class="ia-trava">🔒 <span><b>Encontrei ${lista.length + guardados} kits.</b> No teste grátis a IA monta ${lista.length}. ${plural(guardados, 'kit fica guardado', 'kits ficam guardados')} e ${guardados === 1 ? 'é liberado' : 'são liberados'} quando você assinar.</span></div>` : '';
+      raiz.innerHTML = `
+        <div class="linha-flex entre"><span class="ia-pos">Kit ${pos + 1} de ${lista.length}</span>${k.situacao !== 'conferir' ? `<span class="etiqueta ${k.situacao === 'aprovado' ? 'et-confirmada' : 'et-cancelada'}">${k.situacao === 'aprovado' ? 'Aprovado' : 'Descartado'}</span>` : ''}</div>
+        <div class="ia-pontos">${pontos}</div>
+        ${avisoTeste}
+        ${k.existe ? `<div class="ia-existe">⚠️ Parece que você já tem o <b>${esc(k.existe)}</b> no catálogo. Se for o mesmo kit, toque em <b>Descartar</b>.</div>` : ''}
+        ${fotos.length ? `<div class="ia-foto-grande">${fotoCaixa(fotos[fotoAtual], 'Foto do kit')}<span class="ia-foto-q">${fotoAtual + 1} de ${fotos.length} · foto inteira</span></div>
+          ${fotos.length > 1 ? `<div class="ia-minis">${fotos.map((f, i) => `<button type="button" class="ia-mini ${i === fotoAtual ? 'on' : ''}" data-f="${i}" aria-label="Ver foto ${i + 1}"><img src="${esc(f)}" alt=""></button>`).join('')}</div>` : ''}
+          ${editando ? `<div class="linha-flex" style="gap:8px;flex-wrap:wrap">${fotoAtual > 0 ? '<button type="button" class="btn claro mini" id="ia-principal">Tornar principal</button>' : '<span class="dica">Esta é a foto principal.</span>'}${fotos.length > 1 ? '<button type="button" class="btn perigo mini" id="ia-tirar-foto">Tirar esta foto do kit</button>' : ''}</div>` : ''}`
+          : '<div class="ia-sem-foto">Sem foto no material. Depois de publicar, abra o kit em Kits e adicione as fotos.</div>'}
+        <label class="ia-campo"><span class="ia-rot">Nome ${de(k.nome ? o.nome || 'seu material' : null)}${o.ligacao && k.nome && fotos.length ? `<span class="ia-de nao">${esc(o.ligacao)}</span>` : ''}</span>
+          ${editar(!k.nome) ? `<input name="nome" maxlength="80" value="${esc(k.nome || '')}" placeholder="${k.nome ? '' : 'Preencha o nome do kit'}" class="${k.nome ? '' : 'falta'}">` : `<span class="ia-valor">${esc(k.nome)}</span>`}</label>
+        <label class="ia-campo"><span class="ia-rot">Peças ${de((k.pecas || []).length ? o.pecas || 'seu material' : null)}</span>
+          ${editando ? `<textarea name="pecas" rows="3" placeholder="Opcional: uma peça por linha">${esc((k.pecas || []).join('\n'))}</textarea>`
+            : (k.pecas || []).length ? `<span class="ia-valor">${esc(k.pecas.join(', '))}</span>` : '<span class="ia-valor vazio">Opcional: toque em Corrigir para preencher</span>'}</label>
+        ${opcoes}${precoBox}
+        <p class="ia-falta oculto" id="ia-falta"></p>
+        <div class="ia-acoes">
+          <button type="button" class="btn ${k.existe ? 'principal' : 'contorno'}" id="ia-descartar">Descartar</button>
+          <button type="button" class="btn contorno" id="ia-corrigir">${editando ? 'Pronto' : 'Corrigir'}</button>
+          <button type="button" class="btn verde" id="ia-aprovar">✓ Aprovar</button>
+        </div>
+        ${pos > 0 ? '<button type="button" class="link-btn" id="ia-anterior" style="align-self:center">‹ Voltar para o kit anterior</button>' : ''}`;
+      // ligações
+      $$('[data-f]', raiz).forEach((b) => (b.onclick = () => { lerCampos(); fotoAtual = Number(b.dataset.f); desenhar(); }));
+      const princ = $('#ia-principal', raiz);
+      if (princ) princ.onclick = () => { lerCampos(); k.fotos.unshift(k.fotos.splice(fotoAtual, 1)[0]); fotoAtual = 0; desenhar(); };
+      const tirar = $('#ia-tirar-foto', raiz);
+      if (tirar) tirar.onclick = () => { lerCampos(); k.fotos.splice(fotoAtual, 1); fotoAtual = 0; desenhar(); };
+      $('#ia-corrigir', raiz).onclick = () => { lerCampos(); editando = !editando; desenhar(); };
+      $('#ia-descartar', raiz).onclick = (e) => decidir(e.currentTarget, 'descartado');
+      $('#ia-aprovar', raiz).onclick = (e) => decidir(e.currentTarget, 'aprovado');
+      const ant = $('#ia-anterior', raiz);
+      if (ant) ant.onclick = () => { lerCampos(); pos--; editando = false; fotoAtual = 0; desenhar(); $('.painel-fundo').scrollTop = 0; };
+      conferirPronto();
+    };
+    // lê o que a dona digitou
+    const lerCampos = () => {
+      const k = lote.kits[lista[pos]];
+      const v = (n) => { const el = $(`[name="${n}"]`, raiz); return el ? el.value : undefined; };
+      if (v('nome') !== undefined) k.nome = v('nome').trim().slice(0, 80);
+      if (v('pecas') !== undefined) k.pecas = v('pecas').split('\n').map((x) => x.trim()).filter(Boolean).slice(0, 100);
+      if (v('preco') !== undefined) k.preco = numOuNada(v('preco'));
+      if (v('sinal') !== undefined) k.sinal = numOuNada(v('sinal'));
+      (k.variacoes || []).forEach((va, i) => {
+        const caixa = $(`.ia-opcao[data-v="${i}"]`, raiz);
+        const nm = caixa && $('.v-nome', caixa);
+        if (nm) va.nome = nm.value.trim().slice(0, 60);
+        if (v('vp' + i) !== undefined) va.preco = numOuNada(v('vp' + i));
+        if (v('vs' + i) !== undefined) va.sinal = numOuNada(v('vs' + i));
+      });
+    };
+    const oQueFalta = () => {
+      lerCampos();
+      const k = lote.kits[lista[pos]];
+      const falta = [];
+      if (!k.nome) falta.push('o nome');
+      const vars = k.variacoes || [];
+      if (vars.length) {
+        if (vars.some((x) => !x.nome)) falta.push('o nome de cada opção');
+        if (vars.some((x) => !(x.preco > 0))) falta.push('o preço de cada opção');
+        if (vars.some((x) => x.sinal == null)) falta.push('o sinal de cada opção');
+      } else {
+        if (!(k.preco > 0)) falta.push('o preço');
+        if (k.sinal == null) falta.push('o sinal');
+      }
+      return falta;
+    };
+    const conferirPronto = () => {
+      const falta = oQueFalta();
+      const bt = $('#ia-aprovar', raiz), msg = $('#ia-falta', raiz);
+      if (!bt) return;
+      // tira o vermelho do campo assim que a dona preenche
+      $$('.ia-val input, .ia-campo input', raiz).forEach((el) => {
+        const caixa = el.closest('.ia-val') || el;
+        if (el.dataset.faltou === undefined) el.dataset.faltou = caixa.classList.contains('falta') ? '1' : '';
+        if (el.dataset.faltou) caixa.classList.toggle('falta', !el.value.trim());
+      });
+      bt.disabled = falta.length > 0;
+      msg.textContent = falta.length ? `Preencha ${falta.join(', ').replace(/, ([^,]*)$/, ' e $1')} para aprovar.` : '';
+      msg.classList.toggle('oculto', !falta.length);
+    };
+    const decidir = async (botao, situacao) => {
+      if (situacao === 'aprovado' && oQueFalta().length) { conferirPronto(); return; }
+      lerCampos();
+      const k = lote.kits[lista[pos]];
+      const antes = k.situacao;
+      k.situacao = situacao;
+      const ok = await acao(botao, async () => { await dados.iaSalvar(lote.id, lote.kits); return true; });
+      if (!ok) { k.situacao = antes; return; }
+      editando = false; fotoAtual = 0;
+      const prox = lista.findIndex((i, n) => n > pos && lote.kits[i].situacao === 'conferir');
+      const qualquer = lista.findIndex((i) => lote.kits[i].situacao === 'conferir');
+      if (prox >= 0) pos = prox;
+      else if (qualquer >= 0) pos = qualquer;
+      else { atualizarIA().then(redesenharCartaoIA); iaResumo(lote); return; }
+      desenhar();
+      $('.painel-fundo').scrollTop = 0;
+    };
+    raiz.addEventListener('input', () => conferirPronto());
+    desenhar();
+  }, () => { fecharPainel(); atualizarIA().then(() => desenharAba()); });
+}
+
+// ----- 6. Resumo e publicar -----
+function iaResumo(lote) {
+  const kits = lote.kits;
+  const ap = kits.filter((k) => k.situacao === 'aprovado');
+  const desc = kits.filter((k) => k.situacao === 'descartado').length;
+  const guard = kits.filter((k) => k.situacao === 'guardado').length;
+  const pub = kits.filter((k) => k.situacao === 'publicado').length;
+  const linha = (k) => {
+    const vars = k.variacoes || [];
+    const preco = vars.length ? `a partir de ${reais(Math.min(...vars.map((v) => Number(v.preco) || 0)))} · ${plural(vars.length, 'opção', 'opções')}` : `${reais(k.preco)} · sinal ${reais(k.sinal)}`;
+    const st = { aprovado: ['ok', 'Aprovado'], descartado: ['x', 'Descartado'], publicado: ['ok', 'Já publicado'] }[k.situacao] || ['x', k.situacao];
+    return `<div class="ia-rk">${k.fotos && k.fotos[0] ? `<img src="${esc(k.fotos[0])}" alt="">` : '<span class="ia-rk-sem">🎈</span>'}<div><b>${esc(k.nome || 'Sem nome')}</b><small>${k.situacao === 'descartado' ? '—' : preco}</small></div><span class="ia-st ${st[0]}">${st[1]}</span></div>`;
+  };
+  const pago = estado.ia && estado.ia.plano === 'pago';
+  abrirPainel('Resumo', `
+    <div class="ia-res">
+      <div class="ok"><b>${ap.length}</b><small>${ap.length === 1 ? 'aprovado' : 'aprovados'}</small></div>
+      <div class="x"><b>${desc}</b><small>${desc === 1 ? 'descartado' : 'descartados'}</small></div>
+      <div class="g"><b>${guard}</b><small>${guard === 1 ? 'guardado' : 'guardados'}</small></div>
+    </div>
+    ${ap.length + desc + pub ? `<div class="cartao ia-lista">${kits.filter((k) => ['aprovado', 'descartado', 'publicado'].includes(k.situacao)).map(linha).join('')}</div>` : ''}
+    ${guard && !pago ? `<div class="ia-trava">🔒 <span><b>${plural(guard, 'kit guardado', 'kits guardados')}</b> esperando. Assine para a IA montar o resto do seu catálogo (ilimitado).</span></div>` : ''}
+    <div class="erro oculto" id="ia-pub-erro"></div>
+    ${ap.length ? `<button class="btn principal cheio" id="ia-publicar">Publicar ${plural(ap.length, 'kit', 'kits')} no catálogo</button>
+      <p class="dica centro">Depois você edita qualquer kit normalmente em Kits.</p>
+      <button class="link-btn" id="ia-rever" style="align-self:center">‹ Rever os kits</button>`
+      : `<button class="btn contorno cheio" id="ia-fim">Fechar</button>`}
+    ${guard && !pago ? '<button class="btn verde cheio" id="ia-assinar">Assinar e liberar ilimitado</button>' : ''}`, (p) => {
+    const fim = $('#ia-fim', p); if (fim) fim.onclick = () => { fecharPainel(); atualizarIA().then(() => desenharAba()); };
+    const rever = $('#ia-rever', p); if (rever) rever.onclick = () => iaConferir(lote.id, 0);
+    const ass = $('#ia-assinar', p); if (ass) ass.onclick = () => { fecharPainel(); setTimeout(() => popupPlanosTeste('ia_limite'), 50); };
+    const btn = $('#ia-publicar', p);
+    if (!btn) return;
+    btn.onclick = async () => {
+      btn.disabled = true;
+      const caixa = $('#ia-pub-erro', p);
+      caixa.classList.add('oculto');
+      let feitos = 0;
+      try {
+        for (const k of ap) {
+          btn.textContent = `Publicando ${feitos + 1} de ${ap.length}…`;
+          const vars = (k.variacoes || []).map((v) => ({ id: v.id || 'v' + Math.random().toString(36).slice(2, 9), nome: v.nome, preco: Number(v.preco) || 0, sinal: Number(v.sinal) || 0, extras: v.extras || [], fotos: [] }));
+          const barata = [...vars].sort((a, b) => a.preco - b.preco)[0];
+          const fotos = (k.fotos || []).slice(0, MAX_FOTOS);
+          await dados.salvarKit({
+            nome: k.nome, preco: barata ? barata.preco : Number(k.preco) || 0, sinal: barata ? barata.sinal : Number(k.sinal) || 0,
+            pecas: (k.pecas || []).slice(0, 100), categoria: null, fotos, foto_url: fotos[0] || null, ativo: true, variacoes: vars,
+          });
+          k.situacao = 'publicado';
+          feitos++;
+          await dados.iaSalvar(lote.id, lote.kits).catch(() => {});
+        }
+        await recarregar();
+        await atualizarIA();
+        lojaPronta(feitos, ap.map((k) => k.nome));
+      } catch (e) {
+        await dados.iaSalvar(lote.id, lote.kits).catch(() => {});
+        caixa.textContent = `${feitos ? `${plural(feitos, 'kit foi publicado', 'kits foram publicados')}. ` : ''}${e.message || 'Não deu certo.'} Toque de novo para continuar.`;
+        caixa.classList.remove('oculto');
+        btn.disabled = false;
+        btn.textContent = 'Tentar publicar de novo';
+        ap.splice(0, feitos);
+      }
+    };
+  }, () => { fecharPainel(); atualizarIA().then(() => desenharAba()); });
+}
+
+// ----- 7. Loja pronta -----
+function lojaPronta(publicados, nomes = []) {
+  const n = estado.negocio;
+  const link = linkPublico(n.slug);
+  const novos = new Set(nomes);
+  const comFoto = estado.kits.filter((k) => k.ativo && k.foto_url).sort((a, b) => novos.has(b.nome) - novos.has(a.nome)).slice(0, 4);
+  const textoZap = `Olá! Agora você pode ver todos os kits da ${n.nome} e reservar a sua data pelo link: ${link}`;
+  abrirPainel('Sua loja está no ar!', `
+    <div class="ia-festa"><div style="font-size:34px" aria-hidden="true">🎉</div><b>${plural(publicados, 'kit publicado', 'kits publicados')}</b><span>Sua cliente já pode escolher e reservar pelo link.</span></div>
+    <div class="ia-loja">
+      <div class="ia-loja-topo">${n.logo_url ? `<img class="vitrine-logo" src="${esc(n.logo_url)}" alt="">` : ''}<b>${esc(n.nome)}</b></div>
+      ${comFoto.length ? `<div class="ia-loja-grade">${comFoto.map((k) => `<div>${fotoCaixa(k.foto_url, k.nome)}<small>${esc(k.nome)}</small></div>`).join('')}</div>` : ''}
+    </div>
+    <a class="btn contorno cheio" href="${esc(linkDona())}">👀 Ver como a cliente vê</a>
+    <div class="ia-link"><span>🔗 ${esc(link.replace(/^https?:\/\//, ''))}</span><button type="button" class="btn claro mini" id="lp-copiar">Copiar</button></div>
+    <button class="btn insta cheio" id="lp-bio">📸 Colocar na bio do Instagram</button>
+    <div class="grade-2">
+      <button class="btn contorno" id="lp-stories">⭐ Postar nos stories</button>
+      <a class="btn verde" href="${esc('https://wa.me/?text=' + encodeURIComponent(textoZap))}" target="_blank" rel="noopener">${ICONE.zap} WhatsApp</a>
+    </div>
+    <button class="link-btn" id="lp-fim" style="align-self:center">Fechar</button>`, (p) => {
+    $('#lp-copiar', p).onclick = () => copiarMeuLink();
+    $('#lp-bio', p).onclick = () => popupBio(() => lojaPronta(publicados, nomes));
+    $('#lp-stories', p).onclick = () => storiesLoja(() => lojaPronta(publicados, nomes));
+    $('#lp-fim', p).onclick = () => { fecharPainel(); irPara('kits'); };
+  }, () => { fecharPainel(); irPara('kits'); });
+}
+// ----- 8. Link na bio do Instagram (o Instagram não deixa nenhum app mudar a bio sozinho) -----
+async function popupBio(voltar) {
+  const n = estado.negocio;
+  const link = linkPublico(n.slug);
+  let copiou = false;
+  try { await navigator.clipboard.writeText(link); copiou = true; dados.marcarLinkCopiado().catch(() => {}); } catch (e) { /* mostra o link para copiar */ }
+  const passo = (num, t) => `<div class="passo-inst"><b>${num}</b><span>${t}</span></div>`;
+  abrirPainel('Link na bio do Instagram', `
+    ${copiou ? '<div class="ia-copiado">✓ Link copiado! Agora é só colar.</div>' : `<div class="cartao" style="background:var(--lilas);word-break:break-all;font-weight:800;font-size:14px">${esc(link)}</div><p class="pequeno">Segure no link acima e copie.</p>`}
+    ${passo(1, 'No Instagram, toque em <b>Editar perfil</b>')}
+    ${passo(2, 'Toque em <b>Links</b> e depois em <b>Adicionar link externo</b>')}
+    ${passo(3, 'Segure no campo, toque em <b>Colar</b> e depois em <b>✓ Concluir</b>')}
+    <a class="btn insta cheio" href="${esc(n.instagram ? `https://www.instagram.com/${encodeURIComponent(n.instagram)}/` : 'https://www.instagram.com/')}" target="_blank" rel="noopener">Abrir o Instagram</a>
+    <button class="link-btn" id="bio-feito" style="align-self:center">Já coloquei: <b style="color:var(--verde)">marcar como feito ✓</b></button>`, (p) => {
+    $('#bio-feito', p).onclick = async () => { await dados.marcarLinkBio().catch(() => {}); aviso('Marcado! Agora suas clientes acham sua loja pela bio. 💛'); if (voltar) voltar(); else fecharPainel(); };
+  }, voltar);
+}
+// ----- 9. Stories: o app monta a imagem com a logo e os kits -----
+function carregarImagem(url) {
+  return new Promise((res) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => res(img);
+    img.onerror = () => res(null);
+    img.src = url;
+  });
+}
+async function gerarImagemStories() {
+  const n = estado.negocio;
+  const W = 1080, H = 1920;
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const ctx = c.getContext('2d');
+  const g = ctx.createLinearGradient(0, 0, W * 0.6, H);
+  g.addColorStop(0, '#5B3FA6'); g.addColorStop(1, '#E4505C');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  try { await document.fonts.ready; } catch (e) { /* segue */ }
+  const redondo = (x, y, w, h, r) => { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); };
+  const dentro = (img, x, y, w, h) => { const e = Math.min(w / img.width, h / img.height); const iw = img.width * e, ih = img.height * e; ctx.drawImage(img, x + (w - iw) / 2, y + (h - ih) / 2, iw, ih); };
+  let y = 150;
+  if (n.logo_url) {
+    const logo = await carregarImagem(n.logo_url);
+    if (logo) {
+      ctx.save(); ctx.beginPath(); ctx.arc(W / 2, y + 110, 110, 0, Math.PI * 2); ctx.fillStyle = '#fff'; ctx.fill(); ctx.clip();
+      dentro(logo, W / 2 - 95, y + 15, 190, 190); ctx.restore();
+      y += 250;
+    }
+  }
+  ctx.fillStyle = '#fff'; ctx.textAlign = 'center';
+  ctx.font = "700 76px Fredoka, 'Nunito Sans', sans-serif";
+  ctx.fillText(n.nome.slice(0, 26), W / 2, y + 70, W - 120);
+  ctx.font = "600 46px 'Nunito Sans', sans-serif";
+  ctx.fillText('Reserve seu kit pelo link 🎈', W / 2, y + 150, W - 120);
+  y += 210;
+  const recentes = [...estado.kits].sort((a, b) => String(b.criado_em || '').localeCompare(String(a.criado_em || '')));
+  const kits = recentes.filter((k) => k.ativo && k.foto_url).slice(0, 4);
+  const lado = 440, gap = 30, x0 = (W - lado * 2 - gap) / 2;
+  for (let i = 0; i < kits.length; i++) {
+    const x = x0 + (i % 2) * (lado + gap), yy = y + Math.floor(i / 2) * (lado + gap);
+    ctx.fillStyle = 'rgba(255,255,255,.95)'; redondo(x, yy, lado, lado, 34); ctx.fill();
+    const img = await carregarImagem(kits[i].foto_url);
+    if (img) { ctx.save(); redondo(x + 14, yy + 14, lado - 28, lado - 28, 24); ctx.clip(); dentro(img, x + 14, yy + 14, lado - 28, lado - 28); ctx.restore(); }
+  }
+  const ySt = Math.max(y + Math.ceil(kits.length / 2) * (lado + gap) + 40, H - 420);
+  ctx.fillStyle = '#fff'; redondo(W / 2 - 330, ySt, 660, 120, 28); ctx.fill();
+  ctx.fillStyle = '#2A1B3D'; ctx.font = "700 44px 'Nunito Sans', sans-serif";
+  ctx.fillText('🔗 cole o adesivo Link aqui', W / 2, ySt + 76);
+  ctx.fillStyle = '#fff'; ctx.font = "600 36px 'Nunito Sans', sans-serif";
+  ctx.fillText(linkPublico(n.slug).replace(/^https?:\/\//, ''), W / 2, ySt + 200, W - 120);
+  return new Promise((res) => { try { c.toBlob((b) => res(b), 'image/jpeg', 0.9); } catch (e) { res(null); } });
+}
+async function storiesLoja(voltar) {
+  const link = linkPublico(estado.negocio.slug);
+  abrirPainel('Divulgar nos stories', '<div id="st-raiz" class="coluna"><div class="carregando">Montando a imagem…</div></div>', async (p) => {
+    let blob = null;
+    try { blob = await gerarImagemStories(); } catch (e) { blob = null; }
+    let copiou = false;
+    try { await navigator.clipboard.writeText(link); copiou = true; } catch (e) { /* segue */ }
+    const raiz = $('#st-raiz', p);
+    if (!raiz) return;
+    if (!blob) { raiz.innerHTML = '<div class="erro">Não consegui montar a imagem agora. Tente de novo.</div>'; return; }
+    const arquivo = new File([blob], 'minha-loja.jpg', { type: 'image/jpeg' });
+    const url = URL.createObjectURL(blob);
+    const podeCompartilhar = !!(navigator.canShare && navigator.canShare({ files: [arquivo] }));
+    raiz.innerHTML = `
+      <img class="st-previa" src="${esc(url)}" alt="Imagem para os stories">
+      ${copiou ? '<div class="ia-copiado">✓ Link copiado para o adesivo</div>' : `<div class="cartao" style="background:var(--lilas);word-break:break-all;font-weight:800;font-size:14px">${esc(link)}</div>`}
+      ${podeCompartilhar ? '<button class="btn insta cheio" id="st-comp">Compartilhar no Instagram</button>' : `<a class="btn insta cheio" href="${esc(url)}" download="minha-loja.jpg">Baixar a imagem</a>`}
+      <p class="dica centro">No story, toque no ícone de adesivo → <b>Link</b> → cole o link.</p>`;
+    const comp = $('#st-comp', raiz);
+    if (comp) comp.onclick = () => navigator.share({ files: [arquivo] }).catch(() => {});
+  }, voltar);
 }
 
 // Foto inteira dentro de um quadro quadrado (sem cortar), com fundo desfocado.
@@ -2232,12 +2933,8 @@ function avisosLigados() {
 }
 function cartaoAvisosLoja() {
   if (DEMO_SITE || estado.suporte) return '';
-  if (avisosLigados()) {
-    return `<section class="cartao coluna avisos-loja ligados">
-      <div class="linha-flex" style="gap:12px;align-items:center"><span style="font-size:30px" aria-hidden="true">✅</span><div><b style="font-size:17px">Avisos ligados neste celular</b><div class="pequeno">Você recebe um aviso a cada nova reserva pelo link, o resumo do dia às 8h e os lembretes da sua assinatura.</div></div></div>
-      <div class="linha-flex" style="gap:8px;flex-wrap:wrap"><button class="btn contorno mini" id="avisos-testar">Enviar aviso de teste</button></div>
-    </section>`;
-  }
+  // Depois de ativar, o cartão some da aba Mais (volta só se os avisos forem desligados no celular).
+  if (avisosLigados()) return '';
   return `<section class="cartao coluna avisos-loja">
     <div class="linha-flex" style="gap:12px;align-items:center"><span style="font-size:30px" aria-hidden="true">🔔</span><div><b style="font-size:17px">Avisos de reservas no celular</b><div class="pequeno">Receba um aviso na hora em que uma cliente reservar pelo seu link, mesmo com o app fechado.</div></div></div>
     <button class="btn principal cheio" id="avisos-ativar">Ativar avisos neste celular</button>
@@ -2335,7 +3032,7 @@ function abaMais(tela) {
       <div class="cartao" style="word-break: break-all; font-weight: 700; background: var(--lilas)">${esc(link)}</div>
       <div class="grade-2">
         <button class="btn" id="copiar">Copiar link</button>
-        <a class="btn contorno" href="${esc(link)}" target="_blank" rel="noopener">Abrir</a>
+        <a class="btn contorno" href="${esc(linkDona())}">Abrir</a>
       </div>
     </section>
     <section class="coluna">
@@ -2354,6 +3051,7 @@ function abaMais(tela) {
       : dados.MODO_DEMO ? `<section class="cartao coluna"><h2>Testar situações (só na demonstração)</h2>
           ${[['normal', 'Assinatura ativa (normal)'], ['nova', 'Conta nova vazia (primeiros passos)'], ['teste', 'Em teste de 7 dias'], ['teste_fim', 'Teste de 7 dias acabou'], ['pix', 'Pagamento pendente com Pix'], ['email', 'Pagamento pendente sem Pix'], ['suspensa', 'Assinatura suspensa'], ['cancelada', 'Cliente cancelou']]
             .map(([k, t]) => `<button class="btn contorno cheio" data-simular="${k}">${t}</button>`).join('')}
+          <button class="btn contorno cheio" id="demo-ia-zerar">Zerar a IA do catálogo (volta aos 5 kits do teste)</button>
           <button class="btn contorno cheio" id="demo-reset">Recomeçar a demonstração</button></section>` : ''}
     ${DEMO_SITE ? '' : '<button class="btn perigo cheio" id="sair">Sair do app</button>'}`;
   const inst = $('#instalar', tela); if (inst) inst.onclick = instalarApp;
@@ -2366,6 +3064,8 @@ function abaMais(tela) {
   $('#mensagens', tela).onclick = painelMensagens;
   const sairBtn = $('#sair', tela);
   if (sairBtn) sairBtn.onclick = async () => { await dados.sair(); location.hash = ''; telaLogin('entrar'); };
+  const iaZ = $('#demo-ia-zerar', tela);
+  if (iaZ) iaZ.onclick = async () => { dados.demoIaZerar(); await atualizarIA(); aviso('IA zerada: 5 kits liberados no teste.'); };
   const reset = $('#demo-reset', tela);
   if (reset) reset.onclick = async () => { dados.demoReiniciar(); await carregarTudo(); aviso('Demonstração reiniciada.'); };
   $$('[data-simular]', tela).forEach((b) => (b.onclick = async () => {

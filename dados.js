@@ -454,6 +454,153 @@ export async function solicitarReserva(slug, kitId, dataFesta, nome, whatsapp, v
   return ok(s.rpc('solicitar_reserva', args));
 }
 
+// ---------- Montar catálogo com IA ----------
+// A IA só organiza: não mexe nas fotos e não inventa nada (o que não está escrito fica em branco).
+export function reduzirFoto(arquivo, max, qualidade = 0.85) { return reduzirImagem(arquivo, max, qualidade); }
+const IA_LIMITE_TESTE = 5;
+function demoIa() { const d = D(); if (!d.ia) d.ia = { usados: 0, lotes: [] }; return d.ia; }
+function demoIaPlano() {
+  const a = D().assinatura || {};
+  if (a.status === 'ativa') return 'pago';
+  if (a.status === 'teste') return a.teste_ate && a.teste_ate > new Date().toISOString() ? 'teste' : 'bloqueado';
+  if (a.status === 'carencia' && a.carencia_ate > new Date().toISOString()) return 'pago';
+  return 'bloqueado';
+}
+// Demonstração: a "IA" é simulada (lê só linhas como "Kit Safari R$ 350 sinal 100").
+function demoIaConcluir(l) {
+  if (l.status !== 'processando' || Date.now() - l.criado < 4500) return;
+  const ia = demoIa();
+  const linhas = [l.entrada.texto || '', ...(l.entrada.paginas || []).map((p) => p.texto || '')].join('\n').split(/\n|;/).map((x) => x.trim()).filter(Boolean);
+  const lidos = [];
+  for (const linha of linhas) {
+    const m = linha.match(/^(.*?)\s*[-–:]?\s*R\$\s*([\d.]+(?:,\d{1,2})?)(?:.*?(?:sinal|entrada)\D*([\d.]+(?:,\d{1,2})?))?/i);
+    if (!m || !m[1].trim()) continue;
+    const num = (v) => (v ? Number(v.replace(/\./g, '').replace(',', '.')) : null);
+    lidos.push({ nome: m[1].trim().slice(0, 80), preco: num(m[2]), sinal: num(m[3]), trecho: linha.slice(0, 160) });
+  }
+  const fotos = l.entrada.imagens || [];
+  const grupos = Math.max(lidos.length, Math.ceil(fotos.length / 2));
+  const porGrupo = grupos ? Math.max(1, Math.ceil(fotos.length / grupos)) : 0;
+  const kits = [];
+  for (let g = 0; g < grupos; g++) {
+    const t = lidos[g];
+    const fs = fotos.slice(g * porGrupo, g * porGrupo + porGrupo).slice(0, 5).map((f) => f.url);
+    if (!t && !fs.length) continue;
+    kits.push({ id: 'k' + (g + 1), nome: t ? t.nome : null, preco: t ? t.preco : null, sinal: t ? t.sinal : null, pecas: [], variacoes: [],
+      fotos: fs, fotos_todas: fs, existe: t && D().kits.find((k) => k.nome.toLowerCase() === t.nome.toLowerCase()) ? t.nome : null,
+      origem: { nome: t ? 'lista de preços' : null, ligacao: t && fs.length ? 'simulação da demonstração' : null, preco: t ? 'lista de preços' : null, trecho: t ? t.trecho : null } });
+  }
+  const restante = Math.max(0, IA_LIMITE_TESTE - ia.usados);
+  const ordem = kits.map((k, i) => ({ i, r: (k.fotos.length ? 0 : 1) + Math.random() })).sort((a, b) => a.r - b.r).map((x) => x.i);
+  kits.forEach((k) => { k.situacao = 'conferir'; });
+  if (l.teste) { ordem.forEach((i, pos) => { if (pos >= restante) kits[i].situacao = 'guardado'; }); ia.usados += Math.min(restante, kits.length); }
+  l.kits = kits; l.status = kits.length ? 'pronto' : 'erro';
+  if (!kits.length) l.erro = 'Na demonstração, escreva na lista linhas como "Kit Safari R$ 350 sinal 100" ou mande fotos.';
+  delete l.entrada;
+  demoSalvar();
+}
+function demoIaLiberar() {
+  if (demoIaPlano() !== 'pago') return;
+  for (const l of demoIa().lotes) for (const k of l.kits || []) if (k.situacao === 'guardado') { k.situacao = 'conferir'; k.liberado = true; l.status = 'pronto'; }
+}
+async function chamarFuncaoIA(corpo, bruto = false) {
+  const s = await cliente();
+  const { data } = await s.auth.getSession();
+  let r;
+  try {
+    r = await fetch(`${SUPABASE_URL}/functions/v1/catalogo-ia`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session && data.session.access_token}`, apikey: SUPABASE_ANON_KEY },
+      body: JSON.stringify(corpo),
+    });
+  } catch (e) { throw new Error('Sem conexão. Confira a internet e tente de novo.'); }
+  if (bruto && r.ok) return r;
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || d.erro) throw new Error(d.erro || 'A IA não respondeu agora. Tente de novo em instantes.');
+  return d;
+}
+export async function iaSituacao() {
+  if (MODO_DEMO) {
+    if (DEMO_SITE) return { disponivel: false };
+    const ia = demoIa(); const plano = demoIaPlano();
+    demoIaLiberar(); ia.lotes.forEach(demoIaConcluir);
+    const kits = ia.lotes.filter((l) => l.status === 'pronto').flatMap((l) => l.kits || []);
+    const aberto = [...ia.lotes].reverse().find((l) => l.status === 'pronto' && (l.kits || []).some((k) => ['conferir', 'aprovado'].includes(k.situacao)));
+    const proc = ia.lotes.find((l) => l.status === 'processando');
+    const ultErro = [...ia.lotes].reverse().find((l) => l.status === 'erro' && Date.now() - l.criado < 1800e3);
+    return { disponivel: plano !== 'bloqueado', plano, limite: IA_LIMITE_TESTE, restante: plano === 'teste' ? Math.max(0, IA_LIMITE_TESTE - ia.usados) : null,
+      processando: proc ? proc.id : null, lote: aberto ? aberto.id : null,
+      pendentes: kits.filter((k) => ['conferir', 'aprovado'].includes(k.situacao)).length,
+      liberados: kits.filter((k) => k.situacao === 'conferir' && k.liberado).length,
+      guardados: ia.lotes.flatMap((l) => l.kits || []).filter((k) => k.situacao === 'guardado').length,
+      erro: ultErro ? ultErro.erro : null };
+  }
+  const s = await cliente();
+  return ok(s.rpc('ia_situacao'));
+}
+export async function iaLote(id) {
+  if (MODO_DEMO) {
+    const l = demoIa().lotes.find((x) => x.id === id);
+    if (!l) throw new Error('Envio não encontrado');
+    demoIaLiberar(); demoIaConcluir(l);
+    const pago = demoIaPlano() === 'pago';
+    return { id: l.id, status: l.status, erro: l.erro || null, teste: l.teste, kits: (l.kits || []).map((k) => (k.situacao === 'guardado' && !pago ? { situacao: 'guardado' } : JSON.parse(JSON.stringify(k)))) };
+  }
+  const s = await cliente();
+  return ok(s.rpc('ia_lote', { p_id: id }));
+}
+export async function iaSalvar(id, kits) {
+  if (MODO_DEMO) {
+    const l = demoIa().lotes.find((x) => x.id === id);
+    l.kits = l.kits.map((k, i) => (['guardado', 'publicado'].includes(k.situacao) || !kits[i] ? k : { ...k, ...kits[i], fotos: (kits[i].fotos || []).filter((f) => (k.fotos_todas || []).includes(f)).slice(0, 5) }));
+    if (!l.kits.some((k) => ['conferir', 'aprovado', 'guardado'].includes(k.situacao))) l.status = 'fechado';
+    demoSalvar(); return { ok: true };
+  }
+  const s = await cliente();
+  return ok(s.rpc('ia_salvar', { p_id: id, p_kits: kits }));
+}
+// Envia uma imagem já reduzida para a pasta do envio (fotos dos kits e miniaturas para a IA ler).
+export async function iaEnviarImagem(blob, pasta, nome) {
+  if (MODO_DEMO) return new Promise((res) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(blob); });
+  const s = await cliente();
+  const { data: u } = await s.auth.getUser();
+  const caminho = `${u.user.id}/ia/${pasta}/${nome}.jpg`;
+  await ok(s.storage.from('fotos').upload(caminho, blob, { contentType: 'image/jpeg', upsert: true }));
+  return s.storage.from('fotos').getPublicUrl(caminho).data.publicUrl;
+}
+export async function iaOrganizar(material) {
+  if (MODO_DEMO) {
+    const ia = demoIa(); const plano = demoIaPlano();
+    if (plano === 'bloqueado') throw new Error('Sua assinatura não está ativa. Assine para usar a IA.');
+    if (plano === 'teste' && ia.usados >= IA_LIMITE_TESTE) throw new Error('Você já usou os 5 kits da IA do teste grátis. Assine para usar sem limite.');
+    if (ia.lotes.some((l) => l.status === 'processando')) throw new Error('A IA ainda está organizando o seu último envio. Espere terminar.');
+    const l = { id: uid(), status: 'processando', criado: Date.now(), teste: plano === 'teste', kits: [],
+      entrada: { texto: material.texto, paginas: (material.paginas || []).map((p) => ({ texto: p.texto })), imagens: (material.imagens || []).map((f) => ({ url: f.url })) } };
+    ia.lotes.push(l); ia.lotes = ia.lotes.slice(-6); demoSalvar();
+    return { lote: l.id };
+  }
+  return chamarFuncaoIA({ acao: 'organizar', ...material });
+}
+export async function iaDriveListar(link) {
+  if (MODO_DEMO) throw new Error('Na demonstração o Google Drive não é lido. Na versão real, sim.');
+  return (await chamarFuncaoIA({ acao: 'drive_listar', link })).arquivos || [];
+}
+export async function iaDriveBaixar(id) {
+  const r = await chamarFuncaoIA({ acao: 'drive_baixar', id }, true);
+  const nome = decodeURIComponent(r.headers.get('X-Nome') || '');
+  return { blob: await r.blob(), nome };
+}
+export function demoIaZerar() { const d = D(); d.ia = { usados: 0, lotes: [] }; demoSalvar(); }
+// Link na bio do Instagram: a dona marca que já colocou (usado nos lembretes)
+export async function marcarLinkBio() {
+  const agora = new Date().toISOString();
+  if (MODO_DEMO) { D().negocio.link_bio_em = agora; demoSalvar(); return; }
+  const s = await cliente();
+  const atual = await meuNegocio();
+  if (!atual) return;
+  await ok(s.from('negocios').update({ link_bio_em: agora }).eq('id', atual.id));
+}
+
 // ---------- Montagem da loja (oferta do anual) e mensagens do administrador ----------
 export async function registrarOfertaMontagem() {
   if (MODO_DEMO) return;
