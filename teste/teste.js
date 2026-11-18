@@ -98,6 +98,47 @@ form.whatsapp.addEventListener('input', () => {
   form.whatsapp.value = d.length > 6 ? `(${d.slice(0, 2)}) ${d.slice(2, d.length - 4)}-${d.slice(-4)}` : d.length > 2 ? `(${d.slice(0, 2)}) ${d.slice(2)}` : d;
 });
 
+// Sugere a correção de e-mails digitados errado (gamil.com, hotmial.com, gmail.com.br…)
+const DOMINIOS_EMAIL = ['gmail.com', 'hotmail.com', 'outlook.com', 'yahoo.com.br', 'yahoo.com', 'icloud.com', 'live.com', 'uol.com.br', 'bol.com.br', 'terra.com.br', 'hotmail.com.br', 'outlook.com.br', 'msn.com'];
+function distanciaTexto(a, b) {
+  const m = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+  for (let j = 1; j <= b.length; j++) m[0][j] = j;
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++)
+    m[i][j] = Math.min(m[i - 1][j] + 1, m[i][j - 1] + 1, m[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return m[a.length][b.length];
+}
+function sugerirEmail(email) {
+  const e = String(email || '').trim().toLowerCase();
+  const at = e.lastIndexOf('@');
+  if (at < 1) return null;
+  const nome = e.slice(0, at); const dom = e.slice(at + 1);
+  if (!dom || DOMINIOS_EMAIL.includes(dom)) return null;
+  const fixos = { 'gmail.com.br': 'gmail.com', 'gmail.co': 'gmail.com', 'gmail': 'gmail.com', 'gmail.con': 'gmail.com', 'gmail.cm': 'gmail.com', 'hotmail': 'hotmail.com', 'hotmail.co': 'hotmail.com', 'outlook': 'outlook.com', 'icloud': 'icloud.com' };
+  if (fixos[dom]) return `${nome}@${fixos[dom]}`;
+  let melhor = null; let menor = 3;
+  for (const d of DOMINIOS_EMAIL) { const dist = distanciaTexto(dom, d); if (dist < menor) { menor = dist; melhor = d; } }
+  return melhor && menor <= 2 ? `${nome}@${melhor}` : null;
+}
+function ligarSugestaoEmail(input) {
+  if (!input) return;
+  const caixa = document.createElement('div');
+  caixa.className = 'sugestao-email oculto';
+  (input.closest('label') || input).insertAdjacentElement('afterend', caixa);
+  const checar = () => {
+    const s = sugerirEmail(input.value);
+    caixa.classList.toggle('oculto', !s);
+    if (!s) return;
+    caixa.textContent = 'Você quis dizer ';
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = s;
+    b.onclick = () => { input.value = s; caixa.classList.add('oculto'); input.dispatchEvent(new Event('input', { bubbles: true })); };
+    caixa.append(b, '?');
+  };
+  input.addEventListener('blur', checar);
+  input.addEventListener('input', () => { if (!caixa.classList.contains('oculto')) checar(); });
+}
+
+ligarSugestaoEmail(form.email);
+
 // 5) Cadastro
 form.onsubmit = async (e) => {
   e.preventDefault();
