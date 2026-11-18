@@ -2,7 +2,7 @@
 // App Pegue e Monte — app da dona
 // Abas: Hoje, Agenda, Kits, Mais
 // =====================================================================
-import * as dados from './dados.js?v=20261119a';
+import * as dados from './dados.js?v=20261119b';
 import { PERMITIR_CADASTRO, EMAIL_SUPORTE, WHATSAPP_SUPORTE, LINK_MENSAL, LINK_ANUAL, LINK_ANUAL_PROMO, DEMO_SITE, LINK_PLANOS, SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=20261117c';
 
 const { hojeISO, somaDias, cruza } = dados;
@@ -2063,34 +2063,40 @@ async function prepararMaterial(mat, mostrar) {
   }
   if (fotos.length > IA_MAX_FOTOS) { avisos.push(`Mandamos as ${IA_MAX_FOTOS} primeiras fotos. O resto você manda num próximo envio.`); fotos.length = IA_MAX_FOTOS; }
   const imagens = [], prints = [], pags = [];
-  let feitos = 0, falhas = 0;
+  let feitos = 0, falhas = 0, naoAbriu = 0, erroEnvio = '';
   const total = fotos.length + mat.prints.length + paginas.length;
   const passo = () => mostrar(`Preparando o material (${++feitos} de ${total})…`, 0.3 + 0.7 * feitos / Math.max(1, total));
   const demo = dados.MODO_DEMO;
   const tarefas = [
     ...fotos.map((f, i) => async () => {
       const id = 'F' + (i + 1);
-      try {
-        const grande = await dados.reduzirFoto(f.arq, demo ? 480 : 1200, demo ? 0.6 : 0.85);
-        const url = await dados.iaEnviarImagem(grande, pasta, id);
-        const mini = demo ? url : await dados.iaEnviarImagem(await dados.reduzirFoto(grande, 512, 0.7), pasta, id + '-m');
-        imagens[i] = { id, url, mini, origem: f.origem, arquivo: (f.nome || '').slice(0, 80), pagina: f.pagina };
-      } catch (e) { falhas++; }
+      let grande = null;
+      try { grande = await dados.reduzirFoto(f.arq, demo ? 480 : 1200, demo ? 0.6 : 0.85); } catch (e) { naoAbriu++; }
+      if (grande) {
+        try {
+          const url = await dados.iaEnviarImagem(grande, pasta, id);
+          const mini = demo ? url : await dados.iaEnviarImagem(await dados.reduzirFoto(grande, 512, 0.7), pasta, id + '-m');
+          imagens[i] = { id, url, mini, origem: f.origem, arquivo: (f.nome || '').slice(0, 80), pagina: f.pagina };
+        } catch (e) { falhas++; erroEnvio = e.message || erroEnvio; }
+      }
       passo();
     }),
     ...mat.prints.map((f, i) => async () => {
       const id = 'P' + (i + 1);
-      try { prints[i] = { id, mini: await dados.iaEnviarImagem(await dados.reduzirFoto(f, demo ? 480 : 1400, 0.75), pasta, id) }; } catch (e) { falhas++; }
+      let b = null;
+      try { b = await dados.reduzirFoto(f, demo ? 480 : 1400, 0.75); } catch (e) { naoAbriu++; }
+      if (b) { try { prints[i] = { id, mini: await dados.iaEnviarImagem(b, pasta, id) }; } catch (e) { falhas++; erroEnvio = e.message || erroEnvio; } }
       passo();
     }),
     ...paginas.map((g, i) => async () => {
       const id = 'G' + (i + 1);
-      try { pags[i] = { id, n: g.n, arquivo: g.arquivo, texto: g.texto, mini: demo ? '' : await dados.iaEnviarImagem(g.blob, pasta, id) }; } catch (e) { falhas++; }
+      try { pags[i] = { id, n: g.n, arquivo: g.arquivo, texto: g.texto, mini: demo ? '' : await dados.iaEnviarImagem(g.blob, pasta, id) }; } catch (e) { falhas++; erroEnvio = e.message || erroEnvio; }
       passo();
     }),
   ];
   await emParalelo(tarefas, 3);
-  if (falhas) avisos.push(`${plural(falhas, 'arquivo não pôde ser lido', 'arquivos não puderam ser lidos')} (o formato HEIC do iPhone às vezes não abre no Android). Se faltar algum kit, mande essas fotos de novo como JPG.`);
+  if (naoAbriu) avisos.push(`${plural(naoAbriu, 'foto não abriu', 'fotos não abriram')} neste navegador (o formato HEIC do iPhone só abre no Safari). Mande essas fotos como JPG ou use o Safari.`);
+  if (falhas) avisos.push(`${plural(falhas, 'arquivo não foi enviado', 'arquivos não foram enviados')}: ${erroEnvio || 'falha na internet'}. Tente de novo.`);
   return { pasta, imagens: imagens.filter(Boolean), prints: prints.filter(Boolean), paginas: pags.filter(Boolean), texto: mat.texto.trim(), avisos };
 }
 let pdfjsCarregado = null;

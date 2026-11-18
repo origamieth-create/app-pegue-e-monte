@@ -565,7 +565,7 @@ export async function iaEnviarImagem(blob, pasta, nome) {
   const s = await cliente();
   const { data: u } = await s.auth.getUser();
   const caminho = `${u.user.id}/ia/${pasta}/${nome}.jpg`;
-  await ok(s.storage.from('fotos').upload(caminho, blob, { contentType: 'image/jpeg', upsert: true }));
+  await ok(s.storage.from('fotos').upload(caminho, blob, { contentType: 'image/jpeg', upsert: false }));
   return s.storage.from('fotos').getPublicUrl(caminho).data.publicUrl;
 }
 export async function iaOrganizar(material) {
