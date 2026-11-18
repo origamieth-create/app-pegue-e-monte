@@ -16,6 +16,8 @@ const LOJA = {
   resumo: ['Seu dia hoje', null, () => 'index.html'],
   teste_acabando: ['Seu teste grátis termina amanhã', 'Toque para escolher seu plano e continuar com tudo.', () => 'index.html?planos=1'],
   promo_teste: ['Um presente do seu teste grátis', 'Plano anual com 53% de desconto liberado. Toque para ver.', () => 'index.html?planos=1'],
+  promo_montagem: ['A gente monta sua loja para você', 'No plano anual, nossa equipe cadastra até 50 kits para você. Toque para ver.', () => 'index.html?planos=1'],
+  mensagem: [null, 'Toque para ver no app.', () => 'index.html'],
   pagamento: ['Pagamento não aprovado', 'Não conseguimos cobrar sua assinatura. Toque para regularizar.', () => 'index.html'],
   teste: ['Avisos funcionando', 'Você vai receber um aviso a cada nova reserva pelo link.', () => 'index.html'],
 };
@@ -58,7 +60,7 @@ self.addEventListener('push', (e) => {
         // Usa o aviso mais recente entre os dois (o mesmo celular pode ser do administrador e de uma loja).
         if (l && (!a || new Date(l.criado_em) >= new Date(a.criado_em)) && LOJA[l.tipo]) {
           const [t, c, u] = LOJA[l.tipo];
-          titulo = t; corpo = c || l.corpo || 'Toque para ver.'; url = u(l); tag = 'apm-loja-' + l.id;
+          titulo = t || l.corpo || titulo; corpo = (t ? (c || l.corpo) : c) || 'Toque para ver.'; url = u(l); tag = 'apm-loja-' + l.id;
         } else if (a && ADMIN[a.tipo]) {
           [titulo, corpo, url] = ADMIN[a.tipo]; tag = 'apm-admin-' + a.id;
         }

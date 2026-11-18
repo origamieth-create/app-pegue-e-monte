@@ -331,3 +331,33 @@ button.cartao.perfil-topo { display: flex; flex-direction: row; align-items: cen
 /* Explicação das mensagens */
 .explica-msg { background: #F4EEFC; border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; font-size: 15px; }
 .explica-msg p { margin: 0; }
+
+/* ---------- V.0.0.7: vitrine, compartilhar kit, variações, montagem ---------- */
+.vitrine-loja { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; padding: 18px 16px; }
+.vitrine-editar { position: absolute; top: 10px; right: 10px; background: var(--lilas); color: var(--lilas-texto); border: 0; border-radius: 99px; padding: 7px 12px; font: inherit; font-weight: 800; font-size: 13px; cursor: pointer; }
+.vitrine-logo { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; border: 2px solid var(--linha); background: #fff; }
+.vitrine-nome { font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 21px; }
+.vitrine-recado { margin: 0; font-size: 14px; font-weight: 600; color: var(--texto2); white-space: pre-line; max-width: 520px; max-height: 7.5em; overflow: hidden; }
+.vitrine-links { display: flex; flex-wrap: wrap; gap: 6px 14px; justify-content: center; font-size: 13px; font-weight: 800; }
+.vitrine-links a, .vitrine-links .link-btn { color: var(--lilas-texto); font-size: 13px; padding: 0; min-height: 0; }
+.kit-card-caixa { position: relative; display: flex; }
+.kit-card-caixa > .kit-card { width: 100%; }
+.kit-compartilhar { position: absolute; top: 16px; right: 16px; width: 34px; height: 34px; border-radius: 11px; border: 0; background: rgba(255,255,255,.94); color: var(--tinta); font-weight: 900; font-size: 16px; box-shadow: 0 2px 8px rgba(42,27,61,.18); cursor: pointer; }
+.variacoes-kit { display: flex; flex-direction: column; gap: 8px; }
+.var-kit { gap: 10px; background: var(--fundo); }
+.v-fotos { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.v-foto { width: 56px; height: 56px; padding: 0; border-radius: 12px; overflow: hidden; border: 3px solid transparent; background: var(--linha); cursor: pointer; }
+.v-foto img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.v-foto.on { border-color: var(--coral); }
+.tag-opcao { margin-left: 6px; background: var(--amarelo); color: var(--amarelo-texto); border-radius: 99px; padding: 2px 8px; font-size: 11px; font-weight: 900; }
+.montagem-extra { background: var(--verde-claro); color: var(--verde); border-radius: 10px; padding: 7px 10px; font-weight: 800; font-size: 14px; margin: 4px 0; }
+.selo-presente { align-self: center; background: var(--tinta); color: var(--confete); border-radius: 99px; padding: 6px 14px; font-weight: 900; font-size: 12.5px; }
+.cartao-montagem { border: 3px solid var(--verde); gap: 10px; }
+.selo-ok { align-self: flex-start; background: var(--verde); color: #fff; border-radius: 99px; padding: 4px 11px; font-weight: 900; font-size: 12px; }
+.opcoes-kit { display: flex; flex-wrap: wrap; gap: 8px; }
+.opcao-kit { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; border: 2px solid var(--linha); background: #fff; border-radius: 14px; padding: 9px 12px; font: inherit; color: var(--tinta); cursor: pointer; text-align: left; }
+.opcao-kit b { font-size: 14px; }
+.opcao-kit span { font-size: 12.5px; color: var(--texto2); font-weight: 700; }
+.opcao-kit.sel { border-color: var(--coral); background: var(--vermelho-claro); }
+.sugestao-email { font-size: 13.5px; font-weight: 700; color: var(--amarelo-texto); background: var(--amarelo); border-radius: 10px; padding: 8px 10px; }
+.sugestao-email button { background: none; border: 0; padding: 0; font: inherit; font-weight: 900; color: var(--destaque); text-decoration: underline; cursor: pointer; }

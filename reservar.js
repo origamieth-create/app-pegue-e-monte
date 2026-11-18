@@ -2,7 +2,7 @@
 // App Pegue e Monte — link público de reservas (a cliente final usa)
 // Endereço: reservar.html?l=<link-do-negocio>
 // =====================================================================
-import * as dados from './dados.js?v=20261117c';
+import * as dados from './dados.js?v=20261118b';
 
 // Demonstração do site: botões de WhatsApp mostram um aviso em vez de abrir conversa.
 if (dados.DEMONSTRACAO_SITE) {
@@ -92,6 +92,7 @@ function recadoPadrao(loja) {
 }
 // Uma visita por pessoa por dia; marca se veio pelo Instagram (navegador do Instagram ou link com ?o=ig)
 function contarVisita(slug) {
+  if (new URLSearchParams(location.search).get('adm')) return; // o administrador olhando não conta como visita
   try {
     const chave = `apm-visita-${slug}-${new Date().toISOString().slice(0, 10)}`;
     if (localStorage.getItem(chave)) return;
@@ -134,7 +135,7 @@ async function iniciar() {
         ${fotosDe(k).length > 1 ? `<span class="contador-fotos">📷 ${fotosDe(k).length}</span>` : ''}</span>
         ${k.categoria ? `<span class="etiqueta et-categoria">${esc(k.categoria)}</span>` : ''}
         <span class="nome">${esc(k.nome)}</span>
-        <span class="preco">${reais(k.preco)}</span>
+        <span class="preco">${precoTexto(k)}</span>
         <span class="btn principal mini">Ver datas livres</span>
       </button>`).join('')}</div>
     <p class="vazio-txt centro oculto" id="sem-resultado">Nenhum kit encontrado. Tente outra categoria ou outro nome.</p>` : '<p class="vazio-txt centro">Nenhum kit disponível no momento.</p>'}
@@ -157,6 +158,31 @@ async function iniciar() {
     catAtual = b.dataset.cat; $$('.filtro-cat').forEach((x) => x.classList.toggle('ativo', x === b)); filtrar();
   }));
   if ($('#busca')) $('#busca').oninput = filtrar;
+  // Link de um kit específico (…?kit=ID): já abre nele
+  const kitDoLink = new URLSearchParams(location.search).get('kit');
+  const k0 = kitDoLink && loja.kits.find((k) => k.id === kitDoLink);
+  if (k0) escolherData(k0);
+}
+
+// Variações do kit (opções com preço, sinal, peças extras e foto próprios)
+function variacoesDe(k) { return Array.isArray(k && k.variacoes) ? k.variacoes : []; }
+function precoTexto(k) {
+  const v = variacoesDe(k);
+  if (!v.length) return reais(k.preco);
+  return 'a partir de ' + reais(Math.min(...v.map((x) => Number(x.preco) || 0)));
+}
+function linkDoKit(k) {
+  const u = new URL(location.href);
+  u.search = ''; u.hash = '';
+  if (/reservar\.html$/.test(u.pathname)) u.searchParams.set('l', slug);
+  u.searchParams.set('kit', k.id);
+  return u.toString();
+}
+async function compartilharKit(k) {
+  const link = linkDoKit(k);
+  const texto = `Olha este kit da ${loja.nome}: ${k.nome}`;
+  if (navigator.share) { try { await navigator.share({ title: k.nome, text: texto, url: link }); return; } catch (e) { if (e && e.name === 'AbortError') return; } }
+  window.open(linkZap('', `${texto}\n${link}`).replace('https://wa.me/55?', 'https://wa.me/?'), '_blank', 'noopener');
 }
 
 async function escolherData(kit) {
@@ -211,10 +237,24 @@ async function escolherData(kit) {
     f.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   };
 
+  const vars = variacoesDe(kit);
+  let opcao = vars[0] || null;
+  const fotosDaOpcao = () => (opcao && Array.isArray(opcao.fotos) && opcao.fotos.length ? opcao.fotos : fotosDe(kit));
+  const precoHtml = () => `<span class="preco" style="font-family:'Fredoka',sans-serif;font-size:22px;font-weight:600">${reais(opcao ? opcao.preco : kit.preco)}</span>
+      ${Number(opcao ? opcao.sinal : kit.sinal) > 0 ? `<span class="pequeno">Sinal para reservar: <b>${reais(opcao ? opcao.sinal : kit.sinal)}</b></span>` : ''}`;
+  const pecasHtml = () => {
+    const base = Array.isArray(kit.pecas) ? kit.pecas : [];
+    const extras = opcao && Array.isArray(opcao.extras) ? opcao.extras.filter(Boolean) : [];
+    if (!base.length && !extras.length) return '';
+    return `<p class="pequeno" style="margin:0"><b>Inclui:</b> ${esc(base.join(', '))}${extras.length ? `${base.length ? ', ' : ''}<b style="color:#1F9D63">${esc(extras.join(', '))}</b>` : ''}</p>`;
+  };
   abrirPainel(kit.nome, `
-    ${galeria(fotosDe(kit))}
-    <div class="linha-flex entre"><span class="preco" style="font-family:'Fredoka',sans-serif;font-size:22px;font-weight:600">${reais(kit.preco)}</span>
-      ${Number(kit.sinal) > 0 ? `<span class="pequeno">Sinal para reservar: <b>${reais(kit.sinal)}</b></span>` : ''}</div>
+    <div id="galeria-area">${galeria(fotosDaOpcao())}</div>
+    <div class="linha-flex entre" style="gap:8px"><span></span><button type="button" class="btn claro mini" id="compartilhar-kit">↗ Compartilhar</button></div>
+    ${vars.length ? `<h3 style="margin-bottom:0">Escolha a opção</h3>
+    <div class="opcoes-kit">${vars.map((v, i) => `<button type="button" class="opcao-kit ${i ? '' : 'sel'}" data-op="${esc(v.id)}"><b>${esc(v.nome)}</b><span>${reais(v.preco)}</span></button>`).join('')}</div>` : ''}
+    <div id="pecas-area">${pecasHtml()}</div>
+    <div class="linha-flex entre" id="preco-area">${precoHtml()}</div>
     <h3>Escolha a data da festa</h3>
     <div class="cartao" id="cal"></div>
     <form id="form" class="coluna oculto" novalidate>
@@ -227,7 +267,19 @@ async function escolherData(kit) {
     </form>`, (p) => {
     ligarGaleria(p);
     desenhar(p);
+    $('#compartilhar-kit', p).onclick = () => compartilharKit(kit);
+    $$('[data-op]', p).forEach((b) => (b.onclick = () => {
+      opcao = vars.find((v) => v.id === b.dataset.op) || opcao;
+      $$('[data-op]', p).forEach((x) => x.classList.toggle('sel', x === b));
+      $('#galeria-area', p).innerHTML = galeria(fotosDaOpcao());
+      ligarGaleria(p);
+      $('#preco-area', p).innerHTML = precoHtml();
+      $('#pecas-area', p).innerHTML = pecasHtml();
+      const enviar = $('#form button[type=submit]', p);
+      if (enviar) enviar.textContent = `Pedir reserva: ${opcao.nome}`;
+    }));
     const form = $('#form', p);
+    if (opcao) $('button[type=submit]', form).textContent = `Pedir reserva: ${opcao.nome}`;
     form.onsubmit = async (e) => {
       e.preventDefault();
       const erro = $('#erro', p);
@@ -241,12 +293,12 @@ async function escolherData(kit) {
       const b = $('button[type=submit]', form);
       b.disabled = true; b.textContent = 'Enviando…';
       try {
-        const r = await dados.solicitarReserva(slug, kit.id, escolhida, nome, zap);
-        sucesso(kit, escolhida, nome, zap, r);
+        const r = await dados.solicitarReserva(slug, kit.id, escolhida, nome, zap, opcao ? opcao.id : null);
+        sucesso({ ...kit, nome: opcao ? `${kit.nome} – ${opcao.nome}` : kit.nome }, escolhida, nome, zap, r);
       } catch (err) {
         erro.textContent = err.message; erro.classList.remove('oculto');
         delete cache[escolhida.slice(0, 7)];
-        b.disabled = false; b.textContent = 'Pedir reserva';
+        b.disabled = false; b.textContent = opcao ? `Pedir reserva: ${opcao.nome}` : 'Pedir reserva';
       }
     };
   });

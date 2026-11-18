@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>E-mails · App Pegue e Monte</title>
+<link rel="icon" href="icone.svg" type="image/svg+xml">
+<style>
+  body { margin: 0; background: #FFFBF7; font-family: Arial, Helvetica, sans-serif; color: #2A1B3D; }
+  .caixa { max-width: 460px; margin: 60px auto; padding: 26px 22px; background: #fff; border: 1px solid #EDE3DA; border-radius: 18px; text-align: center; }
+  h1 { font-size: 22px; margin: 8px 0 10px; }
+  p { font-size: 15px; line-height: 1.55; color: #6B5E78; margin: 0 0 14px; }
+  a { display: inline-block; margin-top: 6px; color: #E4505C; font-weight: 800; }
+</style>
+</head>
+<body>
+<div class="caixa">
+  <div style="font-size:38px" aria-hidden="true">🎈</div>
+  <h1 id="t">Pronto, você foi descadastrada</h1>
+  <p id="m">Você não vai mais receber estes e-mails. Se mudar de ideia, é só falar com a gente pelo WhatsApp.</p>
+  <a href="./">Abrir o App Pegue e Monte</a>
+</div>
+<script>
+  if (new URLSearchParams(location.search).get('ok') === '0') {
+    document.getElementById('t').textContent = 'Link inválido';
+    document.getElementById('m').textContent = 'Esse link de descadastro não é válido. Se quiser parar de receber, responda qualquer e-mail nosso pedindo.';
+  }
+</script>
+</body>
+</html>

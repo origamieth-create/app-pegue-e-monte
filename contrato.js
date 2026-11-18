@@ -1,5 +1,5 @@
 // Página pública do contrato: a cliente lê e aceita pelo celular (sem login).
-import * as dados from './dados.js?v=20261117c';
+import * as dados from './dados.js?v=20261118b';
 
 const $ = (s, r = document) => r.querySelector(s);
 const raiz = $('#raiz');

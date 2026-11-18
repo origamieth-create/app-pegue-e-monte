@@ -2,7 +2,7 @@
 // App Pegue e Monte — app da dona
 // Abas: Hoje, Agenda, Kits, Mais
 // =====================================================================
-import * as dados from './dados.js?v=20261117c';
+import * as dados from './dados.js?v=20261118b';
 import { PERMITIR_CADASTRO, EMAIL_SUPORTE, WHATSAPP_SUPORTE, LINK_MENSAL, LINK_ANUAL, LINK_ANUAL_PROMO, DEMO_SITE, LINK_PLANOS, SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=20261117c';
 
 const { hojeISO, somaDias, cruza } = dados;
@@ -85,7 +85,22 @@ function linkPublico(slug) {
 // Nomes que não podem virar link (já são páginas do app)
 const LINKS_RESERVADOS = ['admin', 'reservar', 'index', 'app', 'api', 'manifest', 'icone', 'login', 'suporte', 'ajuda', 'www'];
 function kitDe(id) { return estado.kits.find((k) => k.id === id) || { nome: 'Kit removido', pecas: [] }; }
-function podeEditar() { return !!estado.suporte || !!(estado.assinatura && estado.assinatura.liberado); }
+// Modo suporte "só leitura": o administrador vê tudo, mas nada pode ser alterado.
+function soLeitura() { return !!(estado.suporte && estado.suporte.somente_leitura); }
+function podeEditar() { return estado.suporte ? !soLeitura() : !!(estado.assinatura && estado.assinatura.liberado); }
+// Variações do kit (ex.: Básico, Com escadinha, Com cômoda)
+function variacoesDe(k) { return Array.isArray(k && k.variacoes) ? k.variacoes : []; }
+function nomeKitReserva(r) { const k = kitDe(r.kit_id); return k.nome + (r.variacao ? ' – ' + r.variacao : ''); }
+function precoKitTexto(k) {
+  const v = variacoesDe(k);
+  if (!v.length) return reais(k.preco);
+  return 'a partir de ' + reais(Math.min(...v.map((x) => Number(x.preco) || 0)));
+}
+function pecasComVariacao(k, v) { return [...(k.pecas || []), ...((v && v.extras) || []).filter(Boolean)]; }
+function linkDoKit(k) {
+  const base = linkPublico(estado.negocio.slug);
+  return base + (base.includes('?') ? '&' : '?') + 'kit=' + encodeURIComponent(k.id);
+}
 
 const STATUS = {
   aguardando_sinal: 'Aguardando sinal',
@@ -202,14 +217,11 @@ function abrirPopup(corpo, aoMontar) {
 // dona abre o app depois que os arquivos novos forem publicados.
 // ---------------------------------------------------------------------
 const NOVIDADES = {
-  versao: '2026-11-18',
-  desde: '2026-11-17T21:00:00Z', // contas criadas depois disso já nascem com tudo
+  versao: '2026-11-19',
+  desde: '2026-11-18T21:00:00Z', // contas criadas depois disso já nascem com tudo
   itens: [
-    ['📸', 'Instagram no seu link', 'Em Mais > Meus dados, coloque o @ do seu Instagram: as clientes veem um botão para o seu perfil no topo do link de reservas.'],
-    ['📱', 'WhatsApp sem erro', 'O +55 do Brasil já vem pronto. É só digitar o DDD e o número, e o app avisa se faltar algum número.'],
-    ['💻', 'App no computador', 'Abrindo pelo computador, o app agora usa a tela inteira: menu na lateral, agenda maior e mais kits por linha.'],
-    ['🔔', 'Avisos de reservas no celular', 'Em Mais, toque em "Ativar avisos neste celular" e receba um aviso na hora em que uma cliente reservar pelo seu link, mesmo com o app fechado.'],
-    ['💌', 'Recado pronto no link', 'Se você ainda não escreveu o recado do seu link, ele mostra um texto de boas-vindas com o nome da sua loja.'],
+    ['🎀', 'Variações do kit', 'Tem o mesmo kit em versões diferentes (básico, com escadinha, com cômoda)? Em Kits, abra o kit e ligue "Este kit tem variações": cada opção tem seu preço, sinal, peças extras e foto. A agenda continua uma só.'],
+    ['↗', 'Compartilhar um kit', 'Em Kits, toque no ↗ na foto do kit para mandar o link direto daquele kit pelo WhatsApp. A cliente já abre nele, com as fotos e as datas livres.'],
   ],
 };
 function mostrarNovidades() {
@@ -230,11 +242,11 @@ function mostrarNovidades() {
       ${NOVIDADES.itens.map(([ic, t, d]) => `
         <div class="novidade"><span class="novidade-ic">${ic}</span><div><b>${esc(t)}</b><p class="pequeno">${esc(d)}</p></div></div>`).join('')}
     </div>
-    <button class="btn principal cheio" id="nov-msg">Colocar meu Instagram</button>
+    <button class="btn principal cheio" id="nov-msg">Ver meus kits</button>
     <button class="btn contorno cheio" id="nov-ok">Entendi</button>`, (p) => {
     marcar();
     $('#nov-ok', p).onclick = () => fecharPainel();
-    $('#nov-msg', p).onclick = () => painelNegocio();
+    $('#nov-msg', p).onclick = () => { fecharPainel(); irPara('kits'); };
   });
 }
 
@@ -306,6 +318,13 @@ async function iniciar() {
       if (caixaErro) { caixaErro.textContent = 'Esse link de senha venceu ou já foi usado. Toque em "Esqueci minha senha" e use o e-mail mais novo.'; caixaErro.classList.remove('oculto'); }
       return;
     }
+    if (!sessao && new URLSearchParams(location.search).get('instalar')) {
+      // Instalar não depende de login: mostra o convite já na tela de entrar.
+      try { history.replaceState(null, '', location.pathname); } catch (e) { /* segue */ }
+      telaLogin('entrar');
+      setTimeout(convidarInstalacao, 500);
+      return;
+    }
     if (!sessao) return telaLogin(new URLSearchParams(location.search).has('bemvinda') && PERMITIR_CADASTRO ? 'criar' : 'entrar');
     await carregarTudo();
   } catch (e) {
@@ -326,7 +345,7 @@ async function carregarTudo() {
     if (!estado.assinatura.encontrada) return telaSemAssinatura();
   }
   if (!estado.negocio) return telaConfiguracaoInicial();
-  [estado.kits, estado.reservas, estado.gastos] = await Promise.all([dados.listarKits(), dados.listarReservas(), dados.listarGastos().catch(() => [])]);
+  [estado.kits, estado.reservas, estado.gastos, estado.montagem] = await Promise.all([dados.listarKits(), dados.listarReservas(), dados.listarGastos().catch(() => []), estado.suporte ? null : dados.minhaMontagem().catch(() => null)]);
   estado.carregadoEm = Date.now();
   montarApp();
 }
@@ -458,17 +477,31 @@ function promoAnualLiberada() {
   const agora = agoraServidor();
   return !!inicioDaPromo() && agora >= inicioDaPromo() && agora < fimDaOfertaAnual();
 }
+// Oferta "Montamos sua loja" (só no anual): para quem tinha menos de 3 kits quando a promoção abriu.
+function montagemOfertada() {
+  if (!estado.negocio || situacaoAssinatura() !== 'teste' && !promoAnualLiberada()) return false;
+  const chave = `apm-montagem-ofertada-${estado.negocio.id}`;
+  let ja = false;
+  try { ja = !!localStorage.getItem(chave); } catch (e) { /* segue */ }
+  if (ja) return true;
+  if (!promoAnualLiberada() || (estado.kits || []).length >= 3) return false;
+  try { localStorage.setItem(chave, '1'); } catch (e) { /* segue */ }
+  if (!estado.suporte) dados.registrarOfertaMontagem().catch(() => {});
+  return true;
+}
 function planosHtml() {
   const fim = fimDaOfertaAnual();
   const promo = promoAnualLiberada();
+  const montagem = promo && montagemOfertada();
   const anual = promo
     ? `<div class="plano anual"><span class="fita">${agoraServidor() < fim - HORAS_OFERTA_FIM * 3600e3 ? 'PROMOÇÃO DO TESTE GRÁTIS' : 'OFERTA DE FIM DE TESTE'}</span><span class="desc">53% OFF</span>
         <div class="nome">Plano anual</div>
         <div class="de">De R$ 358,80</div>
         <div class="por">R$ 167 <small>por 12 meses</small></div>
         <div class="mes">Sai por R$ 13,92 por mês · ou parcele no cartão</div>
+        ${montagem ? '<div class="montagem-extra">✓ Nossa equipe cadastra até <b>50 kits</b> para você</div>' : ''}
         ${fim - agoraServidor() <= HORAS_OFERTA_FIM * 3600e3 ? `<div class="contagem-oferta">Oferta termina em <b id="oferta-relogio">${tempoRestante(fim - agoraServidor())}</b></div>` : ''}
-        <a class="btn verde cheio" style="min-height:52px;font-size:17px" href="${esc(LINK_ANUAL_PROMO)}" target="_blank" rel="noopener">Quero o anual com desconto</a>
+        <a class="btn verde cheio" style="min-height:52px;font-size:17px" href="${esc(LINK_ANUAL_PROMO)}" target="_blank" rel="noopener">${montagem ? 'Quero o anual com a loja montada' : 'Quero o anual com desconto'}</a>
       </div>`
     : `<div class="plano anual"><div class="nome">Plano anual</div>
         <div class="por">R$ 269 <small>por 12 meses</small></div>
@@ -479,6 +512,7 @@ function planosHtml() {
       <div class="plano mensal">
         <div class="nome">Plano mensal</div>
         <div class="por">R$ 29,90 <small>por mês</small></div>
+        ${montagem ? '<div class="mes">Você mesma cadastra seus kits</div>' : ''}
         <a class="btn contorno cheio" href="${esc(LINK_MENSAL)}" target="_blank" rel="noopener">Assinar o mensal</a>
       </div>
     </div>`;
@@ -519,6 +553,23 @@ function mostrarPromoDoTeste() {
   const chave = `apm-promo-teste-vista-${estado.negocio.id}`;
   try { if (localStorage.getItem(chave)) return; localStorage.setItem(chave, '1'); } catch (e) { return; }
   const a = estado.assinatura || {};
+  if (montagemOfertada()) {
+    abrirPopup(`
+    ${BANDEIRINHAS}
+    <span class="selo-presente">🎁 PRESENTE DO SEU 2º DIA</span>
+    <h2 class="centro" style="font-size:25px;margin:0">A gente <span style="color:var(--destaque)">monta sua loja</span> para você</h2>
+    <p class="centro pequeno" style="margin:0">Assine o plano anual hoje e nossa equipe cadastra seus kits com fotos, preços e peças.</p>
+    <div class="nota-amarela pequeno centro"><b>1</b> Assine o anual · <b>2</b> Chame a equipe no WhatsApp · <b>3</b> Mande as fotos dos kits</div>
+    ${planosHtml()}
+    ${WHATSAPP_SUPORTE ? `<a class="btn contorno cheio" href="${esc(linkZap(WHATSAPP_SUPORTE, 'Oi! Quero saber como funciona a montagem da loja pela equipe.'))}" target="_blank" rel="noopener">${ICONE.zap} Tirar dúvidas no WhatsApp</a>` : ''}
+    <div class="nota-amarela pequeno">Assine com o <b>mesmo e-mail do teste</b> (<b>${esc(a.email || '')}</b>) para não perder nada do que já cadastrou.</div>
+    <button class="link-btn" id="promo-fechar">Agora não</button>`, (p) => {
+      $('#promo-fechar', p).onclick = () => fecharPainel();
+      ligarRelogioOferta(p);
+      popupMedido('promo_montagem');
+    });
+    return;
+  }
   abrirPopup(`
     ${BANDEIRINHAS}
     <h2 class="centro" style="font-size:24px;margin:0">Um presente do seu teste grátis 🎁</h2>
@@ -554,7 +605,7 @@ function comemorarReservaPeloLink() {
     ${BANDEIRINHAS}
     <div class="centro" style="font-size:44px;line-height:1">🎉</div>
     <h2 class="centro" style="font-size:24px;margin:0">Uma cliente reservou sozinha pelo seu link!</h2>
-    <p class="centro" style="margin:0"><b>${esc(r.cliente_nome || 'Uma cliente')}</b> escolheu o kit <b>${esc((kitDe(r.kit_id) || {}).nome || '')}</b> para ${esc(dataLonga(r.data_festa))}.</p>
+    <p class="centro" style="margin:0"><b>${esc(r.cliente_nome || 'Uma cliente')}</b> escolheu o kit <b>${esc(nomeKitReserva(r))}</b> para ${esc(dataLonga(r.data_festa))}.</p>
     <p class="centro pequeno" style="margin:0">É isso que o app faz por você todo dia: a cliente escolhe o kit e a data livre, e o pedido chega pronto.</p>
     <button class="btn principal cheio" id="cl-ver">Ver a reserva</button>
     ${emTeste ? '<button class="btn verde cheio" id="cl-planos">Garantir meu acesso</button>' : ''}
@@ -610,7 +661,7 @@ function desenharFaixaSuporte(faixa, base) {
   const resto = () => tempoRestante(fim - agoraServidor());
   faixa.innerHTML = base + `
     <div class="faixa-suporte" role="status">
-      <span class="selo">MODO SUPORTE</span>
+      <span class="selo">${soLeitura() ? 'SÓ LEITURA' : 'MODO SUPORTE'}</span>
       <span class="t">Loja: <b>${esc(estado.suporte.nome || estado.negocio.nome)}</b> · <span id="suporte-resto">${resto()}</span></span>
       <button class="btn mini" id="suporte-sair">Sair</button>
     </div>`;
@@ -795,6 +846,45 @@ function avisarCadastroPixel(conta) {
   try { localStorage.setItem(chave, JSON.stringify({ ...ids, em: new Date().toISOString() })); } catch (e) { /* segue */ }
 }
 
+// Sugere a correção de e-mails digitados errado (gamil.com, hotmial.com, gmail.com.br…)
+const DOMINIOS_EMAIL = ['gmail.com', 'hotmail.com', 'outlook.com', 'yahoo.com.br', 'yahoo.com', 'icloud.com', 'live.com', 'uol.com.br', 'bol.com.br', 'terra.com.br', 'hotmail.com.br', 'outlook.com.br', 'msn.com'];
+function distanciaTexto(a, b) {
+  const m = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+  for (let j = 1; j <= b.length; j++) m[0][j] = j;
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++)
+    m[i][j] = Math.min(m[i - 1][j] + 1, m[i][j - 1] + 1, m[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return m[a.length][b.length];
+}
+function sugerirEmail(email) {
+  const e = String(email || '').trim().toLowerCase();
+  const at = e.lastIndexOf('@');
+  if (at < 1) return null;
+  const nome = e.slice(0, at); const dom = e.slice(at + 1);
+  if (!dom || DOMINIOS_EMAIL.includes(dom)) return null;
+  const fixos = { 'gmail.com.br': 'gmail.com', 'gmail.co': 'gmail.com', 'gmail': 'gmail.com', 'gmail.con': 'gmail.com', 'gmail.cm': 'gmail.com', 'hotmail': 'hotmail.com', 'hotmail.co': 'hotmail.com', 'outlook': 'outlook.com', 'icloud': 'icloud.com' };
+  if (fixos[dom]) return `${nome}@${fixos[dom]}`;
+  let melhor = null; let menor = 3;
+  for (const d of DOMINIOS_EMAIL) { const dist = distanciaTexto(dom, d); if (dist < menor) { menor = dist; melhor = d; } }
+  return melhor && menor <= 2 ? `${nome}@${melhor}` : null;
+}
+function ligarSugestaoEmail(input) {
+  if (!input) return;
+  const caixa = document.createElement('div');
+  caixa.className = 'sugestao-email oculto';
+  (input.closest('label') || input).insertAdjacentElement('afterend', caixa);
+  const checar = () => {
+    const s = sugerirEmail(input.value);
+    caixa.classList.toggle('oculto', !s);
+    if (!s) return;
+    caixa.textContent = 'Você quis dizer ';
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = s;
+    b.onclick = () => { input.value = s; caixa.classList.add('oculto'); input.dispatchEvent(new Event('input', { bubbles: true })); };
+    caixa.append(b, '?');
+  };
+  input.addEventListener('blur', checar);
+  input.addEventListener('input', () => { if (!caixa.classList.contains('oculto')) checar(); });
+}
+
 function telaLogin(modo) {
   if (modo === 'criar') carregarPixel();
   const titulos = { entrar: 'Entrar', criar: 'Criar conta', esqueci: 'Recuperar senha' };
@@ -818,6 +908,7 @@ function telaLogin(modo) {
     </form></div>`;
   $$('[data-modo]').forEach((b) => (b.onclick = () => telaLogin(b.dataset.modo)));
   const form = $('form');
+  if (modo === 'criar') ligarSugestaoEmail(form.email);
   form.onsubmit = async (e) => {
     e.preventDefault();
     const email = form.email.value.trim();
@@ -1057,6 +1148,7 @@ function montarApp() {
   setTimeout(mostrarBlackFriday, 1200);
   setTimeout(comemorarReservaPeloLink, 1800);
   setTimeout(mostrarPromoDoTeste, 2400);
+  setTimeout(mostrarMensagensAdmin, 3200);
 }
 
 // Quando a dona toca numa notificação: abre a reserva ou os planos.
@@ -1064,6 +1156,9 @@ function abrirPeloAviso() {
   const q = new URLSearchParams(location.search);
   const reserva = q.get('reserva');
   const planos = q.get('planos');
+  if (q.get('instalar')) { try { history.replaceState(null, '', location.pathname); } catch (e) { /* segue */ } setTimeout(convidarInstalacao, 500); return true; }
+  if (q.get('video')) { try { history.replaceState(null, '', location.pathname); } catch (e) { /* segue */ } setTimeout(abrirVideoTutorial, 400); return true; }
+  if (q.get('link')) { try { history.replaceState(null, '', location.pathname); } catch (e) { /* segue */ } irPara('kits'); return true; }
   if (!reserva && !planos) return false;
   try { history.replaceState(null, '', location.pathname + location.hash); } catch (e) { /* segue */ }
   if (reserva && (estado.reservas || []).some((r) => r.id === reserva)) { setTimeout(() => abrirReserva(reserva), 300); return true; }
@@ -1122,6 +1217,19 @@ function appInstalado() {
   return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
 }
 function ehIphone() { return /iphone|ipad|ipod/i.test(navigator.userAgent); }
+// Link "Instalar o app" do e-mail de boas-vindas: o navegador só deixa instalar com um toque dentro do app.
+function convidarInstalacao() {
+  if (appInstalado()) { aviso('O app já está instalado neste celular 🎉'); return; }
+  abrirPopup(`
+    <div style="font-size:48px;text-align:center" aria-hidden="true">📲</div>
+    <h2 class="centro" style="font-size:23px;margin:0">Coloque o app na sua tela inicial</h2>
+    <p class="centro pequeno" style="margin:0">Fica com um ícone igual a um aplicativo: é só tocar para abrir sua agenda de kits.</p>
+    <button class="btn principal cheio" id="conv-instalar">Instalar agora</button>
+    <button class="link-btn" id="conv-depois">Agora não</button>`, (p) => {
+    $('#conv-depois', p).onclick = () => fecharPainel();
+    $('#conv-instalar', p).onclick = () => { fecharPainel(); setTimeout(instalarApp, 200); };
+  });
+}
 async function instalarApp() {
   if (pedidoInstalacao) {
     pedidoInstalacao.prompt();
@@ -1131,11 +1239,12 @@ async function instalarApp() {
     return;
   }
   const iphone = ehIphone();
-  const foraDoSafari = iphone && /CriOS|FxiOS|EdgiOS|Instagram|FBAN|FBAV|Line\//i.test(navigator.userAgent);
+  const foraDoSafari = iphone && /CriOS|FxiOS|EdgiOS|Instagram|FBAN|FBAV|Line\/|GSA|Gmail/i.test(navigator.userAgent);
   const passo = (n, t) => `<div class="passo-inst"><b>${n}</b><span>${t}</span></div>`;
   abrirPopup(`
     <h2 class="centro" style="font-size:23px;margin:0">${iphone ? 'Instalar no iPhone' : 'Instalar no celular'}</h2>
     ${foraDoSafari ? '<div class="nota-amarela pequeno">Primeiro abra este app no <b>Safari</b> (no iPhone, só o Safari instala). Copie o endereço e cole no Safari.</div>' : ''}
+    ${!iphone ? '<div class="nota-amarela pequeno">Se o app abriu dentro do Gmail ou do Instagram, toque nos <b>3 pontinhos ⋮</b> e em <b>"Abrir no Chrome"</b> antes.</div>' : ''}
     ${iphone
       ? passo(1, 'Toque em <b>Compartilhar</b> <span class="ic-compart">⇧</span> na barra do Safari') + passo(2, 'Role e toque em <b>"Adicionar à Tela de Início"</b> ➕') + passo(3, 'Toque em <b>Adicionar</b>. Pronto, o ícone aparece na sua tela 🎉')
       : passo(1, 'Toque nos <b>3 pontinhos ⋮</b> no canto do navegador') + passo(2, 'Toque em <b>"Instalar app"</b> ou <b>"Adicionar à tela inicial"</b>') + passo(3, 'Confirme. Pronto, o ícone aparece na sua tela 🎉')}
@@ -1178,7 +1287,7 @@ function preencherContrato(modelo, r, pedeCpf) {
     t = t.replace(/\s*·?\s*CPF:?\s*\{cpf\}/gi, '').split('\n').filter((l) => !/\{cpf\}|\{endereco\}/.test(l)).join('\n');
   }
   const valores = {
-    '{nome}': r.cliente_nome, '{kit}': k.nome || '', '{pecas}': pecas, '{festa}': dataContrato(r.data_festa),
+    '{nome}': r.cliente_nome, '{kit}': nomeKitReserva(r), '{pecas}': pecas, '{festa}': dataContrato(r.data_festa),
     '{retirada}': dataContrato(r.data_retirada), '{devolucao}': dataContrato(r.data_devolucao), '{total}': reais(r.valor_total),
     '{sinal}': reais(r.valor_sinal), '{restante}': reais(restante), '{loja}': estado.negocio.nome,
   };
@@ -1230,7 +1339,7 @@ async function desenharCartaoContrato(caixa, r) {
   try { c = await dados.contratoDaReserva(r.id); } catch (e) { caixa.innerHTML = '<div class="pequeno">Não consegui carregar o contrato.</div>'; return; }
   const situacao = c && c.aceito_em ? '<span class="st ok">Aceito ✓</span>' : c ? '<span class="st esp">Aguardando aceite</span>' : '<span class="st esp">Não enviado</span>';
   const primeiro = r.cliente_nome.split(' ')[0];
-  const msg = c ? `Oi, ${primeiro}! Segue o contrato da sua reserva do ${kitComPalavra((kitDe(r.kit_id) || {}).nome)}. É só abrir, conferir e tocar em "Aceitar contrato": ${linkContrato(c.token)}` : '';
+  const msg = c ? `Oi, ${primeiro}! Segue o contrato da sua reserva do ${kitComPalavra(nomeKitReserva(r))}. É só abrir, conferir e tocar em "Aceitar contrato": ${linkContrato(c.token)}` : '';
   caixa.innerHTML = `
     <div class="linha-flex entre"><h3 style="margin:0">📄 Contrato</h3>${situacao}</div>
     ${c && c.aceito_em
@@ -1287,7 +1396,7 @@ function itemReserva(r, extra) {
     <button class="cartao clicavel res-${atrasada ? 'atrasada' : r.status}" data-res="${esc(r.id)}">
       <div class="item-res">
         <div class="info">
-          <div class="nome">${esc(k.nome)} · ${esc(r.cliente_nome)}</div>
+          <div class="nome">${esc(nomeKitReserva(r))} · ${esc(r.cliente_nome)}</div>
           <div class="pequeno">${extra || 'Festa ' + dataCurta(r.data_festa)}</div>
         </div>
         ${atrasada ? etiqueta('atrasada', 'Atrasada') : etiqueta(r.status)}
@@ -1423,6 +1532,60 @@ function popupParabens() {
   });
 }
 
+// Assinou o anual com a montagem: cartão fixo até ela pedir a montagem no WhatsApp.
+function cartaoMontagem() {
+  const m = estado.montagem;
+  if (!m || m.pediu_em || m.concluida_em || estado.suporte || !WHATSAPP_SUPORTE) return '';
+  return `<section class="cartao coluna cartao-montagem">
+    <span class="selo-ok">🎉 ASSINATURA ATIVA</span>
+    <h2 style="margin:0;font-size:22px">Agora é com a gente: <span style="color:var(--destaque)">vamos montar sua loja</span></h2>
+    <p class="pequeno" style="margin:0">Seu plano anual inclui a montagem de <b>até ${Number(m.limite_kits) || 50} kits</b> pela nossa equipe. Para começar, chame a gente no WhatsApp e mande as fotos, os nomes e os preços dos kits.</p>
+    <a class="btn verde cheio" id="pedir-montagem" href="${esc(linkZap(WHATSAPP_SUPORTE, `Oi! Assinei o plano anual com a montagem da loja (${estado.negocio.nome}). Como envio meus kits?`))}" target="_blank" rel="noopener">${ICONE.zap} Pedir a montagem da minha loja</a>
+    <p class="dica centro" style="margin:0">A loja fica pronta em até 3 dias úteis depois que você mandar as fotos.</p>
+  </section>`;
+}
+function ligarCartaoMontagem(tela) {
+  const b = $('#pedir-montagem', tela);
+  if (!b) return;
+  b.addEventListener('click', () => {
+    dados.montagemPedida().catch(() => {});
+    if (estado.montagem) estado.montagem.pediu_em = new Date().toISOString();
+    setTimeout(() => { if (estado.aba === 'hoje') desenharAba(); }, 800);
+  });
+}
+
+// Mensagens do administrador (Central de mensagens): aparece uma vez, como popup.
+async function mostrarMensagensAdmin() {
+  if (estado.suporte || DEMO_SITE || dados.MODO_DEMO || painelAberto) return;
+  let lista = [];
+  try { lista = await dados.minhasMensagens(); } catch (e) { return; }
+  const m = lista && lista[0];
+  if (!m || painelAberto) return;
+  dados.marcarMensagem(m.id, 'viu').catch(() => {});
+  const destino = String(m.botao_destino || '');
+  const ehLink = /^https?:\/\//i.test(destino);
+  abrirPopup(`
+    ${m.imagem_url ? `<img src="${esc(m.imagem_url)}" alt="" style="width:100%;border-radius:16px;max-height:260px;object-fit:cover">` : ''}
+    <h2 style="font-size:23px;margin:0">${esc(m.titulo)}</h2>
+    <p style="margin:0;white-space:pre-line;line-height:1.5">${esc(m.texto)}</p>
+    ${m.botao_texto ? (ehLink || destino === 'zap'
+      ? `<a class="btn principal cheio" id="msg-botao" href="${esc(destino === 'zap' ? linkZap(WHATSAPP_SUPORTE, 'Oi! Vi a mensagem no app e quero saber mais.') : destino)}" target="_blank" rel="noopener">${esc(m.botao_texto)}</a>`
+      : `<button class="btn principal cheio" id="msg-botao">${esc(m.botao_texto)}</button>`) : ''}
+    <button class="link-btn" id="msg-fechar">Fechar</button>`, (p) => {
+    $('#msg-fechar', p).onclick = () => { dados.marcarMensagem(m.id, 'fechou').catch(() => {}); fecharPainel(); };
+    const b = $('#msg-botao', p);
+    if (b) b.addEventListener('click', () => {
+      dados.marcarMensagem(m.id, 'clicou').catch(() => {});
+      if (ehLink || destino === 'zap') return;
+      fecharPainel();
+      if (destino === 'planos') { if (situacaoAssinatura() === 'teste') popupPlanosTeste('mensagem'); else irPara('mais'); return; }
+      const aba = destino.replace('tela:', '');
+      if (['hoje', 'agenda', 'kits', 'mais'].includes(aba)) irPara(aba);
+      if (destino === 'video') abrirVideoTutorial();
+    });
+  });
+}
+
 function abaHoje(tela) {
   const h = hojeISO();
   const mes = estado.mesFin || h.slice(0, 7);
@@ -1452,6 +1615,7 @@ function abaHoje(tela) {
 
   const comPassos = mostrarPassos();
   tela.innerHTML = `
+    ${cartaoMontagem()}
     ${comPassos ? cartaoPassos() : ''}
     <section class="fin">
       <div class="linha-flex entre">
@@ -1492,6 +1656,7 @@ function abaHoje(tela) {
     ${proximas.length ? bloco('Próximos 7 dias', '#4E4459', proximas, (r) => `Retirada ${dataCurta(r.data_retirada)}`) : ''}
     ${estado.kits.length === 0 && !comPassos ? `<div class="cartao coluna"><h3>Comece cadastrando seus kits</h3><p class="pequeno">Eles aparecem no seu link de reservas.</p><button class="btn principal" id="ir-kits">Cadastrar meu primeiro kit</button></div>` : ''}`;
   ligarItens(tela);
+  ligarCartaoMontagem(tela);
   if (comPassos) ligarPassos(tela);
   const muda = (delta) => { const [a, m] = mes.split('-').map(Number); estado.mesFin = dados.isoDe(new Date(a, m - 1 + delta, 1)).slice(0, 7); abaHoje(tela); };
   $('#fin-ant', tela).onclick = () => muda(-1);
@@ -1630,20 +1795,63 @@ function abaAgenda(tela) {
 // KITS
 // ---------------------------------------------------------------------
 function abaKits(tela) {
-  const cartoes = estado.kits.map((k) => `
+  const n = estado.negocio;
+  const cartoes = estado.kits.map((k) => {
+    const nv = variacoesDe(k).length;
+    return `
+    <div class="kit-card-caixa">
     <button class="cartao clicavel kit-card" data-kit="${esc(k.id)}">
       ${k.foto_url ? fotoCaixa(k.foto_url, '', true) : '<div class="foto-kit foto-vazia">Sem foto</div>'}
       <div class="nome">${esc(k.nome)}</div>
-      <div class="pequeno">${reais(k.preco)} · ${k.pecas.length} peça${k.pecas.length === 1 ? '' : 's'}</div>
+      <div class="pequeno">${precoKitTexto(k)} · ${nv ? `${nv} opç${nv === 1 ? 'ão' : 'ões'}` : `${k.pecas.length} peça${k.pecas.length === 1 ? '' : 's'}`}</div>
       ${k.categoria ? `<span class="etiqueta et-categoria">${esc(k.categoria)}</span>` : ''}
       ${k.ativo ? '' : '<span class="etiqueta et-cancelada">Fora do link</span>'}
-    </button>`).join('');
+    </button>
+    ${k.ativo && !DEMO_SITE ? `<button class="kit-compartilhar" data-compartilhar="${esc(k.id)}" aria-label="Compartilhar o kit ${esc(k.nome)}" title="Compartilhar este kit">↗</button>` : ''}
+    </div>`;
+  }).join('');
+  const insta = n.instagram ? `<a class="btn insta mini" href="https://instagram.com/${encodeURIComponent(n.instagram)}" target="_blank" rel="noopener">📷 @${esc(n.instagram)}</a>` : '';
   tela.innerHTML = `
+    <section class="cartao vitrine-loja">
+      ${podeEditar() ? '<button class="vitrine-editar" id="vitrine-editar">✏️ Editar</button>' : ''}
+      ${n.logo_url ? `<img class="vitrine-logo" src="${esc(n.logo_url)}" alt="Logo da loja">` : ''}
+      <div class="vitrine-nome">${esc(n.nome)}</div>
+      <p class="vitrine-recado">${esc(n.recado_link || recadoPadrao(n.nome))}</p>
+      ${insta}
+      <div class="vitrine-links"><a href="${esc(linkPublico(n.slug))}" target="_blank" rel="noopener">👀 Ver como a cliente vê</a><button class="link-btn" id="vitrine-copiar">🔗 Copiar link da loja</button></div>
+    </section>
     <div class="secao-titulo"><h1>Meus kits</h1>${podeEditar() ? `<button class="btn principal mini" id="novo-kit">${ICONE.mais1} Novo kit</button>` : ''}</div>
     ${estado.kits.length ? `<div class="kits-grade">${cartoes}</div>` : '<p class="vazio-txt">Nenhum kit ainda. Cadastre o primeiro: foto, nome, preço e a lista de peças.</p>'}`;
   const novo = $('#novo-kit', tela);
   if (novo) novo.onclick = () => formKit(null);
+  const ed = $('#vitrine-editar', tela);
+  if (ed) ed.onclick = () => painelNegocio();
+  $('#vitrine-copiar', tela).onclick = () => copiarMeuLink();
   $$('[data-kit]', tela).forEach((b) => (b.onclick = () => formKit(estado.kits.find((k) => k.id === b.dataset.kit))));
+  $$('[data-compartilhar]', tela).forEach((b) => (b.onclick = (e) => { e.stopPropagation(); compartilharKit(estado.kits.find((k) => k.id === b.dataset.compartilhar)); }));
+}
+
+// Compartilhar um kit: o link abre o link de reservas direto nesse kit.
+function compartilharKit(k) {
+  if (!k) return;
+  const link = linkDoKit(k);
+  const texto = `${k.nome} · ${estado.negocio.nome}\nVeja as fotos e as datas livres para reservar: ${link}`;
+  abrirPopup(`
+    <h2 style="font-size:22px;margin:0">Compartilhar "${esc(k.nome)}"</h2>
+    <p class="pequeno" style="margin:0">A cliente abre direto neste kit, com as fotos e as datas livres.</p>
+    <div class="cartao" style="background: var(--lilas); word-break: break-all; font-weight:700; font-size:13px">${esc(link)}</div>
+    <a class="btn verde cheio" href="${esc('https://wa.me/?text=' + encodeURIComponent(texto))}" target="_blank" rel="noopener">${ICONE.zap} Enviar no WhatsApp</a>
+    <button class="btn contorno cheio" id="ck-copiar">🔗 Copiar link do kit</button>
+    ${navigator.share ? '<button class="btn contorno cheio" id="ck-mais">📤 Mais opções (Instagram, Direct…)</button>' : ''}
+    <button class="link-btn" id="ck-fechar">Fechar</button>`, (p) => {
+    $('#ck-fechar', p).onclick = () => fecharPainel();
+    $('#ck-copiar', p).onclick = async () => {
+      try { await navigator.clipboard.writeText(link); aviso('Link do kit copiado!'); }
+      catch (e) { prompt('Copie o link do kit:', link); }
+    };
+    const mais = $('#ck-mais', p);
+    if (mais) mais.onclick = () => navigator.share({ title: k.nome, text: `${k.nome} · ${estado.negocio.nome}`, url: link }).catch(() => {});
+  });
 }
 
 // Foto inteira dentro de um quadro quadrado (sem cortar), com fundo desfocado.
@@ -1790,8 +1998,9 @@ function fotosDoKit(k) {
 }
 
 function formKit(kit) {
-  const k = kit || { nome: '', preco: '', sinal: '', pecas: [], foto_url: null, fotos: [], ativo: true };
+  const k = kit || { nome: '', preco: '', sinal: '', pecas: [], foto_url: null, fotos: [], ativo: true, variacoes: [] };
   let fotos = fotosDoKit(k);
+  let vars = variacoesDe(k).map((v) => ({ ...v, extras: [...(v.extras || [])], fotos: [...(v.fotos || [])] }));
   let enviando = 0;
   const so = !podeEditar();
   abrirPainel(kit ? 'Editar kit' : 'Novo kit', `
@@ -1811,7 +2020,7 @@ function formKit(kit) {
         <input name="nova_categoria" maxlength="40" placeholder="Ex.: Super-heróis" autocomplete="off">
       </label>
       <span class="dica" style="margin-top:-6px">No seu link de reservas, a cliente filtra os kits por categoria.</span>
-      <div class="grade-2">
+      <div class="grade-2" id="precos-kit">
         <label class="campo">Preço (R$)<input name="preco" inputmode="decimal" value="${esc(k.preco === '' ? '' : String(k.preco).replace('.', ','))}" placeholder="350"></label>
         <label class="campo">Sinal (R$)<input name="sinal" inputmode="decimal" value="${esc(k.sinal === '' ? '' : String(k.sinal).replace('.', ','))}" placeholder="100"></label>
       </div>
@@ -1819,6 +2028,12 @@ function formKit(kit) {
         <div class="lista-pecas" id="lista-pecas"></div>
         ${so ? '' : '<button type="button" class="btn claro cheio" id="add-peca">＋ Adicionar mais uma peça</button>'}
         <span class="dica">Essa lista vira o checklist de cada retirada e devolução.</span>
+      </div>
+      <div class="campo variacoes-kit">
+        <label class="check ${vars.length ? 'marcado' : ''}"><input type="checkbox" name="tem_var" ${vars.length ? 'checked' : ''} ${so ? 'disabled' : ''}> Este kit tem variações (opções com preço diferente)</label>
+        <span class="dica">Ex.: básico, com escadinha, com cômoda. A agenda continua sendo uma só: reservou qualquer opção, o kit fica ocupado na data.</span>
+        <div id="lista-var" class="coluna"></div>
+        ${so ? '' : '<button type="button" class="btn claro cheio oculto" id="add-var">＋ Adicionar variação</button>'}
       </div>
       <label class="check ${k.ativo ? 'marcado' : ''}"><input type="checkbox" name="ativo" ${k.ativo ? 'checked' : ''}> Mostrar no link de reservas</label>
       <div class="erro oculto" id="erro-kit"></div>
@@ -1839,6 +2054,7 @@ function formKit(kit) {
         </div>`).join('');
       const carregando = Array.from({ length: enviando }, () => '<div class="mini-foto carregando-foto">…</div>').join('');
       area.innerHTML = `${principal}${fotos.length + enviando > 0 ? `<div class="minis">${minis}${carregando}</div>` : ''}`;
+      if (typeof desenharVars === 'function') desenharVars();
       const add = $('#add-foto', p);
       if (add) {
         const cheio = fotos.length + enviando >= MAX_FOTOS;
@@ -1854,6 +2070,57 @@ function formKit(kit) {
         fotos.splice(Number(b.dataset.tirar), 1); desenharFotos();
       }));
     };
+    // ----- Variações -----
+    const listaVar = $('#lista-var', p);
+    const lerVars = () => {
+      $$('.var-kit', listaVar).forEach((el, i) => {
+        if (!vars[i]) return;
+        vars[i].nome = $('.v-nome', el).value.trim().slice(0, 60);
+        vars[i].preco = numero($('.v-preco', el).value);
+        vars[i].sinal = numero($('.v-sinal', el).value);
+        vars[i].extras = $('.v-extras', el).value.split('\n').map((x) => x.trim()).filter(Boolean).slice(0, 30);
+      });
+    };
+    function desenharVars() {
+      if (!listaVar) return;
+      const ligado = form.tem_var && form.tem_var.checked;
+      $('#precos-kit', p).classList.toggle('oculto', ligado);
+      const addV = $('#add-var', p);
+      if (addV) addV.classList.toggle('oculto', !ligado || vars.length >= 10);
+      if (!ligado) { listaVar.innerHTML = ''; return; }
+      listaVar.innerHTML = vars.map((v, i) => `
+        <div class="var-kit cartao coluna" data-v="${i}">
+          <div class="linha-flex entre"><b>Opção ${i + 1}</b>${so ? '' : `<button type="button" class="link-btn v-tirar" data-vt="${i}">Tirar</button>`}</div>
+          <label class="campo">Nome da opção<input class="v-nome" maxlength="60" value="${esc(v.nome || '')}" placeholder="Ex.: Com cômoda" ${so ? 'disabled' : ''}></label>
+          <div class="grade-2">
+            <label class="campo">Preço (R$)<input class="v-preco" inputmode="decimal" value="${esc(v.preco === '' || v.preco == null ? '' : String(v.preco).replace('.', ','))}" placeholder="240" ${so ? 'disabled' : ''}></label>
+            <label class="campo">Sinal (R$)<input class="v-sinal" inputmode="decimal" value="${esc(v.sinal === '' || v.sinal == null ? '' : String(v.sinal).replace('.', ','))}" placeholder="80" ${so ? 'disabled' : ''}></label>
+          </div>
+          <label class="campo">Peças extras desta opção (uma por linha, opcional)<textarea class="v-extras" rows="2" maxlength="1500" placeholder="Ex.: Cômoda branca 3 gavetas" ${so ? 'disabled' : ''}>${esc((v.extras || []).join('\n'))}</textarea></label>
+          <div class="campo">Foto desta opção ${fotos.length ? '<span class="dica">(toque para escolher; sem escolha, aparecem as fotos do kit)</span>' : ''}
+            ${fotos.length ? `<div class="v-fotos">${fotos.map((f) => `<button type="button" class="v-foto ${(v.fotos || []).includes(f) ? 'on' : ''}" data-vf="${esc(f)}" ${so ? 'disabled' : ''}><img src="${esc(f)}" alt=""></button>`).join('')}</div>` : '<span class="dica">Adicione fotos no topo para escolher a foto de cada opção.</span>'}
+          </div>
+        </div>`).join('');
+      $$('.v-tirar', listaVar).forEach((b) => (b.onclick = () => { lerVars(); vars.splice(Number(b.dataset.vt), 1); if (!vars.length) { form.tem_var.checked = false; form.tem_var.closest('.check').classList.remove('marcado'); } desenharVars(); }));
+      $$('.v-foto', listaVar).forEach((b) => (b.onclick = () => {
+        lerVars();
+        const v = vars[Number(b.closest('.var-kit').dataset.v)];
+        const f = b.dataset.vf;
+        v.fotos = v.fotos.includes(f) ? v.fotos.filter((x) => x !== f) : [...v.fotos, f];
+        desenharVars();
+      }));
+    }
+    const novaVar = () => ({ id: 'v' + Math.random().toString(36).slice(2, 9), nome: '', preco: '', sinal: '', extras: [], fotos: [] });
+    if (form.tem_var) form.tem_var.onchange = () => {
+      form.tem_var.closest('.check').classList.toggle('marcado', form.tem_var.checked);
+      if (form.tem_var.checked && !vars.length) {
+        const base = { ...novaVar(), nome: 'Básico', preco: form.preco.value ? numero(form.preco.value) : '', sinal: form.sinal.value ? numero(form.sinal.value) : '' };
+        vars = [base, novaVar()];
+      }
+      desenharVars();
+    };
+    const addVar = $('#add-var', p);
+    if (addVar) addVar.onclick = () => { lerVars(); if (vars.length < 10) vars.push(novaVar()); desenharVars(); const ult = $$('.v-nome', listaVar).pop(); if (ult) ult.focus(); };
     desenharFotos();
     form.ativo.onchange = () => form.ativo.closest('.check').classList.toggle('marcado', form.ativo.checked);
     form.categoria.onchange = () => {
@@ -1920,6 +2187,19 @@ function formKit(kit) {
         ativo: form.ativo.checked,
       };
       if (!novo.nome) { caixa.textContent = 'Dê um nome ao kit.'; caixa.classList.remove('oculto'); return; }
+      // Variações: o preço e o sinal do kit passam a ser os da opção mais barata ("a partir de")
+      if (form.tem_var && form.tem_var.checked) {
+        lerVars();
+        const semNome = vars.findIndex((v) => !v.nome);
+        if (semNome >= 0) { caixa.textContent = `Dê um nome para a opção ${semNome + 1} (ex.: Básico, Com cômoda).`; caixa.classList.remove('oculto'); return; }
+        const nomes = vars.map((v) => v.nome.toLowerCase());
+        if (new Set(nomes).size !== nomes.length) { caixa.textContent = 'Duas opções estão com o mesmo nome.'; caixa.classList.remove('oculto'); return; }
+        novo.variacoes = vars.map((v) => ({ id: v.id, nome: v.nome, preco: Number(v.preco) || 0, sinal: Number(v.sinal) || 0, extras: v.extras || [], fotos: (v.fotos || []).filter((f) => fotos.includes(f)) }));
+        const barata = [...novo.variacoes].sort((a, b) => a.preco - b.preco)[0];
+        novo.preco = barata.preco; novo.sinal = barata.sinal;
+      } else {
+        novo.variacoes = [];
+      }
       if (form.categoria.value === '__nova' && !novo.categoria) { caixa.textContent = 'Escreva o nome da nova categoria.'; caixa.classList.remove('oculto'); return; }
       if (enviando) { caixa.textContent = 'Espere as fotos terminarem de enviar.'; caixa.classList.remove('oculto'); return; }
       if (kit) novo.id = kit.id;
@@ -1955,7 +2235,7 @@ function cartaoAvisosLoja() {
   if (avisosLigados()) {
     return `<section class="cartao coluna avisos-loja ligados">
       <div class="linha-flex" style="gap:12px;align-items:center"><span style="font-size:30px" aria-hidden="true">✅</span><div><b style="font-size:17px">Avisos ligados neste celular</b><div class="pequeno">Você recebe um aviso a cada nova reserva pelo link, o resumo do dia às 8h e os lembretes da sua assinatura.</div></div></div>
-      <div class="linha-flex" style="gap:8px;flex-wrap:wrap"><button class="btn contorno mini" id="avisos-testar">Enviar aviso de teste</button><button class="btn contorno mini" id="avisos-desligar">Desligar</button></div>
+      <div class="linha-flex" style="gap:8px;flex-wrap:wrap"><button class="btn contorno mini" id="avisos-testar">Enviar aviso de teste</button></div>
     </section>`;
   }
   return `<section class="cartao coluna avisos-loja">
@@ -2066,7 +2346,7 @@ function abaMais(tela) {
     <section class="cartao coluna">
       <h2>Precisa de ajuda?</h2>
       <button class="btn contorno cheio" id="ver-video">▶ Ver vídeo passo a passo</button>
-      ${WHATSAPP_SUPORTE ? `<a class="btn verde cheio" href="${esc(linkZap(WHATSAPP_SUPORTE, 'Oi! Sou cliente do App Pegue e Monte e tenho uma dúvida.'))}" target="_blank" rel="noopener">${ICONE.zap} Falar com o suporte no WhatsApp</a>` : ''}
+      ${WHATSAPP_SUPORTE ? `<a class="btn verde cheio" href="${esc(linkZap(WHATSAPP_SUPORTE, 'Oi! Sou cliente do App Pegue e Monte e tenho uma dúvida.'))}" target="_blank" rel="noopener">${ICONE.zap} Suporte no WhatsApp</a>` : ''}
       <a class="btn contorno cheio" href="mailto:${esc(EMAIL_SUPORTE)}?subject=${encodeURIComponent('Ajuda no App Pegue e Monte')}">Enviar e-mail para o suporte</a>
       <p class="dica centro">${esc(EMAIL_SUPORTE)}</p>
     </section>
@@ -2137,7 +2417,7 @@ function preencher(texto, r) {
   const n = estado.negocio || {};
   const dia = (iso) => (iso === hojeISO() ? 'hoje' : dataCurta(iso));
   const v = {
-    nome: String(r.cliente_nome || '').split(' ')[0], kit: kitComPalavra(k.nome), festa: dataCurta(r.data_festa),
+    nome: String(r.cliente_nome || '').split(' ')[0], kit: kitComPalavra(nomeKitReserva(r)), festa: dataCurta(r.data_festa),
     retirada: dia(r.data_retirada), devolucao: dia(r.data_devolucao), sinal: reais(r.valor_sinal),
     total: reais(r.valor_total), restante: reais(Math.max(0, Number(r.valor_total || 0) - Number(r.valor_sinal || 0))),
     pix: n.chave_pix || '', loja: n.nome || '',
@@ -2230,6 +2510,7 @@ function formReserva(pre, existente) {
   abrirPainel(existente ? 'Editar reserva' : 'Nova reserva', `
     <form class="coluna" novalidate>
       <label class="campo">Kit<select name="kit">${kitsAtivos.map((k) => `<option value="${esc(k.id)}" ${k.id === kit0.id ? 'selected' : ''}>${esc(k.nome)}</option>`).join('')}</select></label>
+      <label class="campo oculto" id="campo-variacao">Opção do kit<select name="variacao"></select></label>
       <label class="campo">Data da festa<input type="date" name="festa" value="${festa0}" required></label>
       <div class="grade-2">
         <label class="campo">Retirada<input type="date" name="retirada" value="${r.data_retirada || somaDias(festa0, -n.dias_antes)}"></label>
@@ -2249,6 +2530,20 @@ function formReserva(pre, existente) {
     </form>`, (p) => {
     const form = $('form', p);
     ligarCampoZap(form.zap);
+    // Opções (variações) do kit escolhido
+    const encherVariacoes = (kitId, nomeAtual) => {
+      const vs = variacoesDe(kitDe(kitId));
+      $('#campo-variacao', p).classList.toggle('oculto', !vs.length);
+      form.variacao.innerHTML = vs.map((v) => `<option value="${esc(v.id)}" ${v.nome === nomeAtual ? 'selected' : ''}>${esc(v.nome)} · ${reais(v.preco)}</option>`).join('')
+        + (nomeAtual && !vs.some((v) => v.nome === nomeAtual) ? `<option value="" selected>${esc(nomeAtual)} (opção antiga)</option>` : '');
+    };
+    const variacaoEscolhida = () => variacoesDe(kitDe(form.kit.value)).find((v) => v.id === form.variacao.value) || null;
+    encherVariacoes(kit0.id, r.variacao || null);
+    if (!existente) { const v0 = variacaoEscolhida(); if (v0) { form.valor.value = String(v0.preco).replace('.', ','); form.sinal.value = String(v0.sinal).replace('.', ','); } }
+    form.variacao.onchange = () => {
+      const v = variacaoEscolhida();
+      if (v) { form.valor.value = String(v.preco).replace('.', ','); form.sinal.value = String(v.sinal).replace('.', ','); }
+    };
     const checar = () => {
       const kitId = form.kit.value;
       const ini = form.retirada.value; const fim = form.devolucao.value;
@@ -2267,7 +2562,9 @@ function formReserva(pre, existente) {
     };
     form.kit.onchange = () => {
       const k = kitDe(form.kit.value);
-      if (!existente) { form.valor.value = String(k.preco).replace('.', ','); form.sinal.value = String(k.sinal).replace('.', ','); }
+      encherVariacoes(k.id, null);
+      const v = variacaoEscolhida();
+      if (!existente || v) { form.valor.value = String(v ? v.preco : k.preco).replace('.', ','); form.sinal.value = String(v ? v.sinal : k.sinal).replace('.', ','); }
       checar();
     };
     form.retirada.onchange = checar;
@@ -2291,6 +2588,19 @@ function formReserva(pre, existente) {
         valor_sinal: numero(form.sinal.value),
         obs: form.obs.value.trim() || null,
       };
+      // Opção do kit: guarda o nome e as peças (kit + extras da opção)
+      const kitSel = kitDe(campos.kit_id);
+      const vSel = variacaoEscolhida();
+      const nomeVar = vSel ? vSel.nome : (form.variacao.value === '' && r.variacao && kitSel.id === r.kit_id ? r.variacao : null);
+      const mudouOpcao = !existente || nomeVar !== (r.variacao || null) || campos.kit_id !== r.kit_id;
+      if (mudouOpcao && (!existente || ['aguardando_sinal', 'confirmada'].includes(r.status))) {
+        campos.variacao = nomeVar;
+        if (vSel || existente) {
+          campos.pecas = pecasComVariacao(kitSel, vSel);
+          campos.checklist_retirada = campos.pecas.map(() => false);
+          campos.checklist_devolucao = campos.pecas.map(() => false);
+        }
+      }
       let erro = '';
       if (!campos.data_festa || !campos.data_retirada || !campos.data_devolucao) erro = 'Preencha as três datas.';
       else if (!(campos.data_retirada <= campos.data_festa && campos.data_festa <= campos.data_devolucao)) erro = 'A retirada precisa ser antes ou no dia da festa, e a devolução depois ou no dia.';
@@ -2348,7 +2658,7 @@ function abrirReserva(id) {
     return `<div class="pequeno"><b>${titulo}:</b> ${faltam.length ? `faltou ${esc(faltam.join(', '))}` : 'todas as peças conferidas'}</div>`;
   };
 
-  abrirPainel(k.nome, `
+  abrirPainel(nomeKitReserva(r), `
     <div class="linha-flex entre">${estaAtrasada(r) ? etiqueta('atrasada', 'Atrasada') : etiqueta(r.status)}${r.origem === 'link' ? '<span class="pequeno">Pedido pelo link</span>' : ''}</div>
     <div class="cartao coluna">
       <div class="linha-flex entre"><div><div style="font-weight:800">${esc(r.cliente_nome)}</div>
@@ -2413,8 +2723,9 @@ function telaChecklist(r, tipo) {
   const marcas = [...(tipo === 'retirada' ? r.checklist_retirada : r.checklist_devolucao)];
   while (marcas.length < r.pecas.length) marcas.push(false);
   const titulo = tipo === 'retirada' ? 'Entrega do kit' : 'Devolução do kit';
+  const doKit = new Set(kitDe(r.kit_id).pecas || []);
   const itens = r.pecas.map((peca, i) => `
-    <label class="check ${marcas[i] ? 'marcado' : ''}"><input type="checkbox" data-i="${i}" ${marcas[i] ? 'checked' : ''}> ${esc(peca)}</label>`).join('');
+    <label class="check ${marcas[i] ? 'marcado' : ''}"><input type="checkbox" data-i="${i}" ${marcas[i] ? 'checked' : ''}> ${esc(peca)}${r.variacao && !doKit.has(peca) ? ' <span class="tag-opcao">da opção</span>' : ''}</label>`).join('');
   abrirPainel(titulo, `
     <p class="pequeno">${tipo === 'retirada' ? 'Marque cada peça que está saindo com a cliente.' : 'Marque cada peça que voltou inteira. O que não for marcado fica registrado como faltando ou com avaria.'}</p>
     ${r.pecas.length ? `<button class="btn claro cheio" id="todas">Marcar todas</button><div class="coluna">${itens}</div>` : '<p class="vazio-txt">Esse kit não tem lista de peças. Você pode cadastrar na aba Kits.</p>'}

@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="Pegue e Monte">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito+Sans:wght@400;600;700;800&display=swap">
-<link rel="stylesheet" href="estilo.css?v=20261117b">
+<link rel="stylesheet" href="estilo.css?v=20261118b">
 <style>
   body { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
   #faixa { position: sticky; top: 0; z-index: 40; }
@@ -67,7 +67,7 @@
   .topo { padding: 18px 32px 12px; border-bottom: 1px solid var(--linha); }
   .topo .marca svg, .topo .marca img { display: none; }
   .topo .marca { font-size: 22px; }
-  main { max-width: 1120px; padding: 24px 32px 40px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px 24px; align-items: start; }
+  main { max-width: 1440px; padding: 24px 40px 40px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px 24px; align-items: start; }
   main > * { grid-column: 1 / -1; }
   main > .fin, main > .metade { grid-column: auto; }
   .kits-grade { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
@@ -91,7 +91,11 @@
   main:has(.cal) > section.coluna { grid-column: 2; grid-row: 1 / span 2; }
   main:has(.cal) .cal button { height: 64px; }
 }
+@media (min-width: 1440px) {
+  .kits-grade { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
 @media (min-width: 1024px) {
+  main > .vitrine-loja { grid-column: 1 / -1; }
   main:has(> .bf-card) > section.cartao, main:has(> .instalar) > section.cartao { grid-column: auto; }
   main:has(> .instalar) > .btn.cheio { grid-column: 1; justify-self: start; width: auto; }
 }
@@ -102,6 +106,6 @@
 <div id="raiz"><div class="carregando">Carregando…</div></div>
 <div id="painel"></div>
 <div id="toast" class="toast oculto" role="status" aria-live="polite"></div>
-<script type="module" src="app.js?v=20261118a"></script>
+<script type="module" src="app.js?v=20261118b"></script>
 </body>
 </html>

@@ -3,7 +3,7 @@
 // Só abre para e-mails cadastrados na tabela "administradores".
 // Quem confere é o banco de dados: esta página só mostra o resultado.
 // =====================================================================
-import * as dados from './dados.js?v=20261117c';
+import * as dados from './dados.js?v=20261118b';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=20261117c';
 
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -163,12 +163,17 @@ const MENU_ADM = [
     ['estudo', 'Estudo de conversão', '<path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/>'],
     ['popups', 'Popups e ofertas', '<rect x="4" y="5" width="16" height="12" rx="2"/><path d="M8 21h8"/>'],
   ]],
+  ['Comunicação', [
+    ['mensagens', 'Mensagens', '<path d="M4 5h16v11H8l-4 4z"/>'],
+    ['emails', 'E-mails', '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>'],
+  ]],
   ['Clientes', [
     ['clientes', 'Clientes', '<circle cx="9" cy="8" r="3.5"/><path d="M2 20c1-4 4-6 7-6s6 2 7 6M16 4a3.5 3.5 0 010 7M22 20c-.5-2.5-2-4-4-5"/>'],
+    ['montagem', 'Montagem', '<path d="M3 21h18M5 21V9l7-5 7 5v12M9 21v-6h6v6"/>'],
     ['pagamentos', 'Pagamentos', '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>'],
   ]],
 ];
-const TITULOS_ADM = { resumo: 'Resumo', saude: 'Saúde da base', funil: 'Funil do teste grátis', abordagem: 'Quadro de abordagem', estudo: 'Estudo de conversão', popups: 'Popups e ofertas', clientes: 'Clientes', pagamentos: 'Pagamentos' };
+const TITULOS_ADM = { resumo: 'Resumo', saude: 'Saúde da base', funil: 'Funil do teste grátis', abordagem: 'Quadro de abordagem', estudo: 'Estudo de conversão', popups: 'Popups e ofertas', mensagens: 'Central de mensagens', emails: 'E-mails automáticos', clientes: 'Clientes', montagem: 'Montagem contratada', pagamentos: 'Pagamentos' };
 function montar() {
   const itens = MENU_ADM.flatMap(([, l]) => l);
   raiz.innerHTML = `
@@ -202,6 +207,9 @@ function desenhar() {
   else if (estado.aba === 'abordagem') abaAbordagem(tela);
   else if (estado.aba === 'estudo') abaEstudo(tela);
   else if (estado.aba === 'popups') abaPopups(tela);
+  else if (estado.aba === 'mensagens') abaMensagens(tela);
+  else if (estado.aba === 'emails') abaEmails(tela);
+  else if (estado.aba === 'montagem') abaMontagem(tela);
   else if (estado.aba === 'clientes') abaClientes(tela);
   else abaPagamentos(tela);
   // Barra do topo: título da página, hora da última atualização e botão Atualizar
@@ -493,7 +501,9 @@ function fichaPessoa(p) {
     <p class="dica" style="margin-top:-6px">Use <b>{dias}</b> no texto para o app colocar quantos dias faltam do teste.</p>
     <div class="botoes-ficha">
       ${tel ? `<a class="btn verde" id="ficha-zap" href="${esc(linkZap(tel, msg))}" target="_blank" rel="noopener">Abrir no WhatsApp</a>` : '<span class="pequeno">Sem telefone cadastrado</span>'}
+      ${p.slug ? `<a class="btn contorno" href="${esc(linkVerLoja(p.slug))}" target="_blank" rel="noopener">👀 Ver loja</a>` : ''}
       ${p.slug ? '<button class="btn principal" id="ficha-loja">Entrar na loja</button>' : ''}
+      ${p.slug ? '<button class="btn contorno" id="ficha-leitura" title="Vê tudo por dentro, sem poder alterar nada">🔒 Só olhar por dentro</button>' : ''}
     </div>
     <b class="pequeno" style="color:var(--tinta)">Contatos e anotações</b>
     ${(p.contatos || []).length ? `<div class="hist">${p.contatos.map((c) => `<div><b>${dataHora(c.quando)}</b>${c.nota ? ` · <i>"${esc(c.nota)}"</i>` : ' · contato feito'}</div>`).join('')}</div>` : '<p class="pequeno">Nenhum contato registrado ainda.</p>'}
@@ -510,6 +520,12 @@ function ligarFicha(tela, p) {
     lj.disabled = true; lj.textContent = 'Entrando…';
     try { await dados.adminEntrarLoja(p.email); location.href = 'index.html'; }
     catch (e) { aviso(e.message); lj.disabled = false; lj.textContent = 'Entrar na loja'; }
+  };
+  const lt = $('#ficha-leitura', tela);
+  if (lt) lt.onclick = async () => {
+    lt.disabled = true; lt.textContent = 'Entrando…';
+    try { await dados.adminEntrarLoja(p.email, true); location.href = 'index.html'; }
+    catch (e) { aviso(e.message); lt.disabled = false; lt.textContent = '🔒 Só olhar por dentro'; }
   };
   const sv = $('#msg-salvar', tela);
   if (sv) sv.onclick = async () => {
@@ -543,7 +559,7 @@ function ligarFicha(tela, p) {
 const NOMES_POPUP = {
   fim_teste: 'Fim do teste (anual R$ 167 + 48 h)', promo_dia2: 'Promoção do 2º dia do teste', assinar_agora: 'Botão "Assinar agora"',
   aviso_promo: 'Notificação da promoção', comemoracao_link: 'Comemoração da 1ª reserva pelo link', black_friday: 'Black Friday (anual R$ 167)',
-  faixa: 'Faixa de pagamento', outro: 'Outros botões de assinar',
+  faixa: 'Faixa de pagamento', outro: 'Outros botões de assinar', promo_montagem: 'Montamos sua loja (2º dia, menos de 3 kits)', mensagem: 'Mensagem da Central',
 };
 const NOMES_ACAO = { viu: 'Viu', clicou: 'Clicou em', fechou: 'Fechou', olhou_10s: 'Ficou 10+ segundos olhando', checkout: 'Foi ao checkout pelo' };
 const NOMES_PLANO = { anual_promo: 'anual R$ 167', anual: 'anual R$ 269', mensal: 'mensal' };
@@ -636,6 +652,7 @@ async function abaPopups(tela) {
   const melhor = lista.filter((x) => x.viram >= 5).map((x) => [x, x.assinaram / x.viram]).sort((a, b) => b[1] - a[1])[0];
   const per = [['7', '7 dias'], ['30', '30 dias'], ['90', '90 dias'], ['0', 'Desde o início']];
   alvo.innerHTML = `
+    ${blocoNiveis()}
     <div class="filtros-crm"><label>Período<select id="f-dias">${per.map(([v, t]) => `<option value="${v}" ${v === dias ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label></div>
     <div class="kpis-crm">
       <div class="kpi"><small>Pessoas que viram ofertas</small><b>${viram}</b><i>somando todos os popups</i></div>
@@ -660,6 +677,7 @@ async function abaPopups(tela) {
     </section>`;
   const d = $('#f-dias', alvo);
   if (d) d.onchange = () => { estado.funilDias = d.value; desenhar(); };
+  ligarNiveis(alvo);
 }
 
 // ---------------------------------------------------------------------
@@ -1029,7 +1047,7 @@ function cartaoPessoa(c) {
   if (c.negocio) infos.push(['Negócio', c.negocio]);
   infos.push(['Conta no app', c.tem_conta ? 'Criada' : 'Ainda não criou']);
   if (c.tem_conta) infos.push(['Kits / reservas', `${c.kits || 0} / ${c.reservas || 0}`]);
-  if (c.tem_conta) infos.push(['Último acesso', haQuanto(c.ultimo_acesso)]);
+  if (c.tem_conta) infos.push(['Último uso', haQuanto(c.ultimo_acesso)]);
   if (c.primeira_compra) infos.push(['Cliente desde', data(c.primeira_compra)]);
   if (Number(c.total_pago)) infos.push(['Total pago', reais(c.total_pago)]);
   if (Number(c.total_liquido)) infos.push(['Líquido (sem taxas)', reais(c.total_liquido)]);
@@ -1065,7 +1083,9 @@ function cartaoPessoa(c) {
     ${origem}
     <div class="infos">${infos.map(([k, v]) => `<div>${esc(k)}<br><b>${esc(v)}</b></div>`).join('')}</div>
     <div class="acoes">
+      ${c.slug ? `<a class="btn mini contorno" href="${esc(linkVerLoja(c.slug))}" target="_blank" rel="noopener">👀 Ver loja</a>` : ''}
       ${c.slug ? `<button class="btn mini principal" data-suporte="1">Entrar na loja para ajudar</button>` : ''}
+      ${c.slug ? `<button class="btn mini contorno" data-leitura="1">🔒 Só olhar</button>` : ''}
       ${tel ? `<a class="btn mini verde" href="${esc(linkZap(tel, msg))}" target="_blank" rel="noopener">WhatsApp</a>` : ''}
       <a class="btn mini contorno" href="mailto:${esc(c.email)}">E-mail</a>
       ${c.tem_conta || c.teste_inicio || c.plano ? '<button class="btn mini contorno" data-editar="1">Editar dados</button>' : ''}
@@ -1181,6 +1201,13 @@ function desenharLista() {
       }
     };
   });
+  $$('[data-leitura]', lista).forEach((b) => {
+    b.onclick = async () => {
+      b.disabled = true; b.textContent = 'Entrando…';
+      try { await dados.adminEntrarLoja(b.closest('[data-email]').dataset.email, true); location.href = 'index.html'; }
+      catch (e) { aviso(e.message || 'Não deu para entrar na loja.'); b.disabled = false; b.textContent = '🔒 Só olhar'; }
+    };
+  });
   $$('[data-acao]', lista).forEach((b) => {
     b.onclick = () => {
       const email = b.closest('[data-email]').dataset.email;
@@ -1249,7 +1276,7 @@ function exportar() {
     ['Conta criada', (c) => (c.tem_conta ? 'sim' : 'não')], ['Kits', (c) => c.kits], ['Reservas', (c) => c.reservas],
     ['Total pago', (c) => String(Number(c.total_pago || 0).toFixed(2)).replace('.', ',')],
     ['Cliente desde', (c) => (c.primeira_compra ? data(c.primeira_compra) : '')],
-    ['Último acesso', (c) => (c.ultimo_acesso ? data(c.ultimo_acesso) : '')],
+    ['Último uso', (c) => (c.ultimo_acesso ? data(c.ultimo_acesso) : '')],
   ];
   const cel = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const csv = [colunas.map(([t]) => cel(t)).join(';'), ...itens.map((c) => colunas.map(([, f]) => cel(f(c))).join(';'))].join('\r\n');
@@ -1283,6 +1310,399 @@ function abaPagamentos(tela) {
     </div>
     <button class="btn contorno cheio" id="atualizar">Atualizar</button>`;
   $('#atualizar', tela).onclick = (e) => atualizar(e.currentTarget);
+}
+
+// =====================================================================
+// V.0.0.7 — Ver loja, níveis de interesse, Central de mensagens,
+// e-mails automáticos e montagem contratada
+// =====================================================================
+function linkVerLoja(slug) {
+  const bonito = /(^|\.)pegueemonte\.com$/.test(location.hostname);
+  return bonito ? `${location.origin}/${encodeURIComponent(slug)}?adm=1` : `reservar.html?l=${encodeURIComponent(slug)}&adm=1`;
+}
+function nomeDe(email) {
+  const c = (estado.clientes || []).find((x) => x.email === email);
+  const n = String((c && c.nome) || '').trim().split(/\s+/)[0] || '';
+  return n ? n.charAt(0).toUpperCase() + n.slice(1).toLowerCase() : '';
+}
+function abrirFicha(email) {
+  const p = (estado.crm || []).find((x) => x.email === email);
+  if (!p) { aviso('Essa pessoa não está no funil do teste.'); return; }
+  const g = grupoAbordagem(p);
+  estado.abordAba = g === 'assinou' ? 'geral' : g;
+  estado.abordSel = p.email;
+  estado.aba = 'abordagem';
+  desenhar(); window.scrollTo(0, 0);
+}
+
+// ---------- Níveis de interesse (página Popups e ofertas) ----------
+const MSG_NIVEL = {
+  1: 'Oi{nome}! Vi que você está testando o App Pegue e Monte. Já conseguiu cadastrar seus kits? Se quiser, te ajudo por aqui 😊',
+  2: 'Oi{nome}! Vi que você deu uma olhada nos planos do app. Ficou alguma dúvida? Posso te explicar rapidinho.',
+  3: 'Oi{nome}! Vi que você ficou olhando os planos. Quer que eu te ajude a escolher o melhor para a sua loja?',
+  4: 'Oi{nome}! Vi que você chegou a escolher um plano. Ficou alguma dúvida? Posso te ajudar a finalizar 😊',
+  5: 'Oi{nome}! Obrigado por assinar o App Pegue e Monte 💖 Qualquer dúvida, é só me chamar por aqui.',
+};
+function ultimaInteracao(p) { return (p.interacoes || [])[0] || null; }
+function ultimoBotao(p) { const c = (p.interacoes || []).find((i) => i.acao === 'checkout'); return c ? (NOMES_PLANO[c.detalhe] || c.detalhe || '') : ''; }
+function blocoNiveis() {
+  const crm = estado.crm || [];
+  if (!crm.length) return '';
+  const cont = [0, 0, 0, 0, 0, 0];
+  crm.forEach((p) => { cont[nivelInteresse(p)]++; });
+  const sel = estado.nivelSel ?? 4;
+  const lista = crm.filter((p) => sel === 'todos' || nivelInteresse(p) === sel)
+    .sort((a, b) => new Date((ultimaInteracao(b) || {}).quando || 0) - new Date((ultimaInteracao(a) || {}).quando || 0));
+  const pilula = (n) => `<button class="nivel-pilula ${sel === n ? 'on' : ''}" data-nivel="${n}">
+      <span class="nivel mini">${[1, 2, 3, 4, 5].map((k) => `<i class="${k <= n ? 'on' : ''}"></i>`).join('')}</span>
+      <b>${cont[n]}</b><span>${esc(NOMES_NIVEL[n])}</span></button>`;
+  return `<section class="cartao"><div class="cab-crm"><h2>Níveis de interesse</h2><span>toque num nível para ver quem está nele</span></div>
+    <div class="niveis-pilulas">${[1, 2, 3, 4, 5].map(pilula).join('')}
+      <button class="nivel-pilula ${sel === 'todos' ? 'on' : ''}" data-nivel="todos"><b>${crm.length}</b><span>Todos os níveis${cont[0] ? ` (${cont[0]} ainda não viram oferta)` : ''}</span></button></div>
+    ${lista.length ? `<div class="tabela t-niveis"><div class="tr th"><span>Pessoa / loja</span><span>Última interação</span><span>Botão</span><span>Teste</span><span>Etapa</span><span>Último uso</span><span></span></div>
+      ${lista.slice(0, 80).map((p) => {
+        const u = ultimaInteracao(p); const n = nivelInteresse(p); const nome = nomeDe(p.email);
+        const tel = p.telefone || p.whatsapp_loja;
+        const msg = (MSG_NIVEL[n] || MSG_NIVEL[1]).replace('{nome}', nome ? `, ${nome}` : '');
+        const g = grupoAbordagem(p);
+        return `<div class="tr"><span>${esc(nome ? nome + ' · ' : '')}${esc(p.loja || p.email)}<small>${esc(p.email)}</small></span>
+          <span>${u ? `${esc(quandoCurto(u.quando))}<small>${esc(NOMES_POPUP[u.popup] || u.popup)}</small>` : '—'}</span>
+          <span>${esc(ultimoBotao(p) || '—')}</span>
+          <span>${g === 'assinou' ? 'assinou' : g === 'nao' ? 'acabou' : 'dia ' + crmDiaDoTeste(p)}</span>
+          <span>${esc((ETAPAS[(p.etapa || 1) - 1] || [])[3] || '')}</span>
+          <span>${esc(quandoCurto(p.ultimo_uso))}</span>
+          <span class="acoes-linha">${tel ? `<a class="btn verde mini" href="${esc(linkZap(tel, msg))}" target="_blank" rel="noopener">WhatsApp</a>` : ''}<button class="btn contorno mini" data-ficha="${esc(p.email)}">Ficha</button></span></div>`;
+      }).join('')}</div>${lista.length > 80 ? `<p class="dica">Mostrando as 80 interações mais recentes de ${lista.length}.</p>` : ''}`
+      : '<p class="pequeno">Ninguém neste nível agora.</p>'}
+    <p class="dica" style="margin-top:8px">A mensagem do WhatsApp já vai pronta para o nível de cada pessoa.</p>
+  </section>`;
+}
+function ligarNiveis(el) {
+  $$('[data-nivel]', el).forEach((b) => (b.onclick = () => { estado.nivelSel = b.dataset.nivel === 'todos' ? 'todos' : Number(b.dataset.nivel); desenhar(); }));
+  $$('[data-ficha]', el).forEach((b) => (b.onclick = () => abrirFicha(b.dataset.ficha)));
+}
+
+// ---------- Central de mensagens ----------
+const GRUPOS_MSG = [
+  ['todas', 'Todas'], ['teste', 'Em teste'], ['ativas', 'Assinantes ativas'], ['mensal', 'Mensal'], ['anual', 'Anual'],
+  ['pendente', 'Pagamento pendente'], ['acabou', 'Teste acabou sem assinar'],
+];
+const DESTINOS_MSG = [
+  ['', 'Sem botão'], ['tela:kits', 'Tela: Kits'], ['tela:agenda', 'Tela: Agenda'], ['tela:hoje', 'Tela: Início'], ['tela:mais', 'Tela: Mais'],
+  ['planos', 'Planos (assinar)'], ['video', 'Vídeo passo a passo'], ['zap', 'WhatsApp do suporte'], ['link', 'Um link (endereço)'],
+];
+function publicoMensagem(f) {
+  const crmPor = Object.fromEntries((estado.crm || []).map((p) => [p.email, p]));
+  return (estado.clientes || []).filter((c) => c.tem_conta && c.slug).filter((c) => {
+    if (f.modo === 'pessoas') return f.pessoas.has(c.email);
+    const g = f.grupos;
+    const sit = c.situacao;
+    let ok = g.has('todas')
+      || (g.has('teste') && sit === 'teste')
+      || (g.has('ativas') && sit === 'ativa')
+      || (g.has('mensal') && sit === 'ativa' && c.plano === 'mensal')
+      || (g.has('anual') && sit === 'ativa' && c.plano === 'anual')
+      || (g.has('pendente') && sit === 'carencia')
+      || (g.has('acabou') && sit === 'teste_encerrado');
+    if (!g.size) ok = true;
+    const p = crmPor[c.email];
+    if (ok && f.etapas.size) ok = !!p && f.etapas.has(Number(p.etapa));
+    if (ok && f.semEntrar) {
+      const ult = c.ultimo_acesso ? (Date.now() - new Date(c.ultimo_acesso).getTime()) / 864e5 : 999;
+      ok = ult >= f.semEntrar;
+    }
+    return ok;
+  });
+}
+async function abaMensagens(tela) {
+  const f = estado.msgForm || (estado.msgForm = { modo: 'grupo', grupos: new Set(['teste']), etapas: new Set(), semEntrar: 0, pessoas: new Set(), busca: '',
+    titulo: '', texto: '', destino: '', botao: '', link: '', imagem: '', quando: 'agora', data: '', dias: 7 });
+  const alvo = publicoMensagem(f);
+  const todos = (estado.clientes || []).filter((c) => c.tem_conta && c.slug);
+  const termo = f.busca.trim().toLowerCase();
+  const busca = termo ? todos.filter((c) => `${c.email} ${c.negocio || ''} ${c.nome || ''}`.toLowerCase().includes(termo)).slice(0, 30) : [];
+  tela.innerHTML = `<div class="msg-grade">
+    <section class="cartao coluna"><h2 style="margin:0">1. Mensagem</h2>
+      <label class="campo"><span>Título</span><input id="m-titulo" maxlength="80" value="${esc(f.titulo)}" placeholder="Ex.: Novidade: compartilhe cada kit 🎉"></label>
+      <label class="campo"><span>Texto</span><textarea id="m-texto" rows="5" maxlength="600" placeholder="O que você quer contar para as clientes?">${esc(f.texto)}</textarea></label>
+      <div class="campo"><span>Imagem (opcional)</span>
+        ${f.imagem ? `<div class="linha-flex" style="gap:10px"><img src="${esc(f.imagem)}" alt="" style="width:90px;height:60px;object-fit:cover;border-radius:8px"><button class="link-btn" id="m-tirar-img">Tirar imagem</button></div>`
+          : '<label class="btn contorno mini" style="cursor:pointer;align-self:flex-start">＋ Enviar imagem<input type="file" accept="image/*" id="m-img" class="oculto"></label>'}</div>
+      <div class="campo"><span>Botão (opcional)</span>
+        <div class="grade-2"><input id="m-botao" maxlength="40" value="${esc(f.botao)}" placeholder="Texto do botão, ex.: Ver meus kits"><select id="m-destino">${DESTINOS_MSG.map(([v, t]) => `<option value="${v}" ${f.destino === v ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></div>
+        ${f.destino === 'link' ? `<input id="m-link" value="${esc(f.link)}" placeholder="https://..." style="margin-top:8px">` : ''}</div>
+    </section>
+    <section class="cartao coluna"><h2 style="margin:0">2. Para quem</h2>
+      <div class="pills-adm"><button class="${f.modo === 'grupo' ? 'on' : ''}" data-modo="grupo">Por grupo</button><button class="${f.modo === 'pessoas' ? 'on' : ''}" data-modo="pessoas">Escolher pessoas</button></div>
+      ${f.modo === 'grupo' ? `
+        <div class="pills-adm">${GRUPOS_MSG.map(([v, t]) => `<button class="${f.grupos.has(v) ? 'on' : ''}" data-grupo="${v}">${esc(t)}</button>`).join('')}</div>
+        <span class="pequeno">Etapa do funil do teste (opcional)</span>
+        <div class="pills-adm">${ETAPAS.map(([n, , , c]) => `<button class="${f.etapas.has(n) ? 'on' : ''}" data-etapa="${n}" title="${esc(c)}">${n}. ${esc(c)}</button>`).join('')}</div>
+        <span class="pequeno">Dias sem entrar no app</span>
+        <div class="pills-adm">${[[0, 'Qualquer'], [2, '2+'], [4, '4+'], [7, '7+']].map(([v, t]) => `<button class="${f.semEntrar === v ? 'on' : ''}" data-sem="${v}">${t}</button>`).join('')}</div>`
+      : `<input id="m-busca" value="${esc(f.busca)}" placeholder="Buscar por nome, loja ou e-mail">
+        <div class="lista-pessoas">${busca.map((c) => `<label class="check-adm"><input type="checkbox" data-pessoa="${esc(c.email)}" ${f.pessoas.has(c.email) ? 'checked' : ''}> ${esc(c.negocio || c.email)} <small>${esc(c.email)}</small></label>`).join('') || (termo ? '<p class="pequeno">Ninguém encontrado.</p>' : '<p class="pequeno">Digite para buscar.</p>')}</div>
+        ${f.pessoas.size ? `<p class="pequeno"><b>Escolhidas:</b> ${[...f.pessoas].map(esc).join(', ')} <button class="link-btn" id="m-limpar">limpar</button></p>` : ''}`}
+      <h2 style="margin:6px 0 0">3. Quando</h2>
+      <div class="pills-adm"><button class="${f.quando === 'agora' ? 'on' : ''}" data-quando="agora">Enviar agora</button><button class="${f.quando === 'agendar' ? 'on' : ''}" data-quando="agendar">Agendar</button></div>
+      ${f.quando === 'agendar' ? `<input type="datetime-local" id="m-data" value="${esc(f.data)}"><span class="dica">Sai na hora marcada (pode atrasar até 1 hora).</span>` : ''}
+      <label class="campo"><span>Fica no app por</span><select id="m-dias">${[1, 3, 7, 15, 30].map((d) => `<option value="${d}" ${Number(f.dias) === d ? 'selected' : ''}>${d} dia${d > 1 ? 's' : ''}</option>`).join('')}</select></label>
+      <div class="linha-flex entre" style="margin-top:auto"><b>Vai para <span style="color:var(--acc)">${alvo.length} ${alvo.length === 1 ? 'pessoa' : 'pessoas'}</span></b><button class="btn principal" id="m-enviar" ${alvo.length ? '' : 'disabled'}>${f.quando === 'agendar' ? 'Agendar' : 'Enviar'}</button></div>
+      <p class="dica" style="margin:0">Aparece como popup na próxima vez que a pessoa abrir o app (uma vez só) e vira notificação no celular de quem ativou os avisos.</p>
+    </section>
+    <section class="cartao"><h2 style="margin:0 0 10px">Prévia no celular</h2>
+      <div class="celular-previa"><div class="notif-previa">🔔 <b>${esc(f.titulo || 'Título da mensagem')}</b><br>Toque para ver no app.</div>
+        <div class="popup-previa">${f.imagem ? `<img src="${esc(f.imagem)}" alt="">` : ''}<b>${esc(f.titulo || 'Título da mensagem')}</b><p>${esc(f.texto || 'O texto aparece aqui.')}</p>${f.botao && f.destino ? `<span class="bt">${esc(f.botao)}</span>` : ''}<small>Fechar</small></div></div>
+    </section>
+  </div>
+  <section class="cartao" id="m-historico"><div class="cab-crm"><h2>Mensagens enviadas</h2><span>carregando…</span></div></section>`;
+  const sync = () => {
+    const g = (id) => $(id, tela);
+    f.titulo = g('#m-titulo').value; f.texto = g('#m-texto').value; f.botao = g('#m-botao').value; f.destino = g('#m-destino').value;
+    if (g('#m-link')) f.link = g('#m-link').value;
+    if (g('#m-data')) f.data = g('#m-data').value;
+    f.dias = Number(g('#m-dias').value);
+  };
+  const redesenhar = () => { sync(); desenhar(); };
+  ['#m-titulo', '#m-texto', '#m-botao'].forEach((id) => { $(id, tela).onchange = redesenhar; });
+  $('#m-destino', tela).onchange = redesenhar;
+  $$('[data-modo]', tela).forEach((b) => (b.onclick = () => { sync(); f.modo = b.dataset.modo; desenhar(); }));
+  $$('[data-grupo]', tela).forEach((b) => (b.onclick = () => { sync(); const v = b.dataset.grupo; if (f.grupos.has(v)) f.grupos.delete(v); else f.grupos.add(v); desenhar(); }));
+  $$('[data-etapa]', tela).forEach((b) => (b.onclick = () => { sync(); const v = Number(b.dataset.etapa); if (f.etapas.has(v)) f.etapas.delete(v); else f.etapas.add(v); desenhar(); }));
+  $$('[data-sem]', tela).forEach((b) => (b.onclick = () => { sync(); f.semEntrar = Number(b.dataset.sem); desenhar(); }));
+  $$('[data-quando]', tela).forEach((b) => (b.onclick = () => { sync(); f.quando = b.dataset.quando; desenhar(); }));
+  const bu = $('#m-busca', tela);
+  if (bu) { bu.oninput = () => { clearTimeout(abaMensagens.t); abaMensagens.t = setTimeout(() => { sync(); f.busca = bu.value; desenhar(); const n = $('#m-busca'); if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); } }, 350); }; }
+  $$('[data-pessoa]', tela).forEach((c) => (c.onchange = () => { sync(); if (c.checked) f.pessoas.add(c.dataset.pessoa); else f.pessoas.delete(c.dataset.pessoa); desenhar(); }));
+  const lp = $('#m-limpar', tela); if (lp) lp.onclick = () => { sync(); f.pessoas.clear(); desenhar(); };
+  const ti = $('#m-tirar-img', tela); if (ti) ti.onclick = () => { sync(); f.imagem = ''; desenhar(); };
+  const im = $('#m-img', tela);
+  if (im) im.onchange = async () => {
+    const arq = im.files[0]; if (!arq) return;
+    sync(); aviso('Enviando imagem…');
+    try { f.imagem = await dados.enviarFoto(arq, 1000); desenhar(); } catch (e) { aviso(e.message); }
+  };
+  $('#m-enviar', tela).onclick = async (e) => {
+    sync();
+    const b = e.currentTarget;
+    if (f.titulo.trim().length < 2 || f.texto.trim().length < 2) { aviso('Escreva o título e o texto da mensagem.'); return; }
+    if (f.destino && !f.botao.trim()) { aviso('Escreva o texto do botão.'); return; }
+    if (f.destino === 'link' && !/^https:\/\//.test(f.link.trim())) { aviso('O link precisa começar com https://'); return; }
+    if (f.quando === 'agendar' && !f.data) { aviso('Escolha a data e a hora do envio.'); return; }
+    const pessoas = publicoMensagem(f).map((c) => c.email);
+    if (!confirm(`${f.quando === 'agendar' ? 'Agendar' : 'Enviar'} a mensagem "${f.titulo}" para ${pessoas.length} ${pessoas.length === 1 ? 'pessoa' : 'pessoas'}?`)) return;
+    b.disabled = true; b.textContent = 'Enviando…';
+    const publico = f.modo === 'pessoas' ? `${pessoas.length} escolhidas` : [...f.grupos].map((g) => (GRUPOS_MSG.find(([v]) => v === g) || [g, g])[1]).join(', ')
+      + (f.etapas.size ? ` · etapas ${[...f.etapas].join(', ')}` : '') + (f.semEntrar ? ` · ${f.semEntrar}+ dias sem entrar` : '');
+    try {
+      const r = await dados.adminCriarMensagem({
+        titulo: f.titulo.trim(), texto: f.texto.trim(), imagem_url: f.imagem || null,
+        botao_texto: f.destino ? f.botao.trim() : null, botao_destino: f.destino === 'link' ? f.link.trim() : f.destino || null,
+        publico, dias: f.dias, enviar_em: f.quando === 'agendar' ? new Date(f.data).toISOString() : null,
+      }, pessoas);
+      estado.msgForm = null;
+      aviso(`Mensagem ${f.quando === 'agendar' ? 'agendada' : 'enviada'} para ${r.pessoas} pessoas.`);
+      desenhar();
+    } catch (err) { aviso(err.message); b.disabled = false; b.textContent = f.quando === 'agendar' ? 'Agendar' : 'Enviar'; }
+  };
+  // Histórico
+  const hist = $('#m-historico', tela);
+  let lista = [];
+  try { lista = await dados.adminMensagens(); } catch (e) { hist.innerHTML = `<p class="pequeno">${esc(e.message)}</p>`; return; }
+  if (!hist.isConnected) return;
+  const SIT = { agendada: 'Agendada', enviada: 'No ar', pausada: 'Pausada', encerrada: 'Encerrada' };
+  hist.innerHTML = `<div class="cab-crm"><h2>Mensagens enviadas</h2><span>${lista.length}</span></div>
+    ${lista.length ? `<div class="tabela t-msgs"><div class="tr th"><span>Mensagem</span><span>Para</span><span>Viram</span><span>Clicaram</span><span>Fecharam</span><span>Assinaram</span><span></span></div>
+    ${lista.map((m) => `<div class="tr"><span>${esc(m.titulo)}<small>${esc(SIT[m.status] || m.status)} · ${esc(dataHora(m.enviar_em))} · ${esc(m.publico || '')}</small></span>
+      <span>${m.pessoas}</span><span>${m.viram}<small>${pct(m.viram, m.pessoas)}%</small></span><span>${m.clicaram}<small>${pct(m.clicaram, m.viram)}% de quem viu</small></span><span>${m.fecharam}</span><b class="${m.assinaram ? 'pos' : ''}">${m.assinaram}</b>
+      <span class="acoes-linha">${m.status === 'enviada' || m.status === 'agendada' ? `<button class="btn contorno mini" data-msg="${m.id}" data-st="pausada">Pausar</button>` : ''}${m.status === 'pausada' ? `<button class="btn contorno mini" data-msg="${m.id}" data-st="agendada">Retomar</button>` : ''}${m.status !== 'encerrada' ? `<button class="btn contorno mini" data-msg="${m.id}" data-st="encerrada">Encerrar</button>` : ''}</span></div>`).join('')}</div>`
+    : '<p class="pequeno">Nenhuma mensagem enviada ainda.</p>'}`;
+  $$('[data-msg]', hist).forEach((b) => (b.onclick = async () => {
+    b.disabled = true;
+    try { await dados.adminMudarMensagem(Number(b.dataset.msg), b.dataset.st); desenhar(); } catch (e) { aviso(e.message); b.disabled = false; }
+  }));
+}
+
+// ---------- E-mails automáticos ----------
+const EMAILS_TIPOS = [
+  ['boas_vindas', 'Boas-vindas', 'na hora do cadastro'],
+  ['parada_1', 'Parada: sem loja (etapa 1)', '24 h parada'],
+  ['parada_2', 'Parada: sem kit (etapa 2)', '24 h parada'],
+  ['parada_3', 'Parada: 1 kit (etapa 3)', '24 h parada'],
+  ['parada_4', 'Parada: não divulgou (etapa 4)', '24 h parada'],
+  ['parada_5', 'Parada: sem reserva (etapa 5)', '24 h parada'],
+  ['primeira_reserva', '1ª reserva de cliente real', 'quando acontece'],
+  ['dia2_montagem', 'Dia 2 · Montamos sua loja (menos de 3 kits)', '2º dia'],
+  ['dia2_promo', 'Dia 2 · 53% OFF (3+ kits)', '2º dia'],
+  ['dia5_resumo', 'Dia 5 · resumo do que ela fez', '5º dia'],
+  ['teste_amanha', 'Dia 6 · teste acaba amanhã', '6º dia'],
+  ['checkout', 'Foi ao checkout e não comprou', '~2 h depois'],
+  ['teste_acabou', 'Dia 7 · teste acabou', '7º dia'],
+  ['promo_ultimo_dia', 'Dia 9 · último dia do desconto', '9º dia'],
+];
+async function abaEmails(tela) {
+  tela.innerHTML = '<div id="em-c" class="coluna" style="gap:16px"><div class="cartao">Carregando…</div></div>';
+  const alvo = $('#em-c', tela);
+  const dias = String(estado.emailDias ?? 30);
+  let r;
+  try { r = await dados.adminEmails(Number(dias)); } catch (e) { alvo.innerHTML = `<div class="cartao">${esc(e.message)}</div>`; return; }
+  if (estado.aba !== 'emails' || !alvo.isConnected) return;
+  const por = Object.fromEntries((r.tipos || []).map((t) => [t.tipo, t]));
+  const proprios = new Set((r.modelos || []).map((m) => m.tipo));
+  const soma = (k) => (r.tipos || []).reduce((t, x) => t + Number(x[k] || 0), 0);
+  const env = soma('enviados');
+  const per = [['7', '7 dias'], ['30', '30 dias'], ['90', '90 dias'], ['0', 'Desde o início']];
+  alvo.innerHTML = `
+    <section class="cartao linha-flex entre" style="gap:12px;flex-wrap:wrap">
+      <div><b>${r.pausados ? '⏸️ Envio pausado' : '🟢 Envio ligado'}</b><div class="pequeno">Saem sozinhos a cada 15 minutos (boas-vindas a qualquer hora; os outros das 8h às 20h) · no máximo 1 por dia por pessoa · param quando ela assina.</div></div>
+      <div class="linha-flex" style="gap:8px"><label class="pequeno">Período <select id="em-dias">${per.map(([v, t]) => `<option value="${v}" ${v === dias ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+      <button class="btn ${r.pausados ? 'principal' : 'contorno'} mini" id="em-pausar">${r.pausados ? 'Retomar envios' : 'Pausar todos'}</button></div>
+    </section>
+    <div class="kpis-crm">
+      <div class="kpi"><small>Enviados</small><b>${env}</b></div>
+      <div class="kpi"><small>Abertos</small><b>${pct(soma('abertos'), env)}%</b><i>${soma('abertos')} e-mails</i></div>
+      <div class="kpi"><small>Clicaram</small><b>${pct(soma('clicaram'), env)}%</b><i>${soma('clicaram')} cliques</i></div>
+      <div class="kpi"><small>Assinaram em até 7 dias</small><b>${soma('assinaram')}</b></div>
+      <div class="kpi"><small>Descadastros</small><b>${r.descadastros || 0}</b><i>${soma('problemas')} voltaram ou deram erro</i></div>
+    </div>
+    <section class="cartao"><div class="tabela t-emails"><div class="tr th"><span>E-mail</span><span>Quando sai</span><span>Enviados</span><span>Abertos</span><span>Clicaram</span><span>Assinaram</span><span></span></div>
+      ${EMAILS_TIPOS.map(([t, nome, quando]) => { const x = por[t] || {}; const e = Number(x.enviados || 0); return `<div class="tr">
+        <span>${esc(nome)}${proprios.has(t) ? ' <span class="tag t-lil">seu texto</span>' : ''}</span><span>${esc(quando)}</span><span>${e}</span>
+        <span>${e ? pct(x.abertos, e) + '%' : '—'}</span><span>${e ? pct(x.clicaram, e) + '%' : '—'}</span><b class="${x.assinaram ? 'pos' : ''}">${x.assinaram || 0}</b>
+        <span class="acoes-linha"><button class="btn contorno mini" data-em-editar="${t}">Editar</button><button class="btn contorno mini" data-em-previa="${t}">Prévia</button></span></div>`; }).join('')}
+    </div>
+    <p class="dica" style="margin-top:8px">Aberturas e cliques aparecem depois que o aviso (webhook) do Resend estiver ligado. Todo e-mail tem o botão de WhatsApp e o link "Não quero mais receber".</p></section>`;
+  $('#em-dias', alvo).onchange = (e) => { estado.emailDias = e.target.value; desenhar(); };
+  $('#em-pausar', alvo).onclick = async (e) => {
+    e.currentTarget.disabled = true;
+    try { await dados.adminEmailsPausar(!r.pausados); aviso(r.pausados ? 'Envios retomados.' : 'Envios pausados.'); desenhar(); } catch (err) { aviso(err.message); e.currentTarget.disabled = false; }
+  };
+  $$('[data-em-previa]', alvo).forEach((b) => (b.onclick = () => previaEmail(b.dataset.emPrevia)));
+  $$('[data-em-editar]', alvo).forEach((b) => (b.onclick = () => editarEmail(b.dataset.emEditar, (r.modelos || []).find((m) => m.tipo === b.dataset.emEditar))));
+}
+function modalAdm(html) {
+  const caixa = document.createElement('div');
+  caixa.className = 'modal-adm';
+  caixa.innerHTML = `<div class="modal-in cartao coluna" role="dialog" aria-modal="true" style="max-width:680px">${html}</div>`;
+  caixa.onclick = (e) => { if (e.target === caixa) caixa.remove(); };
+  document.body.append(caixa);
+  return caixa;
+}
+async function previaEmail(tipo) {
+  const nome = (EMAILS_TIPOS.find(([t]) => t === tipo) || [, tipo])[1];
+  const m = modalAdm(`<div class="cab-crm" style="margin:0"><h2>${esc(nome)}</h2><button class="link-btn" data-x>Fechar</button></div><div class="pequeno" id="pv-assunto">Carregando…</div><iframe id="pv" style="width:100%;height:560px;border:0;border-radius:12px;background:#fff"></iframe>
+    <div class="linha-flex" style="gap:8px;justify-content:flex-end"><button class="btn contorno" id="pv-teste">Enviar teste para mim</button></div>`);
+  $('[data-x]', m).onclick = () => m.remove();
+  $('#pv-teste', m).onclick = async (e) => {
+    const b = e.currentTarget; b.disabled = true; b.textContent = 'Enviando…';
+    try { const r = await dados.adminEmailTeste(tipo); aviso(`E-mail de teste enviado para ${r.para}.`); b.textContent = 'Enviado!'; }
+    catch (err) { aviso(err.message); b.disabled = false; b.textContent = 'Enviar teste para mim'; }
+  };
+  try {
+    const r = await dados.adminPreviaEmail(tipo);
+    $('#pv-assunto', m).innerHTML = `<b>Assunto:</b> ${esc(r.assunto)} <span class="dica">(dados de exemplo)</span>`;
+    $('#pv', m).srcdoc = r.html;
+  } catch (e) { $('#pv-assunto', m).textContent = e.message; }
+}
+async function editarEmail(tipo, proprio) {
+  const nome = (EMAILS_TIPOS.find(([t]) => t === tipo) || [, tipo])[1];
+  const m = modalAdm(`<div class="cab-crm" style="margin:0"><h2>Editar: ${esc(nome)}</h2><button class="link-btn" data-x>Fechar</button></div>
+    <p class="pequeno" id="ed-carregando">Carregando o texto…</p>
+    <form class="coluna oculto" id="ed-email" novalidate>
+      <label class="campo"><span>Assunto</span><input name="assunto" maxlength="120"></label>
+      <label class="campo"><span>Texto (deixe uma linha em branco entre os parágrafos)</span><textarea name="texto" rows="8" maxlength="2000"></textarea></label>
+      <label class="campo"><span>Texto do botão</span><input name="botao" maxlength="40"></label>
+      <p class="dica" style="margin:0">Pode usar: <b>{nome}</b> (primeiro nome), <b>{loja}</b>, <b>{kits}</b>, <b>{reservas}</b>, <b>{visitas}</b>, <b>{data_fim}</b> (fim do teste), <b>{data_promo}</b> (fim do desconto). As caixas de oferta, resumo e o botão de WhatsApp continuam automáticos.</p>
+      <div class="linha-flex" style="gap:8px;justify-content:space-between;flex-wrap:wrap">
+        ${proprio ? '<button type="button" class="btn contorno" id="ed-original">Voltar ao texto original</button>' : '<span></span>'}
+        <button class="btn principal" id="ed-salvar">Salvar</button></div>
+    </form>`);
+  $('[data-x]', m).onclick = () => m.remove();
+  const form = $('#ed-email', m);
+  try {
+    const r = await dados.adminPreviaEmail(tipo);
+    const base = proprio || r.padrao;
+    form.assunto.value = base.assunto; form.texto.value = base.texto; form.botao.value = base.botao || '';
+    $('#ed-carregando', m).remove(); form.classList.remove('oculto');
+  } catch (e) {
+    if (proprio) { form.assunto.value = proprio.assunto; form.texto.value = proprio.texto; form.botao.value = proprio.botao || ''; $('#ed-carregando', m).remove(); form.classList.remove('oculto'); }
+    else $('#ed-carregando', m).textContent = e.message;
+  }
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    if (form.assunto.value.trim().length < 2 || form.texto.value.trim().length < 2) { aviso('Preencha o assunto e o texto.'); return; }
+    const b = $('#ed-salvar', m); b.disabled = true;
+    try { await dados.adminSalvarEmailModelo(tipo, form.assunto.value, form.texto.value, form.botao.value); aviso('Texto salvo. Os próximos e-mails já saem assim.'); m.remove(); desenhar(); }
+    catch (err) { aviso(err.message); b.disabled = false; }
+  };
+  const og = $('#ed-original', m);
+  if (og) og.onclick = async () => {
+    og.disabled = true;
+    try { await dados.adminSalvarEmailModelo(tipo, null, null, null); aviso('Voltou ao texto original.'); m.remove(); desenhar(); }
+    catch (err) { aviso(err.message); og.disabled = false; }
+  };
+}
+
+// ---------- Montagem contratada ----------
+function somarDiasUteis(iso, n) {
+  const d = new Date(iso);
+  let faltam = n;
+  while (faltam > 0) { d.setDate(d.getDate() + 1); if (d.getDay() !== 0 && d.getDay() !== 6) faltam--; }
+  return d;
+}
+async function abaMontagem(tela) {
+  tela.innerHTML = '<div id="mt-c" class="coluna" style="gap:16px"><div class="cartao">Carregando…</div></div>';
+  const alvo = $('#mt-c', tela);
+  let lista = [];
+  try { lista = await dados.adminMontagens(); } catch (e) { alvo.innerHTML = `<div class="cartao">${esc(e.message)}</div>`; return; }
+  if (estado.aba !== 'montagem' || !alvo.isConnected) return;
+  const grupos = {
+    andamento: lista.filter((m) => m.pediu_em && !m.concluida_em),
+    naopediu: lista.filter((m) => !m.pediu_em && !m.concluida_em),
+    concluidas: lista.filter((m) => m.concluida_em),
+  };
+  const sub = estado.mtAba || (grupos.andamento.length || !grupos.naopediu.length ? 'andamento' : 'naopediu');
+  const atrasadas = grupos.andamento.filter((m) => somarDiasUteis(m.pediu_em, 3) < new Date()).length;
+  const kitsMes = lista.filter((m) => m.concluida_em && new Date(m.concluida_em).getMonth() === new Date().getMonth()).reduce((t, m) => t + Math.max(0, Number(m.kits_agora) - Number(m.kits_inicio)), 0);
+  const conc = grupos.concluidas.filter((m) => m.pediu_em);
+  const media = conc.length ? conc.reduce((t, m) => t + (new Date(m.concluida_em) - new Date(m.pediu_em)) / 864e5, 0) / conc.length : null;
+  const linhas = grupos[sub] || [];
+  alvo.innerHTML = `
+    <div class="etabas">${[['andamento', 'Em andamento'], ['naopediu', 'Não pediu ainda'], ['concluidas', 'Concluídas']].map(([id, t]) => `<button class="${sub === id ? 'on' : ''}" data-mt="${id}">${t}<b>${grupos[id].length}</b></button>`).join('')}</div>
+    <div class="kpis-crm">
+      <div class="kpi"><small>Kits montados pela equipe (mês)</small><b>${kitsMes}</b></div>
+      <div class="kpi"><small>Tempo médio até concluir</small><b>${media == null ? '—' : num1(media) + ' dias'}</b></div>
+      <div class="kpi"><small>Atrasadas (mais de 3 dias úteis)</small><b class="${atrasadas ? 'neg' : 'pos'}">${atrasadas}</b></div>
+    </div>
+    <section class="cartao">${linhas.length ? `<div class="tabela t-montagem"><div class="tr th"><span>Cliente / loja</span><span>Assinou</span><span>Pediu a montagem</span><span>Kits cadastrados</span><span>Prazo</span><span></span></div>
+      ${linhas.map((m) => {
+        const feitos = Math.max(0, Number(m.kits_agora || 0) - Number(m.kits_inicio || 0));
+        const prazo = m.pediu_em ? somarDiasUteis(m.pediu_em, 3) : null;
+        const atras = prazo && !m.concluida_em && prazo < new Date();
+        const nome = String(m.nome || '').split(' ')[0];
+        const msg = m.pediu_em ? `Oi${nome ? ', ' + nome : ''}! Aqui é da equipe do App Pegue e Monte. Estamos montando a sua loja 😊` : `Oi${nome ? ', ' + nome : ''}! Vi que você assinou o anual com a montagem da loja. Me manda as fotos, os nomes e os preços dos seus kits por aqui que a nossa equipe cadastra tudo para você 😊`;
+        return `<div class="tr"><span>${esc(m.loja || m.email)}<small>${esc(m.email)}</small></span><span>${esc(data(m.assinou_em))}</span>
+          <span>${m.pediu_em ? esc(data(m.pediu_em)) : '<span class="tag t-red">ainda não pediu</span>'}</span>
+          <span><span class="mini-barra"><i style="width:${Math.min(100, (Number(m.kits_agora || 0) / (m.limite_kits || 50)) * 100)}%;background:var(--acc)"></i></span><small>${m.kits_agora || 0} de ${m.limite_kits || 50} · ${feitos} pela montagem</small></span>
+          <span>${prazo ? `<b class="${atras ? 'neg' : ''}">${prazo.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</b>${atras ? '<small>atrasada</small>' : ''}` : '—'}${m.concluida_em ? `<small>concluída ${esc(data(m.concluida_em))}</small>` : ''}</span>
+          <span class="acoes-linha">
+            ${m.telefone ? `<a class="btn verde mini" href="${esc(linkZap(m.telefone, msg))}" target="_blank" rel="noopener">${m.pediu_em ? 'WhatsApp' : 'Lembrar no WhatsApp'}</a>` : ''}
+            ${m.slug ? `<button class="btn contorno mini" data-mt-loja="${esc(m.email)}">Entrar na loja</button>` : ''}
+            ${!m.pediu_em ? `<button class="btn contorno mini" data-mt-id="${m.id}" data-mt-campo="pediu">Marcar que pediu</button>` : ''}
+            ${!m.concluida_em ? `<button class="btn principal mini" data-mt-id="${m.id}" data-mt-campo="concluida">Concluir</button>` : `<button class="btn contorno mini" data-mt-id="${m.id}" data-mt-campo="reabrir">Reabrir</button>`}
+          </span></div>`;
+      }).join('')}</div>` : '<p class="pequeno">Ninguém aqui agora.</p>'}
+      <p class="dica" style="margin-top:8px">Entra aqui quem recebeu a oferta "Montamos sua loja" e assinou o plano anual. O prazo é de 3 dias úteis depois que ela pede a montagem. "Kits cadastrados" conta sozinho pelos kits da loja.</p></section>`;
+  $$('[data-mt]', alvo).forEach((b) => (b.onclick = () => { estado.mtAba = b.dataset.mt; desenhar(); }));
+  $$('[data-mt-id]', alvo).forEach((b) => (b.onclick = async () => {
+    if (b.dataset.mtCampo === 'concluida' && !confirm('Marcar a montagem desta loja como concluída?')) return;
+    b.disabled = true;
+    try { await dados.adminMontagemMarcar(Number(b.dataset.mtId), b.dataset.mtCampo); desenhar(); } catch (e) { aviso(e.message); b.disabled = false; }
+  }));
+  $$('[data-mt-loja]', alvo).forEach((b) => (b.onclick = async () => {
+    b.disabled = true; b.textContent = 'Entrando…';
+    try { await dados.adminEntrarLoja(b.dataset.mtLoja); location.href = 'index.html'; } catch (e) { aviso(e.message); b.disabled = false; b.textContent = 'Entrar na loja'; }
+  }));
 }
 
 iniciar();

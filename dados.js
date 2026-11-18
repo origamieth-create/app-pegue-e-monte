@@ -26,6 +26,7 @@ function erroAmigavel(e) {
   if (/Email not confirmed/i.test(msg)) return 'Confirme seu e-mail pelo link que enviamos antes de entrar.';
   if (/User already registered/i.test(msg)) return 'Esse e-mail já tem conta. Use "Entrar".';
   if (/Password should be/i.test(msg)) return 'A senha precisa ter pelo menos 6 caracteres.';
+  if (/so_leitura/i.test(msg)) return 'Você entrou no modo SÓ LEITURA: dá para ver tudo, mas nada pode ser alterado.';
   if (/row-level security|permission denied/i.test(msg)) return 'Sua assinatura não está ativa, então o app está em modo leitura.';
   if (/Failed to fetch|NetworkError/i.test(msg)) return 'Sem conexão. Confira a internet e tente de novo.';
   return msg;
@@ -192,9 +193,10 @@ export async function suporteSair() {
   const s = await cliente();
   return ok(s.rpc('suporte_sair'));
 }
-export async function adminEntrarLoja(email) {
+export async function adminEntrarLoja(email, soLeitura) {
   if (MODO_DEMO) throw new Error('Na demonstração não dá para entrar na loja de uma cliente.');
   const s = await cliente();
+  if (soLeitura) return ok(s.rpc('admin_entrar_loja', { p_email: email, p_leitura: true }));
   return ok(s.rpc('admin_entrar_loja', { p_email: email }));
 }
 export async function adminSuporteLog() {
@@ -416,7 +418,7 @@ export async function catalogoPublico(slug) {
     if (slug !== n.slug) return null;
     return { nome: n.nome, whatsapp: n.whatsapp, chave_pix: n.chave_pix, logo_url: n.logo_url, recado: n.recado_link || null, instagram: n.instagram || null,
       dias_antes: n.dias_antes, dias_depois: n.dias_depois,
-      kits: D().kits.filter((k) => k.ativo).map(({ id, nome, preco, sinal, foto_url, fotos, categoria }) => ({ id, nome, preco, sinal, foto_url, fotos: fotos || [], categoria: categoria || null })) };
+      kits: D().kits.filter((k) => k.ativo).map(({ id, nome, preco, sinal, foto_url, fotos, categoria, pecas, variacoes }) => ({ id, nome, preco, sinal, foto_url, fotos: fotos || [], categoria: categoria || null, pecas: pecas || [], variacoes: variacoes || [] })) };
   }
   const s = await cliente();
   return ok(s.rpc('catalogo_publico', { p_slug: slug }));
@@ -433,20 +435,109 @@ export async function datasOcupadas(slug, kitId, de, ate) {
   const s = await cliente();
   return ok(s.rpc('datas_ocupadas', { p_slug: slug, p_kit: kitId, p_de: de, p_ate: ate }));
 }
-export async function solicitarReserva(slug, kitId, dataFesta, nome, whatsapp) {
+export async function solicitarReserva(slug, kitId, dataFesta, nome, whatsapp, variacaoId) {
   if (MODO_DEMO) {
     const n = D().negocio; const k = D().kits.find((x) => x.id === kitId);
+    const v = (k.variacoes || []).find((x) => x.id === variacaoId) || null;
     const zap = String(whatsapp).replace(/\D/g, '');
     if (zap.length < 10) throw new Error('Informe um WhatsApp válido, com DDD');
     await criarReserva({ kit_id: kitId, data_festa: dataFesta, data_retirada: somaDias(dataFesta, -n.dias_antes),
       data_devolucao: somaDias(dataFesta, n.dias_depois), status: 'aguardando_sinal', origem: 'link',
-      cliente_nome: nome.trim(), cliente_whatsapp: zap, valor_total: k.preco, valor_sinal: k.sinal })
+      cliente_nome: nome.trim(), cliente_whatsapp: zap, valor_total: v ? v.preco : k.preco, valor_sinal: v ? v.sinal : k.sinal,
+      ...(v ? { variacao: v.nome, pecas: [...(k.pecas || []), ...(v.extras || [])] } : {}) })
       .catch(() => { throw new Error('Este kit acabou de ser reservado para essa data. Escolha outra data ou outro kit.'); });
-    return { whatsapp: n.whatsapp, chave_pix: n.chave_pix, sinal: k.sinal, kit: k.nome };
+    return { whatsapp: n.whatsapp, chave_pix: n.chave_pix, sinal: v ? v.sinal : k.sinal, kit: k.nome + (v ? ' – ' + v.nome : '') };
   }
   const s = await cliente();
-  return ok(s.rpc('solicitar_reserva', { p_slug: slug, p_kit: kitId, p_data_festa: dataFesta, p_nome: nome, p_whatsapp: whatsapp }));
+  const args = { p_slug: slug, p_kit: kitId, p_data_festa: dataFesta, p_nome: nome, p_whatsapp: whatsapp };
+  if (variacaoId) args.p_variacao = variacaoId;
+  return ok(s.rpc('solicitar_reserva', args));
 }
+
+// ---------- Montagem da loja (oferta do anual) e mensagens do administrador ----------
+export async function registrarOfertaMontagem() {
+  if (MODO_DEMO) return;
+  const s = await cliente();
+  await s.rpc('registrar_oferta_montagem');
+}
+export async function minhaMontagem() {
+  if (MODO_DEMO) return null;
+  const s = await cliente();
+  return ok(s.rpc('minha_montagem'));
+}
+export async function montagemPedida() {
+  if (MODO_DEMO) return;
+  const s = await cliente();
+  await s.rpc('montagem_pedida');
+}
+export async function minhasMensagens() {
+  if (MODO_DEMO) return [];
+  const s = await cliente();
+  return ok(s.rpc('minhas_mensagens'));
+}
+export async function marcarMensagem(id, acao) {
+  if (MODO_DEMO) return;
+  const s = await cliente();
+  await s.rpc('marcar_mensagem', { p_id: id, p_acao: acao });
+}
+export async function adminCriarMensagem(dados, emails) {
+  if (MODO_DEMO) return { id: 1, pessoas: emails.length };
+  const s = await cliente();
+  return ok(s.rpc('admin_criar_mensagem', { p_dados: dados, p_emails: emails }));
+}
+export async function adminMensagens() {
+  if (MODO_DEMO) return [];
+  const s = await cliente();
+  return ok(s.rpc('admin_mensagens'));
+}
+export async function adminMudarMensagem(id, status) {
+  if (MODO_DEMO) return;
+  const s = await cliente();
+  return ok(s.rpc('admin_mudar_mensagem', { p_id: id, p_status: status }));
+}
+export async function adminMontagens() {
+  if (MODO_DEMO) return [];
+  const s = await cliente();
+  return ok(s.rpc('admin_montagens'));
+}
+export async function adminMontagemMarcar(id, campo) {
+  if (MODO_DEMO) return;
+  const s = await cliente();
+  return ok(s.rpc('admin_montagem_marcar', { p_id: id, p_campo: campo }));
+}
+export async function adminEmails(dias) {
+  if (MODO_DEMO) return { pausados: false, descadastros: 0, modelos: [], tipos: [] };
+  const s = await cliente();
+  return ok(s.rpc('admin_emails', { p_dias: dias }));
+}
+export async function adminSalvarEmailModelo(tipo, assunto, texto, botao) {
+  if (MODO_DEMO) return;
+  const s = await cliente();
+  return ok(s.rpc('admin_salvar_email_modelo', { p_tipo: tipo, p_assunto: assunto, p_texto: texto, p_botao: botao }));
+}
+export async function adminEmailsPausar(pausar) {
+  if (MODO_DEMO) return;
+  const s = await cliente();
+  return ok(s.rpc('admin_emails_pausar', { p_pausar: pausar }));
+}
+async function chamarFuncaoEmails(corpo) {
+  if (MODO_DEMO) throw new Error('Na demonstração os e-mails não são enviados.');
+  const s = await cliente();
+  const { data } = await s.auth.getSession();
+  let r;
+  try {
+    r = await fetch(`${SUPABASE_URL}/functions/v1/emails`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session && data.session.access_token}`, apikey: SUPABASE_ANON_KEY },
+      body: JSON.stringify(corpo),
+    });
+  } catch (e) { throw new Error('A função "emails" ainda não está no ar no Supabase.'); }
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || d.erro) throw new Error(d.erro || 'A função "emails" ainda não está no ar no Supabase.');
+  return d;
+}
+export function adminEmailTeste(tipo) { return chamarFuncaoEmails({ teste: tipo }); }
+export function adminPreviaEmail(tipo) { return chamarFuncaoEmails({ previa: tipo }); }
 
 // =====================================================================
 // Painel do administrador (só funciona para e-mails da tabela
