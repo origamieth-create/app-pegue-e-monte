@@ -42,6 +42,15 @@ button{font:inherit;cursor:pointer}
 .prog{flex:1;height:8px;background:#EFE4DB;border-radius:99px;overflow:hidden}
 .prog i{display:block;height:100%;background:var(--coral);border-radius:99px;transition:width .3s}
 .centro{justify-content:center}
+.an-barra{height:12px;background:#F1E6DC;border-radius:99px;overflow:hidden}
+.an-barra i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--coral),var(--amarelo));border-radius:99px;transition:width .35s linear}
+.an-pct{font-weight:900;font-size:14px;color:var(--texto2);text-align:right;margin-top:-6px}
+.an-lista{display:flex;flex-direction:column;gap:8px}
+.an-item{display:flex;gap:10px;align-items:flex-start;font-weight:700;font-size:15.5px;line-height:1.35;padding:11px 12px;border-radius:12px;background:#FFF5F5;color:var(--tinta);opacity:0;transform:translateY(6px);transition:opacity .35s,transform .35s}
+.an-item.vis{opacity:1;transform:none}
+.an-item b{color:var(--coral);flex:none}
+.an-item.bom{background:#E9F7EF;color:var(--verde2)}
+.an-item.bom b{color:var(--verde)}
 .carregando{width:46px;height:46px;border-radius:50%;border:5px solid #F3E2E3;border-top-color:var(--coral);animation:gira .9s linear infinite;align-self:center}
 @keyframes gira{to{transform:rotate(360deg)}}
 /* vídeo */
@@ -95,10 +104,11 @@ h2.t{font-family:'Fredoka',sans-serif;font-weight:600;font-size:24px;text-align:
 </div></section>
 
 <section class="tela" id="preparando"><div class="miolo centro">
-  <div class="cartao" style="text-align:center;gap:16px;padding:34px 22px;margin-bottom:22vh">
-    <div class="carregando"></div>
-    <h1 class="perg" style="font-size:21px">Preparando um vídeo para você…</h1>
-    <p class="texto">Com base nas suas respostas.</p>
+  <div class="cartao" style="gap:14px;padding:28px 20px;margin-bottom:18vh">
+    <h1 class="perg" style="font-size:22px;margin:0" id="an-titulo">Analisando suas respostas…</h1>
+    <div class="an-barra"><i id="an-barra"></i></div>
+    <p class="an-pct" id="an-pct">0%</p>
+    <div class="an-lista" id="an-lista"></div>
   </div>
 </div></section>
 
@@ -150,11 +160,11 @@ h2.t{font-family:'Fredoka',sans-serif;font-weight:600;font-size:24px;text-align:
   var PERGUNTAS = [
     { t: 'Há quanto tempo você trabalha com <em>pegue e monte</em>?', ops: ['Estou começando agora', 'Menos de 1 ano', 'De 1 a 3 anos', 'Mais de 3 anos'] },
     { t: 'Quantos <em>kits</em> você tem hoje?', ops: ['De 1 a 5 kits', 'De 6 a 15 kits', 'De 16 a 30 kits', 'Mais de 30 kits'] },
-    { t: 'Onde você anota suas <em>reservas</em> hoje?', ops: ['No caderno ou agenda de papel', 'No próprio WhatsApp', 'Numa planilha', 'Guardo de cabeça'] },
-    { t: 'Já aconteceu de reservar o <em>mesmo kit duas vezes</em>?', ops: ['Já aconteceu, foi um sufoco', 'Quase! Percebi a tempo', 'Ainda não, mas tenho medo', 'Nunca, tenho tudo sob controle'] },
-    { t: 'Quanto tempo por dia você passa respondendo <em>"tem data?"</em> e <em>"manda foto"</em>?', ops: ['Menos de 1 hora', 'De 1 a 2 horas', 'Mais de 3 horas', 'O dia inteiro'] },
-    { t: 'As fotos e os preços dos seus kits estão <em>organizados</em>?', ops: ['Estão soltos na galeria e no WhatsApp', 'Estão só no Instagram', 'Tenho um PDF ou catálogo', 'Ainda não organizei'] },
-    { t: 'Suas clientes assinam <em>contrato</em> antes de levar o kit?', ops: ['Não, vai na confiança', 'Às vezes, em papel', 'Já tive problema sem contrato', 'Sempre, com contrato assinado'] }
+    { t: 'Onde você anota suas <em>reservas</em> hoje?', dor: 'Reservas espalhadas em caderno, planilha e conversas', doi: [0, 1, 2, 3], ops: ['No caderno ou agenda de papel', 'No próprio WhatsApp', 'Numa planilha', 'Guardo de cabeça'] },
+    { t: 'Já aconteceu de reservar o <em>mesmo kit duas vezes</em>?', dor: 'Risco de alugar o mesmo kit duas vezes', doi: [0, 1, 2], ops: ['Já aconteceu, foi um sufoco', 'Quase! Percebi a tempo', 'Ainda não, mas tenho medo', 'Nunca, tenho tudo sob controle'] },
+    { t: 'Quanto tempo por dia você passa respondendo <em>"tem data?"</em> e <em>"manda foto"</em>?', dor: 'Horas no WhatsApp respondendo "tem data?" e "manda foto"', doi: [1, 2, 3], ops: ['Menos de 1 hora', 'De 1 a 2 horas', 'Mais de 3 horas', 'O dia inteiro'] },
+    { t: 'As fotos e os preços dos seus kits estão <em>organizados</em>?', dor: 'Fotos e preços sem uma loja pronta para a cliente escolher', doi: [0, 1, 3], ops: ['Estão soltos na galeria e no WhatsApp', 'Estão só no Instagram', 'Tenho um PDF ou catálogo', 'Ainda não organizei'] },
+    { t: 'Suas clientes assinam <em>contrato</em> antes de levar o kit?', dor: 'Sem contrato assinado se der problema', doi: [0, 1, 2], ops: ['Não, vai na confiança', 'Às vezes, em papel', 'Já tive problema sem contrato', 'Sempre, com contrato assinado'] }
   ];
 
   // ======================= UTILIDADES =======================
@@ -217,11 +227,31 @@ h2.t{font-family:'Fredoka',sans-serif;font-weight:600;font-size:24px;text-align:
   $('#voltar').addEventListener('click', function () { if (atual > 0) pergunta(atual - 1); else mostrar('inicio'); });
   $('#comecar').addEventListener('click', function () { pixel('trackCustom', 'QuizInicio'); pergunta(0); });
 
+  // Tela de análise: barra de progresso e as dores que apareceram nas respostas
   function concluir() {
-    pixel('trackCustom', 'QuizConcluido');
+    var dores = [];
+    PERGUNTAS.forEach(function (q, i) { if (q.dor && q.doi.indexOf(respostas[i]) >= 0) dores.push(q.dor); });
+    if (!dores.length) dores = ['Reservas e pagamentos sem um lugar só', 'Tempo perdido respondendo no WhatsApp'];
+    pixel('trackCustom', 'QuizConcluido', { dores: dores.length });
     guardar('apm-quiz2-feito', '1');
     mostrar('preparando');
-    setTimeout(abrirVsl, 1600);
+    var lista = $('#an-lista');
+    lista.innerHTML = dores.map(function (d) { return '<div class="an-item"><b>✕</b><span>' + d + '</span></div>'; }).join('') +
+      '<div class="an-item bom"><b>✓</b><span>O App Pegue e Monte resolve ' + (dores.length === 1 ? 'esse ponto' : 'os ' + dores.length + ' pontos') + ', pelo celular</span></div>';
+    var itens = lista.querySelectorAll('.an-item');
+    var passo = 900, total = passo * (itens.length + 1);
+    itens.forEach(function (el, k) { setTimeout(function () { el.classList.add('vis'); }, passo * (k + 0.6)); });
+    var inicio = Date.now();
+    var t = setInterval(function () {
+      var f = Math.min(1, (Date.now() - inicio) / total);
+      $('#an-barra').style.width = Math.round(f * 100) + '%';
+      $('#an-pct').textContent = Math.round(f * 100) + '%';
+      if (f >= 1) {
+        clearInterval(t);
+        $('#an-titulo').textContent = dores.length === 1 ? 'Encontramos 1 ponto para melhorar' : 'Encontramos ' + dores.length + ' pontos para melhorar';
+        setTimeout(abrirVsl, 1800);
+      }
+    }, 120);
   }
 
   // ======================= VÍDEO =======================
