@@ -366,7 +366,7 @@ async function carregarTudo() {
     if (!estado.assinatura.encontrada) return telaSemAssinatura();
   }
   if (!estado.negocio) return telaConfiguracaoInicial();
-  [estado.kits, estado.reservas, estado.gastos, estado.montagem, estado.ia] = await Promise.all([dados.listarKits(), dados.listarReservas(), dados.listarGastos().catch(() => []), estado.suporte ? null : dados.minhaMontagem().catch(() => null), estado.suporte ? null : dados.iaSituacao().catch(() => null)]);
+  [estado.kits, estado.reservas, estado.gastos, estado.montagem, estado.ia] = await Promise.all([dados.listarKits(), dados.listarReservas(), dados.listarGastos().catch(() => []), estado.suporte ? null : dados.minhaMontagem().catch(() => null), dados.iaSituacao().catch(() => null)]);
   estado.carregadoEm = Date.now();
   montarApp();
 }
@@ -1863,7 +1863,7 @@ function abaKits(tela) {
   $$('[data-compartilhar]', tela).forEach((b) => (b.onclick = (e) => { e.stopPropagation(); compartilharKit(estado.kits.find((k) => k.id === b.dataset.compartilhar)); }));
   ligarCartaoIA(tela);
   // Situação da IA atualizada (ex.: terminou de organizar enquanto a dona estava em outra aba)
-  if (!estado.suporte) atualizarIA().then(() => { if (estado.aba === 'kits') redesenharCartaoIA(); });
+  atualizarIA().then(() => { if (estado.aba === 'kits') redesenharCartaoIA(); });
 }
 
 // Compartilhar um kit: o link abre o link de reservas direto nesse kit.
@@ -1902,11 +1902,10 @@ const IA_MAX_PRINTS = 6;
 const IA_MAX_PAGINAS = 15;
 
 async function atualizarIA() {
-  if (estado.suporte) { estado.ia = null; return null; }
   try { estado.ia = await dados.iaSituacao(); } catch (e) { estado.ia = null; }
   return estado.ia;
 }
-function iaLigada() { return !!(estado.ia && estado.ia.disponivel && !estado.suporte && podeEditar()); }
+function iaLigada() { return !!(estado.ia && estado.ia.disponivel && podeEditar()); }
 function linkDona() {
   const base = linkPublico(estado.negocio.slug);
   return base + (base.includes('?') ? '&' : '?') + 'dona=1';
@@ -1942,7 +1941,7 @@ function cartaoIA() {
   }
   const pago = ia.plano === 'pago';
   return `${topo}<section class="ia-cartao">
-    <span class="ia-selo">${pago ? '✓ Ilimitado no seu plano' : `Teste grátis · ${ia.restante} de ${ia.limite} kits para o catálogo`}</span>
+    <span class="ia-selo">${ia.suporte ? '🛟 Modo suporte · sem limite (não conta no teste da cliente)' : pago ? '✓ Ilimitado no seu plano' : `Teste grátis · ${ia.restante} de ${ia.limite} kits para o catálogo`}</span>
     <p class="ia-t">✨ ${pago && estado.kits.length ? 'Adicionar kits com IA' : 'Montar meu catálogo com IA'}</p>
     <p class="ia-p">${pago && estado.kits.length ? 'Mande fotos, PDF ou lista de preços quantas vezes quiser. Kits novos, de temporada ou o catálogo inteiro.' : 'Mande suas fotos, PDF ou lista de preços. A IA separa os kits e você só confere e aprova.'}</p>
     ${erro}
