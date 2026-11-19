@@ -3,7 +3,7 @@
 // Só abre para e-mails cadastrados na tabela "administradores".
 // Quem confere é o banco de dados: esta página só mostra o resultado.
 // =====================================================================
-import * as dados from './dados.js?v=20261119a';
+import * as dados from './dados.js?v=20261120a';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=20261117c';
 
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -162,6 +162,8 @@ const MENU_ADM = [
     ['abordagem', 'Abordagem', '<path d="M4 6h16M4 12h10M4 18h7"/>'],
     ['estudo', 'Estudo de conversão', '<path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/>'],
     ['popups', 'Popups e ofertas', '<rect x="4" y="5" width="16" height="12" rx="2"/><path d="M8 21h8"/>'],
+    ['quiz', 'Funil do quiz', '<path d="M9 9a3 3 0 115 2c-1 .7-2 1.3-2 3M12 18h.01"/><circle cx="12" cy="12" r="9.5"/>'],
+    ['ia', 'IA do catálogo', '<path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8zM19 15l.8 2.2 2.2.8-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>'],
   ]],
   ['Comunicação', [
     ['mensagens', 'Mensagens', '<path d="M4 5h16v11H8l-4 4z"/>'],
@@ -173,7 +175,7 @@ const MENU_ADM = [
     ['pagamentos', 'Pagamentos', '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>'],
   ]],
 ];
-const TITULOS_ADM = { resumo: 'Resumo', saude: 'Saúde da base', funil: 'Funil do teste grátis', abordagem: 'Quadro de abordagem', estudo: 'Estudo de conversão', popups: 'Popups e ofertas', mensagens: 'Central de mensagens', emails: 'E-mails automáticos', clientes: 'Clientes', montagem: 'Montagem contratada', pagamentos: 'Pagamentos' };
+const TITULOS_ADM = { resumo: 'Resumo', saude: 'Saúde da base', funil: 'Funil do teste grátis', abordagem: 'Quadro de abordagem', estudo: 'Estudo de conversão', popups: 'Popups e ofertas', quiz: 'Funil do quiz 2 (página com vídeo)', ia: 'IA do catálogo: uso e assinaturas', mensagens: 'Central de mensagens', emails: 'E-mails automáticos', clientes: 'Clientes', montagem: 'Montagem contratada', pagamentos: 'Pagamentos' };
 function montar() {
   const itens = MENU_ADM.flatMap(([, l]) => l);
   raiz.innerHTML = `
@@ -186,7 +188,7 @@ function montar() {
     <header class="topo"><div class="topo-in">
       <a class="btn-voltar" href="./" style="text-decoration:none">‹ Voltar</a>
       <h1>Painel do administrador</h1>
-      <nav class="abas-adm" role="tablist" style="grid-template-columns:repeat(${itens.length}, minmax(0, 1fr))">
+      <nav class="abas-adm" role="tablist">
         ${itens.map(([id, t]) => `<button data-aba="${id}">${esc(t)}</button>`).join('')}
       </nav>
     </div></header>
@@ -200,6 +202,9 @@ function montar() {
 
 function desenhar() {
   $$('[data-aba]').forEach((b) => b.classList.toggle('ativa', b.dataset.aba === estado.aba));
+  // No celular as abas rolam para o lado: deixa a aba aberta sempre à vista
+  const abaAtiva = document.querySelector('.abas-adm button.ativa');
+  if (abaAtiva && abaAtiva.scrollIntoView) abaAtiva.scrollIntoView({ block: 'nearest', inline: 'center' });
   const tela = $('#tela');
   if (estado.aba === 'resumo') { abaResumo(tela); ligarResumoExtras(tela); }
   else if (estado.aba === 'saude') abaSaude(tela);
@@ -207,6 +212,8 @@ function desenhar() {
   else if (estado.aba === 'abordagem') abaAbordagem(tela);
   else if (estado.aba === 'estudo') abaEstudo(tela);
   else if (estado.aba === 'popups') abaPopups(tela);
+  else if (estado.aba === 'quiz') abaQuiz(tela);
+  else if (estado.aba === 'ia') abaIA(tela);
   else if (estado.aba === 'mensagens') abaMensagens(tela);
   else if (estado.aba === 'emails') abaEmails(tela);
   else if (estado.aba === 'montagem') abaMontagem(tela);
@@ -1650,6 +1657,117 @@ function somarDiasUteis(iso, n) {
   while (faltam > 0) { d.setDate(d.getDate() + 1); if (d.getDay() !== 0 && d.getDay() !== 6) faltam--; }
   return d;
 }
+// ---------------------------------------------------------------------
+// Funil do quiz 2: até onde cada visitante chegou (anônimo)
+// ---------------------------------------------------------------------
+const PASSOS_QUIZ = [
+  ['abriu', 'Abriu a página'],
+  ['comecou', 'Começou o quiz'],
+  ['p1', 'Pergunta 1 · tempo no pegue e monte'],
+  ['p2', 'Pergunta 2 · quantos kits'],
+  ['p3', 'Pergunta 3 · onde anota as reservas'],
+  ['p4', 'Pergunta 4 · kit reservado duas vezes'],
+  ['p5', 'Pergunta 5 · tempo no WhatsApp'],
+  ['p6', 'Pergunta 6 · fotos e preços organizados'],
+  ['p7', 'Pergunta 7 · contrato'],
+  ['concluiu', 'Terminou o quiz'],
+  ['video', 'Chegou no vídeo'],
+  ['som', 'Ligou o som'],
+  ['v25', 'Assistiu 25% com som'],
+  ['v50', 'Assistiu 50% com som'],
+  ['v75', 'Assistiu 75% com som'],
+  ['botao', 'Chegou no pitch (2:17) · botão apareceu'],
+  ['planos', 'Clicou em "Ver os planos"'],
+  ['checkout', 'Clicou para pagar (anual + mensal)'],
+];
+async function abaQuiz(tela) {
+  const f = estado.quizFiltro || (estado.quizFiltro = { dias: 7, anuncio: '' });
+  tela.innerHTML = '<div id="qz-c" class="coluna" style="gap:16px"><div class="cartao">Carregando…</div></div>';
+  const alvo = $('#qz-c', tela);
+  let d;
+  try { d = await dados.adminFunilQuiz('quiz2', f.dias, f.anuncio); } catch (e) { alvo.innerHTML = `<div class="cartao">${esc(e.message)}</div>`; return; }
+  if (estado.aba !== 'quiz' || !alvo.isConnected) return;
+  const et = { ...(d.etapas || {}) };
+  et.checkout = Number(et.checkout_anual || 0) + Number(et.checkout_mensal || 0);
+  const topo = Number(et.abriu || 0) || 1;
+  const valores = PASSOS_QUIZ.map(([id]) => Number(et[id] || 0));
+  let maior = 0, onde = -1;
+  valores.forEach((v, i) => { if (i && valores[i - 1] - v > maior) { maior = valores[i - 1] - v; onde = i; } });
+  const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
+  const respostas = d.respostas || [];
+  alvo.innerHTML = `
+    <div class="etabas">${[[1, 'Hoje'], [7, '7 dias'], [30, '30 dias'], [90, '90 dias']].map(([n, t]) => `<button class="${f.dias === n ? 'on' : ''}" data-qd="${n}">${t}</button>`).join('')}</div>
+    ${(d.anuncios || []).length ? `<label class="campo" style="max-width:420px"><span>Anúncio</span><select id="qz-an"><option value="">Todos os anúncios</option>${d.anuncios.map((a) => `<option value="${esc(a.anuncio === '(sem anúncio)' ? '' : a.anuncio)}" ${f.anuncio === a.anuncio ? 'selected' : ''}>${esc(a.anuncio)}</option>`).join('')}</select></label>` : ''}
+    <div class="kpis-crm">
+      <div class="kpi"><small>Abriram a página</small><b>${et.abriu || 0}</b></div>
+      <div class="kpi"><small>Terminaram o quiz</small><b>${pct(et.concluiu || 0, topo)}%</b><i>${et.concluiu || 0} pessoas</i></div>
+      <div class="kpi"><small>Ligaram o som do vídeo</small><b>${pct(et.som || 0, et.video || 0)}%</b><i>de quem chegou no vídeo</i></div>
+      <div class="kpi"><small>Viram os planos</small><b>${et.planos || 0}</b><i>${pct(et.planos || 0, topo)}% de quem abriu</i></div>
+      <div class="kpi"><small>Clicaram para pagar</small><b>${et.checkout}</b><i class="p">${et.checkout_anual || 0} anual · ${et.checkout_mensal || 0} mensal</i></div>
+    </div>
+    <section class="cartao">
+      <div class="cab-crm"><h2>Até onde as pessoas chegam</h2><span>cada pessoa conta uma vez por passo</span></div>
+      <div class="qz-lista">${PASSOS_QUIZ.map(([id, t], i) => `<div class="qz-l ${i === onde ? 'buraco' : ''}">
+        <span class="qz-t">${esc(t)}</span>
+        <span class="qz-barra"><i style="width:${pct(valores[i], topo)}%"></i></span>
+        <b>${valores[i]}</b><small>${pct(valores[i], topo)}%</small>
+        <em>${i && valores[i - 1] - valores[i] > 0 ? '−' + (valores[i - 1] - valores[i]) : ''}</em></div>`).join('')}</div>
+      ${onde > 0 && maior ? `<div class="nota-crm">O maior buraco está entre <b>${esc(PASSOS_QUIZ[onde - 1][1].toLowerCase())}</b> e <b>${esc(PASSOS_QUIZ[onde][1].toLowerCase())}</b>: ${maior} pessoas pararam ali.</div>` : ''}
+    </section>
+    ${respostas.length ? `<section class="cartao"><div class="cab-crm"><h2>O que responderam</h2></div>
+      <div class="qz-resp">${PASSOS_QUIZ.filter(([id]) => /^p\d$/.test(id)).map(([id, t]) => {
+        const rs = respostas.filter((r) => r.etapa === id); const tot = rs.reduce((a, r) => a + Number(r.n), 0);
+        return rs.length ? `<div><b>${esc(t)}</b>${rs.map((r) => `<div class="qz-r"><span>${esc(r.detalhe || '—')}</span><span class="qz-barra"><i style="width:${pct(r.n, tot)}%"></i></span><small>${pct(r.n, tot)}%</small></div>`).join('')}</div>` : '';
+      }).join('')}</div></section>` : ''}
+    ${(d.anuncios || []).length ? `<section class="cartao"><div class="cab-crm"><h2>Por anúncio</h2><span>utm_content do link</span></div>
+      <div class="tabela"><div class="tr th qz-an"><span>Anúncio</span><span>Abriram</span><span>Terminaram</span><span>Som</span><span>Planos</span><span>Pagar</span></div>
+      ${d.anuncios.map((a) => `<div class="tr qz-an"><span>${esc(a.anuncio)}</span><span>${a.abriu}</span><span>${a.concluiu} <small>${pct(a.concluiu, a.abriu)}%</small></span><span>${a.som}</span><span>${a.planos}</span><span><b>${a.checkout}</b> <small>${pct(a.checkout, a.abriu)}%</small></span></div>`).join('')}</div></section>` : ''}
+    <p class="dica">Conta só quem abriu o app.pegueemonte.com/quiz2. "Clicou para pagar" é o clique no botão do plano: a compra em si aparece em Pagamentos e na Utmify.</p>`;
+  $$('[data-qd]', alvo).forEach((b) => (b.onclick = () => { f.dias = Number(b.dataset.qd); abaQuiz(tela); }));
+  const an = $('#qz-an', alvo);
+  if (an) an.onchange = () => { f.anuncio = an.value; abaQuiz(tela); };
+}
+
+async function abaIA(tela) {
+  const f = estado.iaFiltro || (estado.iaFiltro = { dias: 0 });
+  tela.innerHTML = '<div id="ia-c" class="coluna" style="gap:16px"><div class="cartao">Carregando…</div></div>';
+  const alvo = $('#ia-c', tela);
+  let d;
+  try { d = await dados.adminIaResultados(f.dias); } catch (e) { alvo.innerHTML = `<div class="cartao">${esc(e.message)}</div>`; return; }
+  if (estado.aba !== 'ia' || !alvo.isConnected) return;
+  const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
+  const n = (k) => Number(d[k] || 0);
+  const topo = n('usaram') || 1;
+  const passos = [['Usaram a IA (mandaram material)', n('usaram')], ['Publicaram kits pela IA', n('publicaram')], ['Assinaram depois de publicar', n('assinaram_depois')]];
+  const SIT = { assinou: ['Assinou depois', 'ok'], ja_era: ['Já era assinante', ''], nao: ['Ainda não assinou', 'nao'] };
+  alvo.innerHTML = `
+    <div class="etabas">${[[0, 'Desde o início'], [7, '7 dias'], [30, '30 dias'], [90, '90 dias']].map(([v, t]) => `<button class="${f.dias === v ? 'on' : ''}" data-iad="${v}">${t}</button>`).join('')}</div>
+    ${d.liberado_para !== 'todos' ? '<div class="nota-crm">A IA ainda está liberada só para administradores. Os números abaixo não contam as contas de administrador.</div>' : ''}
+    <div class="kpis-crm">
+      <div class="kpi"><small>Lojas que usaram a IA</small><b>${n('usaram')}</b><i>${n('envios')} envios · ${n('erros')} com erro</i></div>
+      <div class="kpi"><small>Publicaram kits pela IA</small><b>${n('publicaram')}</b><i>${n('kits_publicados')} kits no catálogo</i></div>
+      <div class="kpi"><small>Assinaram depois</small><b>${n('assinaram_depois')}</b><i class="p">${pct(n('assinaram_depois'), n('podiam_assinar'))}% de quem publicou no teste</i></div>
+      <div class="kpi"><small>Custo da IA</small><b>US$ ${Number(d.custo_usd || 0).toFixed(2).replace('.', ',')}</b><i>${n('kits_encontrados')} kits encontrados</i></div>
+    </div>
+    <section class="cartao">
+      <div class="cab-crm"><h2>Do uso à assinatura</h2><span>cada loja conta uma vez</span></div>
+      <div class="qz-lista">${passos.map(([t, v]) => `<div class="qz-l"><span class="qz-t">${esc(t)}</span><span class="qz-barra"><i style="width:${pct(v, topo)}%"></i></span><b>${v}</b><small>${pct(v, topo)}%</small><em></em></div>`).join('')}</div>
+      ${n('ja_assinantes') ? `<p class="dica" style="margin:8px 0 0">${n('ja_assinantes')} ${n('ja_assinantes') === 1 ? 'loja já era assinante quando publicou' : 'lojas já eram assinantes quando publicaram'} pela IA (não entram em "assinaram depois").</p>` : ''}
+    </section>
+    <section class="cartao">
+      <div class="cab-crm"><h2>Contas novas: com IA x sem IA</h2><span>contas criadas no período</span></div>
+      <div class="kpis-crm" style="margin:0">
+        <div class="kpi"><small>Publicaram kits pela IA</small><b>${pct(n('contas_com_ia_assinaram'), n('contas_com_ia'))}%</b><i>assinaram · ${n('contas_com_ia_assinaram')} de ${n('contas_com_ia')}</i></div>
+        <div class="kpi"><small>Não usaram a IA</small><b>${pct(n('contas_sem_ia_assinaram'), n('contas_sem_ia'))}%</b><i>assinaram · ${n('contas_sem_ia_assinaram')} de ${n('contas_sem_ia')}</i></div>
+      </div>
+    </section>
+    ${(d.lojas || []).length ? `<section class="cartao"><div class="cab-crm"><h2>Lojas que publicaram pela IA</h2><span>mais recentes primeiro</span></div>
+      <div class="tabela"><div class="tr th ia-lj"><span>Loja</span><span>Kits pela IA</span><span>Quando</span><span>Assinatura</span></div>
+      ${d.lojas.map((l) => `<div class="tr ia-lj"><span>${esc(l.loja || '—')}</span><span>${Number(l.kits) || 0}</span><span>${esc(dataHora(l.quando))}</span><span><em class="ia-sit ${(SIT[l.situacao] || ['', ''])[1]}">${esc((SIT[l.situacao] || [l.situacao])[0])}</em></span></div>`).join('')}</div></section>` : ''}
+    <p class="dica">"Assinaram depois" = primeira compra aprovada na Cakto depois da primeira publicação de kits pela IA. Contas de administrador e cortesias ficam de fora.</p>`;
+  $$('[data-iad]', alvo).forEach((b) => (b.onclick = () => { f.dias = Number(b.dataset.iad); abaIA(tela); }));
+}
+
 async function abaMontagem(tela) {
   tela.innerHTML = '<div id="mt-c" class="coluna" style="gap:16px"><div class="cartao">Carregando…</div></div>';
   const alvo = $('#mt-c', tela);
@@ -1680,10 +1798,10 @@ async function abaMontagem(tela) {
         const prazo = m.pediu_em ? somarDiasUteis(m.pediu_em, 3) : null;
         const atras = prazo && !m.concluida_em && prazo < new Date();
         const nome = String(m.nome || '').split(' ')[0];
-        const msg = m.pediu_em ? `Oi${nome ? ', ' + nome : ''}! Aqui é da equipe do App Pegue e Monte. Estamos montando a sua loja 😊` : `Oi${nome ? ', ' + nome : ''}! Vi que você assinou o anual com a montagem da loja. Me manda as fotos, os nomes e os preços dos seus kits por aqui que a nossa equipe cadastra tudo para você 😊`;
+        const msg = m.pediu_em ? `Oi${nome ? ', ' + nome : ''}! Aqui é da equipe do App Pegue e Monte. Estamos montando a sua loja 😊` : `Oi${nome ? ', ' + nome : ''}! Vi que você assinou o app, e a montagem da loja está incluída. Me manda as fotos, os nomes e os preços dos seus kits por aqui que a nossa equipe cadastra tudo para você 😊`;
         return `<div class="tr"><span>${esc(m.loja || m.email)}<small>${esc(m.email)}</small></span><span>${esc(data(m.assinou_em))}</span>
           <span>${m.pediu_em ? esc(data(m.pediu_em)) : '<span class="tag t-red">ainda não pediu</span>'}</span>
-          <span><span class="mini-barra"><i style="width:${Math.min(100, (Number(m.kits_agora || 0) / (m.limite_kits || 50)) * 100)}%;background:var(--acc)"></i></span><small>${m.kits_agora || 0} de ${m.limite_kits || 50} · ${feitos} pela montagem</small></span>
+          <span><small><b>${m.kits_agora || 0}</b> kits · ${feitos} pela montagem</small></span>
           <span>${prazo ? `<b class="${atras ? 'neg' : ''}">${prazo.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</b>${atras ? '<small>atrasada</small>' : ''}` : '—'}${m.concluida_em ? `<small>concluída ${esc(data(m.concluida_em))}</small>` : ''}</span>
           <span class="acoes-linha">
             ${m.telefone ? `<a class="btn verde mini" href="${esc(linkZap(m.telefone, msg))}" target="_blank" rel="noopener">${m.pediu_em ? 'WhatsApp' : 'Lembrar no WhatsApp'}</a>` : ''}

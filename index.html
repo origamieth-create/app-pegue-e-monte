@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="Pegue e Monte">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito+Sans:wght@400;600;700;800&display=swap">
-<link rel="stylesheet" href="estilo.css?v=20261119a">
+<link rel="stylesheet" href="estilo.css?v=20261120a">
 <style>
   body { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
   #faixa { position: sticky; top: 0; z-index: 40; }
@@ -90,6 +90,27 @@
   main:has(.cal) > .cartao { grid-column: 1; }
   main:has(.cal) > section.coluna { grid-column: 2; grid-row: 1 / span 2; }
   main:has(.cal) .cal button { height: 64px; }
+  /* a lista do dia pode ser longa: ela não empurra o calendário para baixo */
+  main:has(.cal) { grid-template-rows: auto 1fr; }
+  main:has(.cal) > .cartao { align-self: start; position: sticky; top: 16px; }
+  /* Início: "Tudo em dia" fica na coluna dos alertas */
+  main:has(> .fin) > .tudo-em-dia { grid-column: 2; align-self: start; }
+  /* Aba Mais no computador */
+  main:has(> .perfil-topo) > h1 { order: 0; }
+  main:has(> .perfil-topo) > .perfil-topo { order: 1; grid-column: 1; align-self: stretch; padding: 22px 24px; gap: 18px; }
+  main:has(> .perfil-topo) > .perfil-topo:hover { border-color: var(--tinta); }
+  main:has(> .perfil-topo) > section.cartao.mais-link { order: 2; grid-column: 2; }
+  main:has(> .perfil-topo) > .bf-card { order: 3; }
+  main:has(> .perfil-topo) > .avisos-loja, main:has(> .perfil-topo) > .instalar { order: 4; grid-column: auto; }
+  main:has(> .perfil-topo) > .mais-atalhos { order: 5; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+  main:has(> .perfil-topo) > .mais-atalhos > .cartao { margin: 0; padding: 20px; display: flex; flex-direction: column; justify-content: center; gap: 4px; min-height: 96px; }
+  main:has(> .perfil-topo) > section.cartao.mais-ajuda { order: 6; grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: center; }
+  main:has(> .perfil-topo) > .mais-ajuda > h2, main:has(> .perfil-topo) > .mais-ajuda > .dica { grid-column: 1 / -1; margin: 0; }
+  main:has(> .perfil-topo) > .mais-ajuda > .dica { text-align: left; }
+  main:has(> .perfil-topo) > section:not([class*=mais-]):not(.avisos-loja):not(.instalar) { order: 7; }
+  main:has(> .perfil-topo) > #sair { order: 8; justify-self: start; width: auto; padding: 0 28px; }
+  .perfil-topo .perfil-logo { width: 72px; height: 72px; font-size: 28px; }
+  .perfil-topo .perfil-txt b { font-size: 19px; }
 }
 @media (min-width: 1440px) {
   .kits-grade { grid-template-columns: repeat(5, minmax(0, 1fr)); }
@@ -106,6 +127,6 @@
 <div id="raiz"><div class="carregando">Carregando…</div></div>
 <div id="painel"></div>
 <div id="toast" class="toast oculto" role="status" aria-live="polite"></div>
-<script type="module" src="app.js?v=20261119c"></script>
+<script type="module" src="app.js?v=20261120a"></script>
 </body>
 </html>

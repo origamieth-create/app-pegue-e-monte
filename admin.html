@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="icone-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito+Sans:wght@400;600;700;800&display=swap">
-<link rel="stylesheet" href="estilo.css?v=20261119a">
+<link rel="stylesheet" href="estilo.css?v=20261120a">
 <style>
   body { padding-bottom: calc(32px + env(safe-area-inset-bottom)); }
   .topo { position: sticky; top: 0; z-index: 20; background: var(--tinta); color: #fff; padding: calc(8px + env(safe-area-inset-top)) 10px 0; }
@@ -102,7 +102,9 @@
   .barra-topo .atu { font-size: 12.5px; color: var(--texto2); font-weight: 600; }
   .topo { background: var(--lado); border-bottom: 1px solid var(--linha); }
   .topo h1 { font-size: 18px; color: var(--tinta); }
-  .abas-adm button { color: var(--texto2); font-size: 14px; }
+  .abas-adm { display: flex; gap: 2px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; margin: 0 -16px; padding: 0 12px; }
+  .abas-adm::-webkit-scrollbar { display: none; }
+  .abas-adm button { flex: none; white-space: nowrap; padding: 0 12px; color: var(--texto2); font-size: 14px; }
   .abas-adm button.ativa { color: var(--tinta); border-bottom-color: var(--acc); }
   @media (min-width: 1024px) {
     .topo { display: none; }
@@ -203,6 +205,25 @@
   .lista-crm > div:last-child { border: 0; }
   .lista-crm span { display: flex; align-items: center; gap: 8px; }
   /* ===== Quadro de abordagem ===== */
+  .qz-lista { display: flex; flex-direction: column; }
+  .qz-l { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(60px, 1fr) 44px 40px 40px; gap: 10px; align-items: center; padding: 8px 4px; border-bottom: 1px solid var(--linha); font-size: 13.5px; }
+  .qz-l:last-child { border-bottom: 0; }
+  .qz-l.buraco { background: rgba(240, 82, 92, .08); border-radius: 8px; }
+  .qz-t { font-weight: 700; color: var(--tinta); }
+  .qz-barra { height: 9px; background: var(--cartao2); border-radius: 99px; overflow: hidden; }
+  .qz-barra i { display: block; height: 100%; background: linear-gradient(90deg, #3B6CF6, #B04A9E); border-radius: 99px; }
+  .qz-l b { text-align: right; color: var(--tinta); }
+  .qz-l small, .qz-r small { color: var(--texto2); font-weight: 700; text-align: right; }
+  .qz-l em { font-style: normal; color: #F0525C; font-weight: 800; font-size: 12px; text-align: right; }
+  .qz-resp { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; }
+  .qz-resp > div > b { display: block; margin-bottom: 6px; font-size: 13.5px; color: var(--tinta); }
+  .qz-r { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(50px, 1fr) 40px; gap: 8px; align-items: center; font-size: 13px; padding: 4px 0; color: var(--texto2); }
+  .tabela .tr.qz-an { display: grid; grid-template-columns: minmax(0, 2fr) repeat(5, minmax(60px, 1fr)); }
+  .tabela .tr.ia-lj { display: grid; grid-template-columns: minmax(0, 2fr) minmax(70px, 1fr) minmax(110px, 1.3fr) minmax(120px, 1.3fr); align-items: center; }
+  .ia-sit { font-style: normal; font-weight: 800; font-size: 12.5px; padding: 3px 9px; border-radius: 99px; background: #EEE9F7; color: #5B3FA6; white-space: nowrap; }
+  .ia-sit.ok { background: #E3F5EA; color: #1E7A45; } .ia-sit.nao { background: #F4EFEA; color: #7A6E66; }
+  @media (max-width: 600px) { .tabela .tr.ia-lj { grid-template-columns: minmax(0, 1.3fr) 44px minmax(0, 1fr); font-size: 12px; } .tabela .tr.ia-lj > span:nth-child(3) { display: none; } .ia-sit { font-size: 11px; padding: 2px 6px; } }
+  @media (max-width: 600px) { .qz-l { grid-template-columns: minmax(0, 1fr) 70px 38px 34px; } .qz-l em { display: none; } .tabela .tr.qz-an { grid-template-columns: minmax(0, 1.4fr) repeat(5, 46px); font-size: 12px; } }
   .etabas { display: flex; gap: 2px; border-bottom: 1px solid var(--linha); overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .etabas button { flex: none; background: none; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; padding: 11px 12px; color: var(--texto2); font-weight: 800; font-size: 14px; cursor: pointer; white-space: nowrap; }
   .etabas button b { display: inline-block; min-width: 22px; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: var(--cartao2); color: var(--tinta); font-size: 12px; }
@@ -346,6 +367,6 @@
 <body>
 <div id="raiz"><div class="carregando">Carregando…</div></div>
 <div id="toast" class="toast oculto" role="status" aria-live="polite"></div>
-<script type="module" src="admin.js?v=20261119a"></script>
+<script type="module" src="admin.js?v=20261120a"></script>
 </body>
 </html>

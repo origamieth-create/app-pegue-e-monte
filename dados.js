@@ -490,10 +490,9 @@ function demoIaConcluir(l) {
       fotos: fs, fotos_todas: fs, existe: t && D().kits.find((k) => k.nome.toLowerCase() === t.nome.toLowerCase()) ? t.nome : null,
       origem: { nome: t ? 'lista de preços' : null, ligacao: t && fs.length ? 'simulação da demonstração' : null, preco: t ? 'lista de preços' : null, trecho: t ? t.trecho : null } });
   }
-  const restante = Math.max(0, IA_LIMITE_TESTE - ia.usados);
-  const ordem = kits.map((k, i) => ({ i, r: (k.fotos.length ? 0 : 1) + Math.random() })).sort((a, b) => a.r - b.r).map((x) => x.i);
-  kits.forEach((k) => { k.situacao = 'conferir'; });
-  if (l.teste) { ordem.forEach((i, pos) => { if (pos >= restante) kits[i].situacao = 'guardado'; }); ia.usados += Math.min(restante, kits.length); }
+  const todos = !l.teste || kits.length <= 10;
+  kits.forEach((k) => { k.situacao = todos ? 'conferir' : 'guardado'; });
+  l.escolher = todos ? 0 : 10;
   l.kits = kits; l.status = kits.length ? 'pronto' : 'erro';
   if (!kits.length) l.erro = 'Na demonstração, escreva na lista linhas como "Kit Safari R$ 350 sinal 100" ou mande fotos.';
   delete l.entrada;
@@ -501,7 +500,7 @@ function demoIaConcluir(l) {
 }
 function demoIaLiberar() {
   if (demoIaPlano() !== 'pago') return;
-  for (const l of demoIa().lotes) for (const k of l.kits || []) if (k.situacao === 'guardado') { k.situacao = 'conferir'; k.liberado = true; l.status = 'pronto'; }
+  for (const l of demoIa().lotes) { l.escolher = 0; for (const k of l.kits || []) if (k.situacao === 'guardado') { k.situacao = 'conferir'; k.liberado = true; if (l.status === 'fechado') l.status = 'pronto'; } }
 }
 async function chamarFuncaoIA(corpo, bruto = false) {
   const s = await cliente();
@@ -525,10 +524,12 @@ export async function iaSituacao() {
     const ia = demoIa(); const plano = demoIaPlano();
     demoIaLiberar(); ia.lotes.forEach(demoIaConcluir);
     const kits = ia.lotes.filter((l) => l.status === 'pronto').flatMap((l) => l.kits || []);
-    const aberto = [...ia.lotes].reverse().find((l) => l.status === 'pronto' && (l.kits || []).some((k) => ['conferir', 'aprovado'].includes(k.situacao)));
+    const aberto = [...ia.lotes].reverse().find((l) => l.status === 'pronto' && (l.escolher > 0 || (l.kits || []).some((k) => ['conferir', 'aprovado'].includes(k.situacao))));
+    const escolher = [...ia.lotes].reverse().find((l) => l.status === 'pronto' && l.escolher > 0);
     const proc = ia.lotes.find((l) => l.status === 'processando');
     const ultErro = [...ia.lotes].reverse().find((l) => l.status === 'erro' && Date.now() - l.criado < 1800e3);
     return { disponivel: plano !== 'bloqueado', plano, limite: IA_LIMITE_TESTE, restante: plano === 'teste' ? Math.max(0, IA_LIMITE_TESTE - ia.usados) : null,
+      limite_por_envio: 10, escolher: escolher ? escolher.id : null,
       processando: proc ? proc.id : null, lote: aberto ? aberto.id : null,
       pendentes: kits.filter((k) => ['conferir', 'aprovado'].includes(k.situacao)).length,
       liberados: kits.filter((k) => k.situacao === 'conferir' && k.liberado).length,
@@ -544,7 +545,8 @@ export async function iaLote(id) {
     if (!l) throw new Error('Envio não encontrado');
     demoIaLiberar(); demoIaConcluir(l);
     const pago = demoIaPlano() === 'pago';
-    return { id: l.id, status: l.status, erro: l.erro || null, teste: l.teste, kits: (l.kits || []).map((k) => (k.situacao === 'guardado' && !pago ? { situacao: 'guardado' } : JSON.parse(JSON.stringify(k)))) };
+    return { id: l.id, status: l.status, erro: l.erro || null, teste: l.teste, escolher: pago ? 0 : l.escolher || 0,
+      kits: (l.kits || []).map((k) => (k.situacao === 'guardado' && !pago ? { situacao: 'guardado', nome: k.nome, foto: (k.fotos || [])[0] || null, recorte: (k.recortes || [])[0] || null } : JSON.parse(JSON.stringify(k)))) };
   }
   const s = await cliente();
   return ok(s.rpc('ia_lote', { p_id: id }));
@@ -552,7 +554,15 @@ export async function iaLote(id) {
 export async function iaSalvar(id, kits) {
   if (MODO_DEMO) {
     const l = demoIa().lotes.find((x) => x.id === id);
-    l.kits = l.kits.map((k, i) => (['guardado', 'publicado'].includes(k.situacao) || !kits[i] ? k : { ...k, ...kits[i], fotos: (kits[i].fotos || []).filter((f) => (k.fotos_todas || []).includes(f) || String(f).startsWith('data:')).slice(0, 5) }));
+    const ia = demoIa(); const teste = demoIaPlano() === 'teste';
+    let cabe = teste ? Math.max(0, IA_LIMITE_TESTE - ia.usados) : Infinity, publicou = 0;
+    l.kits = l.kits.map((k, i) => {
+      if (['guardado', 'publicado'].includes(k.situacao) || !kits[i]) return k;
+      let sit = ['conferir', 'aprovado', 'descartado', 'publicado'].includes(kits[i].situacao) || (kits[i].situacao === 'guardado' && teste) ? kits[i].situacao : k.situacao;
+      if (sit === 'publicado' && teste) { if (publicou >= cabe) sit = 'aprovado'; else publicou++; }
+      return { ...k, ...kits[i], situacao: sit, fotos: (kits[i].fotos || []).filter((f) => (k.fotos_todas || []).includes(f) || String(f).startsWith('data:')).slice(0, 5) };
+    });
+    ia.usados += publicou;
     if (!l.kits.some((k) => ['conferir', 'aprovado', 'guardado'].includes(k.situacao))) l.status = 'fechado';
     demoSalvar(); return { ok: true };
   }
@@ -568,15 +578,30 @@ export async function iaEnviarImagem(blob, pasta, nome) {
   await ok(s.storage.from('fotos').upload(caminho, blob, { contentType: 'image/jpeg', upsert: false }));
   return s.storage.from('fotos').getPublicUrl(caminho).data.publicUrl;
 }
+export async function iaEscolher(id, posicoes) {
+  if (MODO_DEMO) {
+    const ia = demoIa(); const l = ia.lotes.find((x) => x.id === id);
+    const cabe = Math.min(l.escolher || 0, 10);
+    if (!posicoes.length) throw new Error('Escolha pelo menos 1 kit');
+    if (posicoes.length > cabe) throw new Error(`No teste grátis você pode escolher até ${cabe} kits`);
+    let n = 0;
+    l.kits.forEach((k, i) => { if (k.situacao === 'guardado' && posicoes.includes(i)) { k.situacao = 'conferir'; n++; } });
+    l.escolher = 0; demoSalvar();
+    return { ok: true, escolhidos: n };
+  }
+  const s = await cliente();
+  return ok(s.rpc('ia_escolher', { p_id: id, p_posicoes: posicoes }));
+}
 export async function iaOrganizar(material) {
   if (MODO_DEMO) {
     const ia = demoIa(); const plano = demoIaPlano();
     if (plano === 'bloqueado') throw new Error('Sua assinatura não está ativa. Assine para usar a IA.');
-    if (plano === 'teste' && ia.usados >= IA_LIMITE_TESTE) throw new Error('Você já usou os 5 kits da IA do teste grátis. Assine para usar sem limite.');
     if (ia.lotes.some((l) => l.status === 'processando')) throw new Error('A IA ainda está organizando o seu último envio. Espere terminar.');
     const l = { id: uid(), status: 'processando', criado: Date.now(), teste: plano === 'teste', kits: [],
       entrada: { texto: material.texto, paginas: (material.paginas || []).map((p) => ({ texto: p.texto })), imagens: (material.imagens || []).map((f) => ({ url: f.url })) } };
-    ia.lotes.push(l); ia.lotes = ia.lotes.slice(-6); demoSalvar();
+    ia.lotes.push(l);
+    ia.lotes = ia.lotes.slice(-6);
+    demoSalvar();
     return { lote: l.id };
   }
   return chamarFuncaoIA({ acao: 'organizar', ...material });
@@ -641,6 +666,25 @@ export async function adminMudarMensagem(id, status) {
   if (MODO_DEMO) return;
   const s = await cliente();
   return ok(s.rpc('admin_mudar_mensagem', { p_id: id, p_status: status }));
+}
+export async function adminFunilQuiz(pagina, dias, anuncio) {
+  if (MODO_DEMO) {
+    const base = { abriu: 412, comecou: 301, p1: 288, p2: 280, p3: 271, p4: 266, p5: 259, p6: 252, p7: 248, concluiu: 246, video: 240, som: 171, v25: 150, v50: 121, v75: 98, botao: 92, video_fim: 64, planos: 58, checkout_anual: 21, checkout_mensal: 9, whatsapp: 4 };
+    return { etapas: base, respostas: [{ etapa: 'p2', detalhe: 'De 6 a 15 kits', n: 120 }, { etapa: 'p2', detalhe: 'De 1 a 5 kits', n: 90 }], anuncios: [{ anuncio: 'Video Teste_01', abriu: 260, concluiu: 160, som: 110, planos: 40, checkout: 22 }, { anuncio: '(sem anúncio)', abriu: 152, concluiu: 86, som: 61, planos: 18, checkout: 8 }] };
+  }
+  const s = await cliente();
+  return ok(s.rpc('admin_funil_quiz', { p_pagina: pagina, p_dias: dias, p_anuncio: anuncio || null }));
+}
+export async function adminIaResultados(dias) {
+  if (MODO_DEMO) {
+    const agora = Date.now();
+    return { liberado_para: 'todos', usaram: 48, envios: 71, erros: 3, kits_encontrados: 612, publicaram: 37, kits_publicados: 402, ja_assinantes: 6, assinaram_depois: 9, podiam_assinar: 31, custo_usd: 18.4,
+      contas_com_ia: 31, contas_com_ia_assinaram: 9, contas_sem_ia: 64, contas_sem_ia_assinaram: 5,
+      lojas: [['Festas da Ana', 12, 'assinou'], ['Doce Festa Kits', 5, 'nao'], ['Mundo Pegue e Monte', 23, 'ja_era'], ['Kits da Ju', 5, 'assinou'], ['Encanto Festas', 4, 'nao']]
+        .map(([loja, kits, situacao], i) => ({ loja, kits, situacao, quando: new Date(agora - i * 7e6).toISOString() })) };
+  }
+  const s = await cliente();
+  return ok(s.rpc('admin_ia_resultados', { p_dias: dias || 0 }));
 }
 export async function adminMontagens() {
   if (MODO_DEMO) return [];
