@@ -58,9 +58,21 @@ button{font:inherit;cursor:pointer}
 .player{width:100%;background:#000;aspect-ratio:9/16;max-height:82vh;max-height:82dvh;display:flex;align-items:center;justify-content:center;color:#fff;position:relative}
 .player video,.player iframe{width:100%;height:100%;border:0;display:block;background:#000}
 .player .vazio{display:flex;flex-direction:column;align-items:center;gap:10px;opacity:.75;font-weight:700;font-size:14px}
+.player video{object-fit:contain;cursor:pointer}
+.som{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:6px;background:rgba(228,80,92,.94);color:#fff;border:3px solid #fff;border-radius:18px;padding:18px 22px;box-shadow:0 10px 30px rgba(0,0,0,.35);animation:pulso 1.6s ease-in-out infinite;text-align:center;width:max-content;max-width:80%}
+.som b{font-size:18px;font-weight:900}
+.som span{font-size:14.5px;font-weight:700}
+.som-ic{display:flex}
+@keyframes pulso{0%,100%{transform:translate(-50%,-50%) scale(1)}50%{transform:translate(-50%,-50%) scale(1.05)}}
+.pausa{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.25);cursor:pointer}
+.pausa.vis{display:flex}
+.vprog{position:absolute;left:0;right:0;bottom:0;height:5px;background:rgba(255,255,255,.18)}
+.vprog i{display:block;height:100%;width:0;background:var(--coral)}
 .acao{padding:0 18px;display:flex;flex-direction:column;gap:8px}
 .acao .btn{opacity:0;transform:translateY(8px);transition:opacity .4s,transform .4s;pointer-events:none}
-.acao.mostra .btn{opacity:1;transform:none;pointer-events:auto}
+.acao.mostra .btn{opacity:1;transform:none;pointer-events:auto;animation:pulsar 2.4s ease-in-out .5s infinite}
+@keyframes pulsar{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(31,157,99,.55)}50%{transform:scale(1.04);box-shadow:0 0 0 12px rgba(31,157,99,0)}}
+@media (prefers-reduced-motion:reduce){.acao.mostra .btn{animation:none}}
 /* planos */
 #planos{background:#fff}
 #planos .miolo{gap:18px;padding-top:26px}
@@ -114,7 +126,7 @@ h2.t{font-family:'Fredoka',sans-serif;font-weight:600;font-size:24px;text-align:
 
 <section class="tela" id="vsl"><div class="miolo">
   <div class="player" id="player"></div>
-  <div class="acao" id="acao"><button class="btn verde" type="button" id="ver-planos">Ver os planos</button></div>
+  <div class="acao" id="acao"><button class="btn verde" type="button" id="ver-planos">Escolher meu plano agora</button></div>
 </div></section>
 
 <section class="tela" id="planos"><div class="miolo">
@@ -149,11 +161,15 @@ h2.t{font-family:'Fredoka',sans-serif;font-weight:600;font-size:24px;text-align:
     mensal: 'https://pay.cakto.com.br/3bnawbt_1255298'  // mensal R$ 29,90
   };
   var VALOR = { anual: 167, mensal: 29.9 };
-  // VÍDEO (VSL): use UMA das duas opções. Deixe a outra vazia.
-  var VSL_MP4 = '';    // ex.: 'videos/vsl.mp4' (arquivo dentro da pasta quiz2/videos)
-  var VSL_EMBED = '';  // ex.: código do player do VTurb (o <div> + <script> que o VTurb dá), entre aspas simples
-  // Segundo do vídeo em que aparece o botão "Ver os planos" (ex.: 140 = 2min20s). 0 = aparece na hora.
-  var BOTAO_SEGUNDOS = 140;
+  // VÍDEO (VSL): arquivo dentro da pasta quiz2/videos
+  var VSL_MP4 = 'videos/vsl.mp4';
+  var VSL_CAPA = 'videos/vsl-capa.jpg';
+  // Segundo do vídeo em que aparece o botão "Ver os planos" (137 = 2min17s, fim do pitch). 0 = aparece na hora.
+  var BOTAO_SEGUNDOS = 137;
+  // Funil do quiz no painel do administrador (anônimo: não guarda nome, e-mail nem telefone)
+  var SUPABASE_URL = 'https://qjezuqbxcvcvqhkbrugb.supabase.co';
+  var SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFqZXp1cWJ4Y3ZjdnFoa2JydWdiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyMDg3MjIsImV4cCI6MjEwODc4NDcyMn0.vv1yoEFNiTrj4sz4hk50-fK08XhX4WJ47nPNtkYMTcg';
+  var PAGINA = 'quiz2';
   var WHATSAPP = '5551982316117';
   var PIXEL_META = '1489696249388385';
 
@@ -192,6 +208,21 @@ h2.t{font-family:'Fredoka',sans-serif;font-weight:600;font-size:24px;text-align:
   fbq('track', 'PageView');
   function pixel(tipo, nome, dados) { try { fbq(tipo, nome, dados || {}); } catch (e) { /* segue */ } }
 
+  // Funil: anota cada passo (uma vez por visitante) para o painel do administrador
+  var sessao = ler('apm-quiz2-sessao');
+  if (!sessao) { sessao = 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10); guardar('apm-quiz2-sessao', sessao); }
+  function registrar(etapa, detalhe) {
+    try {
+      fetch(SUPABASE_URL + '/rest/v1/rpc/registrar_quiz', {
+        method: 'POST', keepalive: true,
+        headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON, Authorization: 'Bearer ' + SUPABASE_ANON },
+        body: JSON.stringify({ p_pagina: PAGINA, p_sessao: sessao, p_etapa: etapa, p_detalhe: detalhe || null,
+          p_anuncio: origem.utm_content || null, p_campanha: origem.utm_campaign || null, p_origem: origem.utm_source || null })
+      }).catch(function () {});
+    } catch (e) { /* segue */ }
+  }
+  registrar('abriu');
+
   // ======================= NAVEGAÇÃO =======================
   var atual = 0, respostas = [];
   function mostrar(id) {
@@ -218,6 +249,7 @@ h2.t{font-family:'Fredoka',sans-serif;font-weight:600;font-size:24px;text-align:
     $('#caixa').dataset.trava = '1';
     b.classList.add('on');
     respostas[atual] = Number(b.dataset.n);
+    registrar('p' + (atual + 1), PERGUNTAS[atual].ops[respostas[atual]]);
     setTimeout(function () {
       delete $('#caixa').dataset.trava;
       if (atual < PERGUNTAS.length - 1) pergunta(atual + 1);
@@ -225,7 +257,7 @@ h2.t{font-family:'Fredoka',sans-serif;font-weight:600;font-size:24px;text-align:
     }, 260);
   });
   $('#voltar').addEventListener('click', function () { if (atual > 0) pergunta(atual - 1); else mostrar('inicio'); });
-  $('#comecar').addEventListener('click', function () { pixel('trackCustom', 'QuizInicio'); pergunta(0); });
+  $('#comecar').addEventListener('click', function () { pixel('trackCustom', 'QuizInicio'); registrar('comecou'); pergunta(0); });
 
   // Tela de análise: barra de progresso e as dores que apareceram nas respostas
   function concluir() {
@@ -233,6 +265,7 @@ h2.t{font-family:'Fredoka',sans-serif;font-weight:600;font-size:24px;text-align:
     PERGUNTAS.forEach(function (q, i) { if (q.dor && q.doi.indexOf(respostas[i]) >= 0) dores.push(q.dor); });
     if (!dores.length) dores = ['Reservas e pagamentos sem um lugar só', 'Tempo perdido respondendo no WhatsApp'];
     pixel('trackCustom', 'QuizConcluido', { dores: dores.length });
+    registrar('concluiu', dores.length + ' dores');
     guardar('apm-quiz2-feito', '1');
     mostrar('preparando');
     var lista = $('#an-lista');
@@ -255,47 +288,65 @@ h2.t{font-family:'Fredoka',sans-serif;font-weight:600;font-size:24px;text-align:
   }
 
   // ======================= VÍDEO =======================
-  var botaoLiberado = false, inicioVsl = 0;
+  // Começa tocando sem som, com o aviso no centro (estilo VTurb). Ao tocar no aviso,
+  // liga o som e recomeça do início. O botão dos planos aparece no fim do pitch.
+  var botaoLiberado = false, comSom = false, marcos = {};
   function liberarBotao() {
     if (botaoLiberado) return;
     botaoLiberado = true;
     $('#acao').classList.add('mostra');
     guardar('apm-quiz2-botao', '1');
     pixel('trackCustom', 'VslBotao');
+    registrar('botao');
   }
   function abrirVsl() {
     mostrar('vsl');
     pixel('track', 'ViewContent', { content_name: 'vsl-quiz2' });
+    registrar('video');
     var player = $('#player');
     if (!player.dataset.pronto) {
       player.dataset.pronto = '1';
-      if (VSL_MP4) {
-        player.innerHTML = '<video src="' + VSL_MP4 + '" controls playsinline preload="metadata"></video>';
-        var v = player.querySelector('video');
-        v.addEventListener('timeupdate', function () { if (v.currentTime >= BOTAO_SEGUNDOS) liberarBotao(); });
-        v.addEventListener('ended', liberarBotao);
-      } else if (VSL_EMBED) {
-        var caixa = document.createElement('div');
-        caixa.style.cssText = 'width:100%;height:100%';
-        caixa.innerHTML = VSL_EMBED;
-        player.appendChild(caixa);
-        caixa.querySelectorAll('script').forEach(function (s) { var n = document.createElement('script'); [].forEach.call(s.attributes, function (a) { n.setAttribute(a.name, a.value); }); n.text = s.text; s.replaceWith(n); });
-      } else {
-        player.innerHTML = '<div class="vazio"><svg width="64" height="64" viewBox="0 0 64 64"><circle cx="32" cy="32" r="32" fill="#E4505C"/><path d="M26 20 L46 32 L26 44 Z" fill="#fff"/></svg>Espaço do vídeo</div>';
-      }
-    }
-    // Player externo (VTurb e parecidos): conta o tempo desde que a tela abriu
-    if (!VSL_MP4) {
-      inicioVsl = Date.now();
-      var relogio = setInterval(function () {
-        if (botaoLiberado) return clearInterval(relogio);
-        if ((Date.now() - inicioVsl) / 1000 >= BOTAO_SEGUNDOS) liberarBotao();
-      }, 1000);
+      player.innerHTML = '<video src="' + VSL_MP4 + '" poster="' + VSL_CAPA + '" muted autoplay playsinline preload="auto" disablepictureinpicture></video>' +
+        '<button type="button" class="som" id="som"><span class="som-ic"><svg viewBox="0 0 24 24" width="40" height="40"><path d="M4 9h4l5-4v14l-5-4H4z" fill="#fff"/><path d="M17 9l4 6M21 9l-4 6" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg></span><b>Seu vídeo já começou</b><span>Toque aqui para ouvir</span></button>' +
+        '<div class="pausa" id="pausa"><svg viewBox="0 0 64 64" width="72" height="72"><circle cx="32" cy="32" r="32" fill="rgba(228,80,92,.92)"/><path d="M26 20 L46 32 L26 44 Z" fill="#fff"/></svg></div>' +
+        '<div class="vprog"><i id="vprog"></i></div>';
+      var v = player.querySelector('video');
+      var tentar = v.play(); if (tentar && tentar.catch) tentar.catch(function () { /* sem autoplay: o aviso continua no centro */ });
+      $('#som').addEventListener('click', function (e) {
+        e.stopPropagation();
+        comSom = true;
+        v.muted = false; v.currentTime = 0;
+        var t = v.play(); if (t && t.catch) t.catch(function () {});
+        $('#som').remove();
+        pixel('trackCustom', 'VslSom');
+        registrar('som');
+      });
+      // Com som: tocar no vídeo pausa e continua (sem barra para pular)
+      v.addEventListener('click', function () { if (!comSom) return; if (v.paused) v.play(); else v.pause(); });
+      $('#pausa').addEventListener('click', function () { v.play(); });
+      v.addEventListener('pause', function () { if (comSom && !v.ended) $('#pausa').classList.add('vis'); });
+      v.addEventListener('play', function () { $('#pausa').classList.remove('vis'); });
+      v.addEventListener('timeupdate', function () {
+        var d = v.duration || 0;
+        if (d) $('#vprog').style.width = Math.min(100, (v.currentTime / d) * 100) + '%';
+        if (v.currentTime >= BOTAO_SEGUNDOS) liberarBotao();
+        if (comSom && d) {
+          [25, 50, 75].forEach(function (pc) {
+            if (!marcos[pc] && v.currentTime / d >= pc / 100) { marcos[pc] = 1; registrar('v' + pc); }
+          });
+        }
+      });
+      v.addEventListener('ended', function () {
+        liberarBotao();
+        if (comSom) registrar('video_fim');
+      });
     }
     if (BOTAO_SEGUNDOS <= 0 || ler('apm-quiz2-botao') === '1' || url.get('planos')) liberarBotao();
   }
   $('#ver-planos').addEventListener('click', function () {
     pixel('trackCustom', 'VerPlanos');
+    registrar('planos');
+    var v = $('#player video'); if (v) v.pause();
     mostrar('planos');
   });
 
@@ -304,8 +355,10 @@ h2.t{font-family:'Fredoka',sans-serif;font-weight:600;font-size:24px;text-align:
     a.href = linkCheckout(CHECKOUT[a.dataset.plano]);
     a.addEventListener('click', function () {
       pixel('track', 'InitiateCheckout', { content_name: a.dataset.plano, value: VALOR[a.dataset.plano], currency: 'BRL' });
+      registrar('checkout_' + a.dataset.plano);
     });
   });
+  $('#zap').addEventListener('click', function () { registrar('whatsapp'); });
   $('#zap').href = 'https://wa.me/' + WHATSAPP + '?text=' + encodeURIComponent('Oi! Vi o vídeo do App Pegue e Monte e fiquei com uma dúvida sobre os planos.');
 
   // Quem já fez o quiz volta direto para o vídeo (?refazer=1 recomeça)
