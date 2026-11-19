@@ -2,7 +2,7 @@
 // App Pegue e Monte — app da dona
 // Abas: Hoje, Agenda, Kits, Mais
 // =====================================================================
-import * as dados from './dados.js?v=20261119b';
+import * as dados from './dados.js?v=20261119c';
 import { PERMITIR_CADASTRO, EMAIL_SUPORTE, WHATSAPP_SUPORTE, LINK_MENSAL, LINK_ANUAL, LINK_ANUAL_PROMO, DEMO_SITE, LINK_PLANOS, SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=20261117c';
 
 const { hojeISO, somaDias, cruza } = dados;
@@ -2075,7 +2075,7 @@ async function prepararMaterial(mat, mostrar) {
       if (grande) {
         try {
           const url = await dados.iaEnviarImagem(grande, pasta, id);
-          const mini = demo ? url : await dados.iaEnviarImagem(await dados.reduzirFoto(grande, 512, 0.7), pasta, id + '-m');
+          const mini = demo ? url : await dados.iaEnviarImagem(await dados.reduzirFoto(grande, 768, 0.72), pasta, id + '-m');
           imagens[i] = { id, url, mini, origem: f.origem, arquivo: (f.nome || '').slice(0, 80), pagina: f.pagina };
         } catch (e) { falhas++; erroEnvio = e.message || erroEnvio; }
       }
@@ -2221,6 +2221,39 @@ function iaAndamento(loteId, fontes) {
   }, () => { parar = true; fecharPainel(); desenharAba(); });
 }
 
+// Prints de catálogo: a IA indica onde está a foto de cada kit e o app recorta
+// aquele pedaço (a foto do kit em si não é alterada).
+async function iaRecortar(lote) {
+  let mudou = false;
+  for (let i = 0; i < lote.kits.length; i++) {
+    const k = lote.kits[i];
+    if (k.recortado || k.situacao !== 'conferir' || !Array.isArray(k.recortes) || !k.recortes.length) continue;
+    const novas = [];
+    for (let j = 0; j < k.recortes.length; j++) {
+      const r = k.recortes[j];
+      try {
+        const img = await carregarImagem(r.url);
+        if (!img) continue;
+        const W = img.naturalWidth, H = img.naturalHeight, folga = 0.006;
+        const x = Math.max(0, (r.x - folga) * W), y = Math.max(0, (r.y - folga) * H);
+        const w = Math.min(W - x, (r.w + 2 * folga) * W), h = Math.min(H - y, (r.h + 2 * folga) * H);
+        if (w < 60 || h < 60) continue;
+        const c = document.createElement('canvas');
+        c.width = Math.round(w); c.height = Math.round(h);
+        c.getContext('2d').drawImage(img, x, y, w, h, 0, 0, c.width, c.height);
+        const blob = await new Promise((res) => c.toBlob(res, 'image/jpeg', 0.9));
+        if (!blob) continue;
+        const pasta = (String(r.url).match(/\/ia\/([^/]+)\//) || [])[1] || 'recortes';
+        novas.push(await dados.iaEnviarImagem(blob, pasta, `R${i + 1}-${j + 1}-${Date.now().toString(36)}`));
+      } catch (e) { /* segue sem esse recorte */ }
+    }
+    k.fotos = [...novas, ...(k.fotos || [])].slice(0, MAX_FOTOS);
+    k.recortado = true;
+    mudou = true;
+  }
+  if (mudou) await dados.iaSalvar(lote.id, lote.kits).catch(() => {});
+}
+
 // ----- 4 e 5. Conferir 1 a 1 -----
 function numOuNada(v) { return String(v ?? '').trim() === '' ? null : numero(v); }
 function iaConferir(loteId, posInicial) {
@@ -2229,6 +2262,10 @@ function iaConferir(loteId, posInicial) {
     const raiz = $('#ia-conf', p);
     try { lote = await dados.iaLote(loteId); }
     catch (e) { raiz.innerHTML = `<div class="erro">${esc(e.message)}</div>`; return; }
+    if (lote.kits.some((k) => !k.recortado && k.situacao === 'conferir' && Array.isArray(k.recortes) && k.recortes.length)) {
+      raiz.innerHTML = '<div class="carregando">Separando as fotos dos prints…</div>';
+      await iaRecortar(lote);
+    }
     lista = lote.kits.map((k, i) => i).filter((i) => ['conferir', 'aprovado', 'descartado'].includes(lote.kits[i].situacao));
     if (!lista.length) { iaResumo(lote); return; }
     pos = posInicial != null ? posInicial : Math.max(0, lista.findIndex((i) => lote.kits[i].situacao === 'conferir'));

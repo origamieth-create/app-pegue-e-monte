@@ -552,7 +552,7 @@ export async function iaLote(id) {
 export async function iaSalvar(id, kits) {
   if (MODO_DEMO) {
     const l = demoIa().lotes.find((x) => x.id === id);
-    l.kits = l.kits.map((k, i) => (['guardado', 'publicado'].includes(k.situacao) || !kits[i] ? k : { ...k, ...kits[i], fotos: (kits[i].fotos || []).filter((f) => (k.fotos_todas || []).includes(f)).slice(0, 5) }));
+    l.kits = l.kits.map((k, i) => (['guardado', 'publicado'].includes(k.situacao) || !kits[i] ? k : { ...k, ...kits[i], fotos: (kits[i].fotos || []).filter((f) => (k.fotos_todas || []).includes(f) || String(f).startsWith('data:')).slice(0, 5) }));
     if (!l.kits.some((k) => ['conferir', 'aprovado', 'guardado'].includes(k.situacao))) l.status = 'fechado';
     demoSalvar(); return { ok: true };
   }
