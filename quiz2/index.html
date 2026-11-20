@@ -369,7 +369,7 @@ h2.t{font-family:'Fredoka',sans-serif;font-weight:600;font-size:24px;text-align:
 </script>
 <script type="module">
 // Checkout próprio (Pagar.me): quando estiver ligado, o pagamento acontece aqui mesmo, sem ir para a Cakto
-import { abrirCheckout, checkoutAtivo } from '../checkout.js?v=20261121c';
+import { abrirCheckout, checkoutAtivo } from '../checkout.js?v=20261121e';
 let ativo = false;
 checkoutAtivo().then((v) => { ativo = v; });
 document.querySelectorAll('[data-plano]').forEach((a) => a.addEventListener('click', (e) => {
