@@ -2,7 +2,7 @@
 // App Pegue e Monte — app da dona
 // Abas: Hoje, Agenda, Kits, Mais
 // =====================================================================
-import * as dados from './dados.js?v=20261120a';
+import * as dados from './dados.js?v=20261121a';
 import { PERMITIR_CADASTRO, EMAIL_SUPORTE, WHATSAPP_SUPORTE, LINK_MENSAL, LINK_ANUAL, LINK_ANUAL_PROMO, DEMO_SITE, LINK_PLANOS, SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=20261117c';
 
 const { hojeISO, somaDias, cruza } = dados;
@@ -90,8 +90,9 @@ function soLeitura() { return !!(estado.suporte && estado.suporte.somente_leitur
 function podeEditar() { return estado.suporte ? !soLeitura() : !!(estado.assinatura && estado.assinatura.liberado); }
 // Variações do kit (ex.: Básico, Com escadinha, Com cômoda)
 function variacoesDe(k) { return Array.isArray(k && k.variacoes) ? k.variacoes : []; }
-function nomeKitReserva(r) { const k = kitDe(r.kit_id); return k.nome + (r.variacao ? ' – ' + r.variacao : ''); }
+function nomeKitReserva(r) { const k = kitDe(r.kit_id); return k.nome + (r.tema ? ' · tema ' + r.tema : '') + (r.variacao ? ' – ' + r.variacao : ''); }
 function precoKitTexto(k) {
+  if (k.preco_consultar) return 'Preço a consultar';
   const v = variacoesDe(k);
   if (!v.length) return reais(k.preco);
   return 'a partir de ' + reais(Math.min(...v.map((x) => Number(x.preco) || 0)));
@@ -218,7 +219,7 @@ function abrirPopup(corpo, aoMontar) {
 // ---------------------------------------------------------------------
 const NOVIDADES = {
   versao: '2026-11-20',
-  desde: '2026-11-20T03:00:00Z', // contas criadas depois disso já nascem com tudo
+  desde: '2026-11-19T20:00:00Z', // contas criadas depois disso já nascem com tudo
   ia: true, // só aparece para quem já tem a IA liberada
   itens: [
     ['✨', 'Montar catálogo com IA', 'Mande fotos, prints, PDF ou o link do Drive. A IA separa os kits com nome e preço, e você só confere e aprova.'],
@@ -359,6 +360,8 @@ async function carregarTudo() {
   marcarRelogio();
   dados.registrarUso().catch(() => {}); // só marca a data de uso; nunca atrapalha o app
   const a = estado.assinatura || {};
+  // Aba de suporte cuja loja já foi fechada: nunca abre a conta do administrador aqui
+  if (dados.lojaSuporteDaAba() && (!estado.suporte || !estado.negocio)) { dados.sairDaLojaNestaAba(); location.href = 'admin.html?aba=clientes'; return; }
   if (estado.suporte && !estado.negocio) { await dados.suporteSair().catch(() => {}); location.href = 'admin.html'; return; }
   if (!estado.suporte && !a.cortesia && !a.encontrada) {
     // Conta nova sem compra: ganha 7 dias de teste grátis (uma vez por e-mail).
@@ -366,15 +369,15 @@ async function carregarTudo() {
     if (!estado.assinatura.encontrada) return telaSemAssinatura();
   }
   if (!estado.negocio) return telaConfiguracaoInicial();
-  [estado.kits, estado.reservas, estado.gastos, estado.montagem, estado.ia] = await Promise.all([dados.listarKits(), dados.listarReservas(), dados.listarGastos().catch(() => []), estado.suporte ? null : dados.minhaMontagem().catch(() => null), dados.iaSituacao().catch(() => null)]);
+  [estado.kits, estado.reservas, estado.gastos, estado.montagem, estado.ia, estado.estruturas, estado.fechados] = await Promise.all([dados.listarKits(), dados.listarReservas(), dados.listarGastos().catch(() => []), estado.suporte ? null : dados.minhaMontagem().catch(() => null), dados.iaSituacao().catch(() => null), dados.listarEstruturas().catch(() => []), dados.listarFechados().catch(() => [])]);
   estado.carregadoEm = Date.now();
   montarApp();
 }
 
 async function recarregar() {
   const antes = estado.assinatura ? estado.assinatura.liberado : null;
-  [estado.kits, estado.reservas, estado.gastos, estado.assinatura] = await Promise.all([
-    dados.listarKits(), dados.listarReservas(), dados.listarGastos().catch(() => []), dados.minhaAssinatura()]);
+  [estado.kits, estado.reservas, estado.gastos, estado.assinatura, estado.estruturas, estado.fechados] = await Promise.all([
+    dados.listarKits(), dados.listarReservas(), dados.listarGastos().catch(() => []), dados.minhaAssinatura(), dados.listarEstruturas().catch(() => []), dados.listarFechados().catch(() => [])]);
   marcarRelogio();
   estado.carregadoEm = Date.now();
   if (antes !== estado.assinatura.liberado) { montarApp(); return; }
@@ -679,26 +682,25 @@ function ajustarAlturaFaixa() {
   const f = $('#faixa');
   document.documentElement.style.setProperty('--altura-faixa', (f ? f.offsetHeight : 0) + 'px');
 }
-// Modo suporte: faixa só para o administrador, com o tempo que falta e "Sair".
+// Modo suporte: faixa só para o administrador, com a loja desta aba e "Sair".
 function desenharFaixaSuporte(faixa, base) {
   const fim = new Date(estado.suporte.ate).getTime();
-  const resto = () => tempoRestante(fim - agoraServidor());
   faixa.innerHTML = base + `
     <div class="faixa-suporte" role="status">
       <span class="selo">${soLeitura() ? 'SÓ LEITURA' : 'MODO SUPORTE'}</span>
-      <span class="t">Loja: <b>${esc(estado.suporte.nome || estado.negocio.nome)}</b> · <span id="suporte-resto">${resto()}</span></span>
+      <span class="t">Loja: <b>${esc(estado.suporte.nome || estado.negocio.nome)}</b></span>
       <button class="btn mini" id="suporte-sair">Sair</button>
     </div>`;
   $('#suporte-sair', faixa).onclick = async (e) => {
     e.currentTarget.disabled = true;
     await dados.suporteSair().catch(() => {});
+    dados.sairDaLojaNestaAba();
+    if (window.opener) { try { window.close(); } catch (x) { /* segue */ } }
     location.href = 'admin.html?aba=clientes';
   };
   relogioFaixa = setInterval(() => {
-    const el = $('#suporte-resto');
-    if (fim - agoraServidor() <= 0) { clearInterval(relogioFaixa); location.href = 'admin.html?aba=clientes'; return; }
-    if (el) el.textContent = resto();
-  }, 30000);
+    if (fim - agoraServidor() <= 0) { clearInterval(relogioFaixa); dados.sairDaLojaNestaAba(); location.href = 'admin.html?aba=clientes'; }
+  }, 60000);
 }
 
 function desenharFaixaAssinatura() {
@@ -1077,6 +1079,7 @@ function telaConfiguracaoInicial() {
         const c = lerCamposNegocio(form, true);
         if (!(await dados.linkDisponivel(c.slug))) throw new Error('Esse link já está em uso. Escolha outro.');
         await dados.salvarNegocio(c);
+        estado.mostrarAssistente = true; // conta nova: perguntas da agenda logo de cara
         await carregarTudo();
       } catch (err) { caixa.textContent = err.message; caixa.classList.remove('oculto'); }
     });
@@ -1086,7 +1089,9 @@ function telaConfiguracaoInicial() {
 function painelNegocio() {
   const n = estado.negocio;
   let logo = n.logo_url || null;
+  const chRasc = chaveRascunho('loja');
   abrirPainel('Meus dados', `<form class="coluna" novalidate>
+      ${faixaRascunho(chRasc)}
       <section class="cartao coluna">
         <div><h3>Seu perfil no link de reservas</h3><span class="dica">É assim que as suas clientes veem o topo do seu link.</span></div>
         <div class="linha-flex" style="gap:14px">
@@ -1129,6 +1134,19 @@ function painelNegocio() {
     };
     const conta = () => { $('#recado-conta', p).textContent = `${form.recado_link.value.length}/300 caracteres`; };
     form.recado_link.oninput = conta; conta();
+    // Rascunho dos dados da loja (campos com nome)
+    const camposForm = () => [...form.elements].filter((el) => el.name && el.type !== 'file' && el.type !== 'submit');
+    ligarFaixaRascunho(p, chRasc, (r) => {
+      camposForm().forEach((el) => { if (r[el.name] == null) return; if (el.type === 'checkbox') el.checked = !!r[el.name]; else el.value = r[el.name]; });
+      if (r.__logo !== undefined) { logo = r.__logo; desenharLogo(); }
+      conta(); const f = $('#rasc-faixa', p); if (f) f.remove();
+    });
+    let tRasc = 0;
+    const guardar = () => { clearTimeout(tRasc); tRasc = setTimeout(() => {
+      const d = { __logo: logo }; camposForm().forEach((el) => { d[el.name] = el.type === 'checkbox' ? el.checked : el.value; });
+      gravarRascunho(chRasc, d);
+    }, 500); };
+    form.addEventListener('input', guardar); form.addEventListener('change', guardar);
     form.onsubmit = async (e) => {
       e.preventDefault();
       await acao($('button[type=submit]', form), async () => {
@@ -1138,6 +1156,7 @@ function painelNegocio() {
           c.logo_url = logo;
           c.recado_link = form.recado_link.value.trim().slice(0, 300) || null;
           estado.negocio = await dados.salvarNegocio(c);
+          apagarRascunho(chRasc);
           fecharPainel(); aviso('Dados salvos!'); montarApp();
         } catch (err) { $('#erro-neg', p).textContent = err.message; $('#erro-neg', p).classList.remove('oculto'); }
       });
@@ -1168,6 +1187,7 @@ function montarApp() {
   irPara(['hoje', 'agenda', 'kits', 'mais'].includes(deHash) ? deHash : 'hoje');
   if (abrirPeloAviso()) return;
   if (estado.suporte) return; // no modo suporte não aparece nenhum aviso da dona
+  if (estado.mostrarAssistente) { estado.mostrarAssistente = false; setTimeout(() => assistenteAgenda(), 400); return; }
   setTimeout(mostrarNovidades, 600);
   setTimeout(mostrarBlackFriday, 1200);
   setTimeout(comemorarReservaPeloLink, 1800);
@@ -1774,27 +1794,40 @@ function abaAgenda(tela) {
   for (let d = 1; d <= diasNoMes; d++) {
     const iso = `${estado.mes}-${String(d).padStart(2, '0')}`;
     const n = Math.min(3, festasPorDia[iso] || 0);
-    celulas += `<button data-dia="${iso}" class="${iso === h ? 'hoje' : ''} ${iso === estado.dia ? 'sel' : ''}" aria-label="${dataLonga(iso)}${n ? `, ${festasPorDia[iso]} festa(s)` : ''}">
+    const fech = (estado.fechados || []).some((f) => iso >= f.de && iso <= f.ate);
+    celulas += `<button data-dia="${iso}" class="${iso === h ? 'hoje' : ''} ${iso === estado.dia ? 'sel' : ''} ${fech ? 'fechado' : ''}" aria-label="${dataLonga(iso)}${n ? `, ${festasPorDia[iso]} festa(s)` : ''}">
       ${d}<span class="pontos">${'<span class="ponto"></span>'.repeat(n)}</span></button>`;
   }
 
   const dia = estado.dia;
   const kitsVisiveis = estado.kits.filter((k) => k.ativo || ativas.some((r) => r.kit_id === k.id && cruza(r, dia, dia)));
-  const linhas = kitsVisiveis.map((k) => {
-    const r = ativas.find((x) => x.kit_id === k.id && cruza(x, dia, dia));
-    if (r) {
+  const linhas = dados.ordenarKits(kitsVisiveis, estado.negocio.ordem_kits || 'az').map((k) => {
+    const rs = ativas.filter((x) => x.kit_id === k.id && cruza(x, dia, dia));
+    const qtd = Math.max(1, Number(k.quantidade) || 1);
+    const itens = rs.map((r) => {
       let papel = 'Com a cliente';
       if (r.data_festa === dia) papel = 'Dia da festa';
       else if (r.data_retirada === dia) papel = 'Retirada';
       else if (r.data_devolucao === dia) papel = 'Devolução';
       return itemReserva(r, `${papel} · festa ${dataCurta(r.data_festa)}`);
-    }
-    return `
+    }).join('');
+    const livres = qtd - rs.length;
+    if (livres <= 0) return itens;
+    return itens + `
       <div class="cartao"><div class="item-res">
-        <div class="info"><div class="nome">${esc(k.nome)}</div><div class="pequeno">Disponível</div></div>
+        <div class="info"><div class="nome">${esc(k.nome)}</div><div class="pequeno">${qtd > 1 ? `${livres} de ${qtd} livre${livres > 1 ? 's' : ''}` : 'Disponível'}</div></div>
         ${podeEditar() ? `<button class="btn claro mini" data-reservar="${esc(k.id)}">Reservar</button>` : etiqueta('livre', 'Livre')}
       </div></div>`;
   }).join('');
+  const fechadoDia = (estado.fechados || []).find((f) => dia >= f.de && dia <= f.ate);
+  const lim = estado.negocio.limite_dia;
+  const noDia = ativas.filter((x) => cruza(x, dia, dia)).length;
+  const usoEstr = (estado.estruturas || []).map((e) => {
+    const usados = ativas.filter((x) => cruza(x, dia, dia)).reduce((t, x) => { const kk = kitDe(x.kit_id); const u = (kk.estruturas || []).find((y) => y.id === e.id); return t + (u ? Math.max(1, Number(u.qtd) || 1) : 0); }, 0);
+    return usados ? `${esc(e.nome)}: ${usados} de ${e.quantidade}` : '';
+  }).filter(Boolean);
+  const topoDia = `${fechadoDia ? `<div class="nota-amarela pequeno">🔒 Dia fechado no seu link${fechadoDia.recado ? `: ${esc(fechadoDia.recado)}` : ''}</div>` : ''}
+    ${lim || usoEstr.length ? `<div class="pequeno ag-uso">${lim ? `<b>Festas nesse dia: ${noDia} de ${lim}</b>${noDia >= lim ? ' · <span class="ag-no">lotado no link</span>' : ''}` : ''}${usoEstr.length ? `${lim ? ' · ' : ''}${usoEstr.join(' · ')}` : ''}</div>` : ''}`;
 
   const nomeMes = maiuscula(primeiro.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }));
   tela.innerHTML = `
@@ -1806,6 +1839,7 @@ function abaAgenda(tela) {
     <div class="cartao"><div class="cal">${celulas}</div></div>
     <section class="coluna">
       <div class="secao-titulo"><h2>${esc(dataLonga(dia))}</h2></div>
+      ${topoDia}
       ${kitsVisiveis.length ? `<div class="lista">${linhas}</div>` : '<p class="vazio-txt">Cadastre seus kits na aba Kits para ver a disponibilidade.</p>'}
     </section>`;
 
@@ -1827,17 +1861,21 @@ function abaAgenda(tela) {
 // ---------------------------------------------------------------------
 function abaKits(tela) {
   const n = estado.negocio;
-  const cartoes = estado.kits.map((k) => {
+  const ORDENS = [['az', 'A–Z'], ['numero', 'Número do kit'], ['menor', 'Menor preço'], ['maior', 'Maior preço'], ['novos', 'Mais novos']];
+  const cartoes = dados.ordenarKits(estado.kits, n.ordem_kits || 'az').map((k) => {
     const nv = variacoesDe(k).length;
+    const qtd = Math.max(1, Number(k.quantidade) || 1), nt = (k.temas || []).length;
     return `
     <div class="kit-card-caixa">
     <button class="cartao clicavel kit-card" data-kit="${esc(k.id)}">
       ${k.foto_url ? fotoCaixa(k.foto_url, '', true) : '<div class="foto-kit foto-vazia">Sem foto</div>'}
       <div class="nome">${esc(k.nome)}</div>
       <div class="pequeno">${precoKitTexto(k)} · ${nv ? `${nv} opç${nv === 1 ? 'ão' : 'ões'}` : `${k.pecas.length} peça${k.pecas.length === 1 ? '' : 's'}`}</div>
+      ${qtd > 1 || nt ? `<div class="pequeno ag-resumo-kit">✓ Pode sair até ${qtd} por dia${nt ? ` · ${plural(nt, 'tema', 'temas')}` : ''}</div>` : ''}
       ${k.categoria ? `<span class="etiqueta et-categoria">${esc(k.categoria)}</span>` : ''}
-      ${k.ativo ? '' : '<span class="etiqueta et-cancelada">Fora do link</span>'}
+      ${k.ativo ? '' : '<span class="etiqueta et-cancelada">Oculto</span>'}
     </button>
+    ${podeEditar() ? `<button class="kit-olho ${k.ativo ? '' : 'off'}" data-olho="${esc(k.id)}" aria-label="${k.ativo ? 'Ocultar do link' : 'Mostrar no link'}" title="${k.ativo ? 'Ocultar do link' : 'Mostrar no link'}">${k.ativo ? '👁' : '🙈'}</button>` : ''}
     ${k.ativo && !DEMO_SITE ? `<button class="kit-compartilhar" data-compartilhar="${esc(k.id)}" aria-label="Compartilhar o kit ${esc(k.nome)}" title="Compartilhar este kit">↗</button>` : ''}
     </div>`;
   }).join('');
@@ -1853,6 +1891,7 @@ function abaKits(tela) {
     </section>
     <div id="ia-caixa" class="coluna" style="gap:10px">${cartaoIA()}</div>
     <div class="secao-titulo"><h1>Meus kits</h1>${podeEditar() ? `<button class="btn principal mini" id="novo-kit">${ICONE.mais1} Novo kit</button>` : ''}</div>
+    ${estado.kits.length > 1 ? `<label class="ag-ordem">Ordenar: <select id="ordem-kits">${ORDENS.map(([v, t]) => `<option value="${v}" ${(n.ordem_kits || 'az') === v ? 'selected' : ''}>${t}</option>`).join('')}</select><small class="dica">vale também no seu link</small></label>` : ''}
     ${estado.kits.length ? `<div class="kits-grade">${cartoes}</div>` : '<p class="vazio-txt">Nenhum kit ainda. Cadastre o primeiro: foto, nome, preço e a lista de peças.</p>'}`;
   const novo = $('#novo-kit', tela);
   if (novo) novo.onclick = () => formKit(null);
@@ -1861,6 +1900,14 @@ function abaKits(tela) {
   $('#vitrine-copiar', tela).onclick = () => copiarMeuLink();
   $$('[data-kit]', tela).forEach((b) => (b.onclick = () => formKit(estado.kits.find((k) => k.id === b.dataset.kit))));
   $$('[data-compartilhar]', tela).forEach((b) => (b.onclick = (e) => { e.stopPropagation(); compartilharKit(estado.kits.find((k) => k.id === b.dataset.compartilhar)); }));
+  $$('[data-olho]', tela).forEach((b) => (b.onclick = (e) => { e.stopPropagation(); acao(b, async () => {
+    const k = kitDe(b.dataset.olho);
+    await dados.salvarKit({ id: k.id, ativo: !k.ativo });
+    aviso(k.ativo ? 'Kit oculto: não aparece mais no link.' : 'Kit aparecendo no link de novo.');
+    await recarregar();
+  }); }));
+  const ord = $('#ordem-kits', tela);
+  if (ord) ord.onchange = () => acao(null, async () => { estado.negocio = await dados.salvarNegocio({ ordem_kits: ord.value }); abaKits(tela); });
   ligarCartaoIA(tela);
   // Situação da IA atualizada (ex.: terminou de organizar enquanto a dona estava em outra aba)
   atualizarIA().then(() => { if (estado.aba === 'kits') redesenharCartaoIA(); });
@@ -1985,12 +2032,13 @@ const IA_ORIGENS = {
   pdf: { ic: '📄', nome: 'Num PDF ou catálogo pronto', sub: '', titulo: 'Do PDF',
     passos: ['Toque no botão abaixo', 'Escolha o <b>arquivo do catálogo</b> (PDF) no celular ou no computador', 'Toque em <b>Continuar</b>'] },
   drive: { ic: '☁️', nome: 'No Google Drive', sub: '', titulo: 'Do Google Drive' },
+  conversa: { ic: '🗨️', nome: 'Numa conversa do WhatsApp', sub: 'cole a conversa onde os kits foram combinados', titulo: 'Da conversa' },
   misto: { ic: '🤷', nome: 'Um pouco de cada', sub: '', titulo: 'Seus arquivos',
     passos: ['Toque no botão abaixo', 'Escolha <b>fotos, prints e PDF</b>, tudo junto', 'Se tiver uma pasta no Google Drive, cole o link logo abaixo'] },
 };
 function iaEnviar() {
   if (!iaLigada()) return;
-  const mat = { fotos: [], pdfs: [], prints: [], drive: [], texto: '', origens: [] };
+  const mat = { fotos: [], pdfs: [], prints: [], drive: [], texto: '', conversa: '', origens: [] };
   let passo = 1, origem = null, precos = null;
   const ia = estado.ia;
   const total = () => mat.fotos.length + mat.pdfs.length + mat.drive.length;
@@ -2013,6 +2061,17 @@ function iaEnviar() {
       ${Object.entries(IA_ORIGENS).map(([v, o]) => opc(v, o.ic, o.nome, o.sub, v === origem)).join('')}`,
     2: () => {
       const o = IA_ORIGENS[origem];
+      if (origem === 'conversa') {
+        return `<p class="ia-perg">Cole a conversa do WhatsApp</p>
+          <div class="passo-inst"><b>1</b><span>No WhatsApp, abra a conversa, toque e segure numa mensagem, marque as mensagens dos kits e toque em <b>Copiar</b>. Ou use <b>⋮ › Mais › Exportar conversa</b> e escolha "sem mídia".</span></div>
+          <div class="passo-inst"><b>2</b><span>Cole aqui embaixo (ou anexe o arquivo .txt exportado). Depois escolha as <b>fotos dos kits</b>.</span></div>
+          <textarea id="ia-conversa" rows="7" maxlength="60000" placeholder="Cole a conversa aqui">${esc(mat.conversa)}</textarea>
+          <label class="btn contorno mini" style="cursor:pointer;align-self:flex-start">📄 Anexar conversa exportada (.txt)<input type="file" accept=".txt,text/plain" class="oculto" id="ia-in-txt"></label>
+          <div class="ia-dica">💡 A IA usa só o que foi combinado sobre os kits (nomes, preços, sinal, peças). Se o valor mudou na conversa, vale o último. Conversa fiada e dados pessoais são ignorados.</div>
+          ${botaoArquivos(true)}
+          ${escolhidos()}
+          <button class="btn principal cheio" id="ia-cont" ${total() || mat.conversa.trim() ? '' : 'disabled'}>Continuar</button>`;
+      }
       if (origem === 'drive') {
         return `<p class="ia-perg">Cole o link do Google Drive</p>
           <p class="pequeno">O link da pasta (ou do arquivo) com as fotos dos kits.</p>
@@ -2048,6 +2107,7 @@ function iaEnviar() {
         ${mat.fotos.length ? `<div>🖼️ ${plural(mat.fotos.length, 'foto ou print', 'fotos ou prints')}<span>✓</span></div>` : ''}
         ${mat.pdfs.length ? `<div>📄 ${plural(mat.pdfs.length, 'PDF', 'PDFs')}<span>✓</span></div>` : ''}
         ${mat.drive.length ? `<div>☁️ ${plural(mat.drive.length, 'arquivo do Drive', 'arquivos do Drive')}<span>✓</span></div>` : ''}
+        ${mat.conversa.trim() ? '<div>🗨️ Conversa do WhatsApp<span>✓</span></div>' : ''}
         ${mat.texto.trim() || mat.prints.length ? '<div>📝 Lista de preços<span>✓</span></div>' : ''}
       </div>
       ${opc('mais', '➕', 'Mandar mais arquivos', 'de outro lugar (galeria, PDF, Drive…)', false)}
@@ -2099,6 +2159,17 @@ function iaEnviar() {
     };
     const texto = $('#ia-texto', p);
     if (texto) texto.oninput = () => { mat.texto = texto.value; };
+    const conv = $('#ia-conversa', p);
+    if (conv) conv.oninput = () => { mat.conversa = conv.value; const c = $('#ia-cont', p); if (c) c.disabled = !(total() || mat.conversa.trim()); };
+    const txt = $('#ia-in-txt', p);
+    if (txt) txt.onchange = () => {
+      const f = txt.files[0]; txt.value = '';
+      if (!f) return;
+      const fr = new FileReader();
+      fr.onload = () => { mat.conversa = String(fr.result || '').slice(-60000); desenhar(); };
+      fr.onerror = () => aviso('Não consegui ler esse arquivo. Copie e cole a conversa.');
+      fr.readAsText(f);
+    };
     const dOk = $('#ia-drive-ok', p);
     if (dOk) dOk.onclick = (e) => acao(e.currentTarget, async () => {
       const msg = $('#ia-drive-msg', p);
@@ -2116,6 +2187,7 @@ function iaEnviar() {
     const cont = $('#ia-cont', p);
     if (cont) cont.onclick = () => {
       if (passo === 3 && precos === 'lista' && !mat.texto.trim() && !mat.prints.length) { aviso('Cole a lista ou mande um print dela. Ou escolha outra opção.'); return; }
+      if (passo === 2 && origem === 'conversa') { mat.conversa = ($('#ia-conversa', p) || {}).value || mat.conversa; if (!precos) precos = 'conversa'; ir(4); return; }
       ir(passo === 2 && precos ? 4 : passo + 1);
     };
     const btn = $('#ia-ir', p);
@@ -2223,7 +2295,8 @@ async function prepararMaterial(mat, mostrar) {
   await emParalelo(tarefas, 3);
   if (naoAbriu) avisos.push(`${plural(naoAbriu, 'foto não abriu', 'fotos não abriram')} neste navegador (o formato HEIC do iPhone só abre no Safari). Mande essas fotos como JPG ou use o Safari.`);
   if (falhas) avisos.push(`${plural(falhas, 'arquivo não foi enviado', 'arquivos não foram enviados')}: ${erroEnvio || 'falha na internet'}. Tente de novo.`);
-  return { pasta, imagens: imagens.filter(Boolean), prints: prints.filter(Boolean), paginas: pags.filter(Boolean), texto: mat.texto.trim(), avisos };
+  const texto = [mat.conversa.trim() ? `CONVERSA DO WHATSAPP (use só o que foi combinado sobre os kits; se um valor mudou, vale o último):\n${mat.conversa.trim()}` : '', mat.texto.trim()].filter(Boolean).join('\n\n').slice(-60000);
+  return { pasta, imagens: imagens.filter(Boolean), prints: prints.filter(Boolean), paginas: pags.filter(Boolean), texto, avisos };
 }
 let pdfjsCarregado = null;
 function carregarPdfjs() {
@@ -2349,6 +2422,29 @@ function iaAndamento(loteId, fontes) {
 
 // Prints de catálogo: a IA indica onde está a foto de cada kit e o app recorta
 // aquele pedaço (a foto do kit em si não é alterada).
+// Recorte de print: amplia fotos pequenas (até ~1100px) e devolve um pouco da nitidez (leve, sem exagero)
+function melhorarRecorte(img, x, y, w, h) {
+  const esc = Math.min(3, Math.max(1, 1100 / Math.max(w, h)));
+  const c = document.createElement('canvas');
+  c.width = Math.round(w * esc); c.height = Math.round(h * esc);
+  const g = c.getContext('2d');
+  g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+  g.drawImage(img, x, y, w, h, 0, 0, c.width, c.height);
+  if (esc > 1.05 && c.width * c.height <= 4e6) {
+    try {
+      const d = g.getImageData(0, 0, c.width, c.height), o = new Uint8ClampedArray(d.data), W = c.width, H = c.height, a = 0.35;
+      for (let yy = 1; yy < H - 1; yy++) for (let xx = 1; xx < W - 1; xx++) {
+        const i = (yy * W + xx) * 4;
+        for (let ch = 0; ch < 3; ch++) {
+          const viz = o[i - 4 + ch] + o[i + 4 + ch] + o[i - W * 4 + ch] + o[i + W * 4 + ch];
+          d.data[i + ch] = o[i + ch] + a * (4 * o[i + ch] - viz);
+        }
+      }
+      g.putImageData(d, 0, 0);
+    } catch (e) { /* imagem de outro site: fica só ampliada */ }
+  }
+  return c;
+}
 async function iaRecortar(lote) {
   let mudou = false;
   for (let i = 0; i < lote.kits.length; i++) {
@@ -2364,9 +2460,7 @@ async function iaRecortar(lote) {
         const x = Math.max(0, (r.x - folga) * W), y = Math.max(0, (r.y - folga) * H);
         const w = Math.min(W - x, (r.w + 2 * folga) * W), h = Math.min(H - y, (r.h + 2 * folga) * H);
         if (w < 60 || h < 60) continue;
-        const c = document.createElement('canvas');
-        c.width = Math.round(w); c.height = Math.round(h);
-        c.getContext('2d').drawImage(img, x, y, w, h, 0, 0, c.width, c.height);
+        const c = melhorarRecorte(img, x, y, w, h);
         const blob = await new Promise((res) => c.toBlob(res, 'image/jpeg', 0.93));
         if (!blob) continue;
         const pasta = (String(r.url).match(/\/ia\/([^/]+)\//) || [])[1] || 'recortes';
@@ -2383,7 +2477,7 @@ async function iaRecortar(lote) {
 // ----- 4 e 5. Conferir 1 a 1 -----
 function numOuNada(v) { return String(v ?? '').trim() === '' ? null : numero(v); }
 function iaConferir(loteId, posInicial) {
-  let lote = null, lista = [], pos = 0, editando = false, fotoAtual = 0;
+  let lote = null, lista = [], pos = 0, editando = true, fotoAtual = 0; // tudo já editável, sem "Corrigir"
   abrirPainel('Conferir kits', '<div id="ia-conf" class="coluna"><div class="carregando">Carregando…</div></div>', async (p) => {
     const raiz = $('#ia-conf', p);
     try { lote = await dados.iaLote(loteId); }
@@ -2413,11 +2507,17 @@ function iaConferir(loteId, posInicial) {
       const campoValor = (nome, rotulo, v, falta) => editar(falta)
         ? `<label class="ia-val ${falta ? 'falta' : ''}"><small>${rotulo}</small><input name="${nome}" inputmode="decimal" value="${v == null ? '' : esc(String(v).replace('.', ','))}" placeholder="${falta ? 'Preencha' : ''}"></label>`
         : `<div class="ia-val"><small>${rotulo}</small><b>${reais(v)}</b></div>`;
-      const precoBox = vars.length ? '' : `
+      const precoBox = vars.length ? '' : k.consultar ? `
+        <div class="ia-preco">
+          <p class="ia-preco-t">💰 Preço a consultar</p>
+          <p class="ia-trecho">No seu link vai aparecer "Preço a consultar": a cliente reserva a data e você passa o valor pelo WhatsApp.</p>
+          <button type="button" class="btn claro mini" id="ia-tira-consultar">Colocar preço</button>
+        </div>` : `
         <div class="ia-preco">
           <p class="ia-preco-t">💰 Preço e sinal: confira com atenção</p>
           <div class="grade-2">${campoValor('preco', 'Preço', k.preco, k.preco == null)}${campoValor('sinal', 'Sinal', k.sinal, k.sinal == null)}</div>
-          <p class="ia-trecho">${k.preco == null && k.sinal == null ? 'Não encontrei o preço nem o sinal no seu material. Digite para poder aprovar.'
+          ${k.preco == null ? '<button type="button" class="btn claro mini" id="ia-consultar" style="align-self:flex-start">Deixar a consultar</button>' : ''}
+          <p class="ia-trecho">${k.preco == null && k.sinal == null ? 'Não encontrei o preço nem o sinal no seu material. Digite ou deixe a consultar.'
             : k.preco == null ? 'Não encontrei o preço no seu material. Digite para poder aprovar.'
             : k.sinal == null ? 'Não encontrei o valor do sinal no seu material. Digite o sinal para poder aprovar.'
             : `Li ${o.preco ? `em: ${esc(o.preco)}` : 'no seu material'}${o.trecho ? `: “${esc(o.trecho)}”` : ''}`}</p>
@@ -2448,12 +2548,11 @@ function iaConferir(loteId, posInicial) {
           ${editar(!k.nome) ? `<input name="nome" maxlength="80" value="${esc(k.nome || '')}" placeholder="${k.nome ? '' : 'Preencha o nome do kit'}" class="${k.nome ? '' : 'falta'}">` : `<span class="ia-valor">${esc(k.nome)}</span>`}</label>
         <label class="ia-campo"><span class="ia-rot">Peças ${de((k.pecas || []).length ? o.pecas || 'seu material' : null)}</span>
           ${editando ? `<textarea name="pecas" rows="3" placeholder="Opcional: uma peça por linha">${esc((k.pecas || []).join('\n'))}</textarea>`
-            : (k.pecas || []).length ? `<span class="ia-valor">${esc(k.pecas.join(', '))}</span>` : '<span class="ia-valor vazio">Opcional: toque em Corrigir para preencher</span>'}</label>
+            : (k.pecas || []).length ? `<span class="ia-valor">${esc(k.pecas.join(', '))}</span>` : '<span class="ia-valor vazio">Opcional</span>'}</label>
         ${opcoes}${precoBox}
         <p class="ia-falta oculto" id="ia-falta"></p>
         <div class="ia-acoes">
           <button type="button" class="btn ${k.existe ? 'principal' : 'contorno'}" id="ia-descartar">Descartar</button>
-          <button type="button" class="btn contorno" id="ia-corrigir">${editando ? 'Pronto' : 'Corrigir'}</button>
           <button type="button" class="btn verde" id="ia-aprovar">✓ Aprovar</button>
         </div>
         ${pos > 0 ? '<button type="button" class="link-btn" id="ia-anterior" style="align-self:center">‹ Voltar para o kit anterior</button>' : ''}`;
@@ -2463,11 +2562,15 @@ function iaConferir(loteId, posInicial) {
       if (princ) princ.onclick = () => { lerCampos(); k.fotos.unshift(k.fotos.splice(fotoAtual, 1)[0]); fotoAtual = 0; desenhar(); };
       const tirar = $('#ia-tirar-foto', raiz);
       if (tirar) tirar.onclick = () => { lerCampos(); k.fotos.splice(fotoAtual, 1); fotoAtual = 0; desenhar(); };
-      $('#ia-corrigir', raiz).onclick = () => { lerCampos(); editando = !editando; desenhar(); };
+      const cons = $('#ia-consultar', raiz);
+      if (cons) cons.onclick = () => { lerCampos(); k.consultar = true; k.preco = 0; k.sinal = 0; desenhar(); };
+      const tcons = $('#ia-tira-consultar', raiz);
+      if (tcons) tcons.onclick = () => { k.consultar = false; k.preco = null; k.sinal = null; desenhar(); };
+      $$('input, textarea', raiz).forEach((el) => el.addEventListener('input', () => { lerCampos(); conferirPronto(); }));
       $('#ia-descartar', raiz).onclick = (e) => decidir(e.currentTarget, 'descartado');
       $('#ia-aprovar', raiz).onclick = (e) => decidir(e.currentTarget, 'aprovado');
       const ant = $('#ia-anterior', raiz);
-      if (ant) ant.onclick = () => { lerCampos(); pos--; editando = false; fotoAtual = 0; desenhar(); $('.painel-fundo').scrollTop = 0; };
+      if (ant) ant.onclick = () => { lerCampos(); pos--; fotoAtual = 0; desenhar(); $('.painel-fundo').scrollTop = 0; };
       conferirPronto();
     };
     // lê o que a dona digitou
@@ -2496,8 +2599,8 @@ function iaConferir(loteId, posInicial) {
         if (vars.some((x) => !x.nome)) falta.push('o nome de cada opção');
         if (vars.some((x) => !(x.preco > 0))) falta.push('o preço de cada opção');
         if (vars.some((x) => x.sinal == null)) falta.push('o sinal de cada opção');
-      } else {
-        if (!(k.preco > 0)) falta.push('o preço');
+      } else if (!k.consultar) {
+        if (!(k.preco > 0)) falta.push('o preço (ou deixe a consultar)');
         if (k.sinal == null) falta.push('o sinal');
       }
       return falta;
@@ -2524,7 +2627,7 @@ function iaConferir(loteId, posInicial) {
       k.situacao = situacao;
       const ok = await acao(botao, async () => { await dados.iaSalvar(lote.id, lote.kits); return true; });
       if (!ok) { k.situacao = antes; return; }
-      editando = false; fotoAtual = 0;
+      fotoAtual = 0;
       const prox = lista.findIndex((i, n) => n > pos && lote.kits[i].situacao === 'conferir');
       const qualquer = lista.findIndex((i) => lote.kits[i].situacao === 'conferir');
       if (prox >= 0) pos = prox;
@@ -2659,8 +2762,9 @@ function iaResumo(lote) {
           const barata = [...vars].sort((a, b) => a.preco - b.preco)[0];
           const fotos = (k.fotos || []).slice(0, MAX_FOTOS);
           await dados.salvarKit({
-            nome: k.nome, preco: barata ? barata.preco : Number(k.preco) || 0, sinal: barata ? barata.sinal : Number(k.sinal) || 0,
+            nome: k.nome, preco: k.consultar ? 0 : barata ? barata.preco : Number(k.preco) || 0, sinal: k.consultar ? 0 : barata ? barata.sinal : Number(k.sinal) || 0,
             pecas: (k.pecas || []).slice(0, 100), categoria: null, fotos, foto_url: fotos[0] || null, ativo: true, variacoes: vars,
+            ...(k.consultar ? { preco_consultar: true } : {}),
           });
           k.situacao = 'publicado';
           feitos++;
@@ -2932,7 +3036,7 @@ function recortarFoto(arquivo, posicao, opcoes = {}) {
   });
 }
 
-const MAX_FOTOS = 5;
+const MAX_FOTOS = 30;
 const CATEGORIAS_PADRAO = ['Menino', 'Menina', 'Unissex', 'Chá revelação', 'Chá de bebê', 'Batizado', 'Adulto', 'Casamento', 'Formatura', 'Datas comemorativas'];
 function opcoesCategoria(atual) {
   const proprias = estado.kits.map((x) => x.categoria).filter(Boolean);
@@ -2945,17 +3049,42 @@ function fotosDoKit(k) {
   return k.foto_url ? [k.foto_url] : [];
 }
 
-function formKit(kit) {
-  const k = kit || { nome: '', preco: '', sinal: '', pecas: [], foto_url: null, fotos: [], ativo: true, variacoes: [] };
+// ---------------------------------------------------------------------
+// Rascunho: o que a dona está preenchendo fica guardado no aparelho.
+// Se der erro, cair a internet, a sessão vencer ou o app fechar, ela recupera.
+// ---------------------------------------------------------------------
+function chaveRascunho(tipo, id) { return `apm-rasc-${(estado.negocio && estado.negocio.id) || 'x'}-${tipo}-${id || 'novo'}`; }
+function lerRascunho(ch) {
+  try { const r = JSON.parse(localStorage.getItem(ch) || 'null'); if (r && Date.now() - r.t < 14 * 864e5) return r.d; } catch (e) { /* sem storage */ }
+  return null;
+}
+function gravarRascunho(ch, dadosR) { try { localStorage.setItem(ch, JSON.stringify({ t: Date.now(), d: dadosR })); } catch (e) { /* cheio: segue */ } }
+function apagarRascunho(ch) { try { localStorage.removeItem(ch); } catch (e) { /* segue */ } }
+function faixaRascunho(ch) {
+  return lerRascunho(ch) ? `<div class="ag-rasc" id="rasc-faixa"><span>📝 Você tinha começado a preencher e não salvou.</span><div><button type="button" class="btn principal mini" id="rasc-voltar">Recuperar</button><button type="button" class="link-btn" id="rasc-descartar">Descartar</button></div></div>` : '';
+}
+function ligarFaixaRascunho(p, ch, recuperar) {
+  const v = $('#rasc-voltar', p), d = $('#rasc-descartar', p);
+  if (v) v.onclick = () => { const r = lerRascunho(ch); if (r) recuperar(r); };
+  if (d) d.onclick = () => { apagarRascunho(ch); const f = $('#rasc-faixa', p); if (f) f.remove(); };
+}
+
+function formKit(kit, rascunho) {
+  const k0 = kit || { nome: '', preco: '', sinal: '', pecas: [], foto_url: null, fotos: [], ativo: true, variacoes: [], quantidade: 1, temas: [], estruturas: [], preco_consultar: false };
+  const k = rascunho ? { ...k0, ...rascunho } : k0;
+  const chRasc = chaveRascunho('kit', kit && kit.id);
   let fotos = fotosDoKit(k);
+  let temas = (k.temas || []).map((t) => ({ ...t }));
+  let enviandoTemas = 0;
   let vars = variacoesDe(k).map((v) => ({ ...v, extras: [...(v.extras || [])], fotos: [...(v.fotos || [])] }));
   let enviando = 0;
   const so = !podeEditar();
   abrirPainel(kit ? 'Editar kit' : 'Novo kit', `
     <form class="coluna" novalidate>
+      ${so || rascunho ? '' : faixaRascunho(chRasc)}
       <div id="foto-area"></div>
       ${so ? '' : `<label class="btn contorno cheio" style="cursor:pointer" id="add-foto">Adicionar fotos<input type="file" accept="image/*" name="arquivo" multiple class="oculto"></label>
-      <span class="dica" style="margin-top:-6px">Até ${MAX_FOTOS} fotos. A primeira é a foto principal: toque numa miniatura para torná-la principal.</span>`}
+      <span class="dica" style="margin-top:-6px">Pode colocar várias fotos (até ${MAX_FOTOS}). A primeira é a foto principal: toque numa miniatura para torná-la principal.</span>`}
       <label class="campo">Nome do kit<input name="nome" maxlength="80" value="${esc(k.nome)}" placeholder="Ex.: Safári" required></label>
       <label class="campo">Categoria (opcional)
         <select name="categoria">
@@ -2968,10 +3097,22 @@ function formKit(kit) {
         <input name="nova_categoria" maxlength="40" placeholder="Ex.: Super-heróis" autocomplete="off">
       </label>
       <span class="dica" style="margin-top:-6px">No seu link de reservas, a cliente filtra os kits por categoria.</span>
-      <div class="grade-2" id="precos-kit">
+      <div class="grade-2 ${k.preco_consultar ? 'oculto' : ''}" id="precos-kit">
         <label class="campo">Preço (R$)<input name="preco" inputmode="decimal" value="${esc(k.preco === '' ? '' : String(k.preco).replace('.', ','))}" placeholder="350"></label>
         <label class="campo">Sinal (R$)<input name="sinal" inputmode="decimal" value="${esc(k.sinal === '' ? '' : String(k.sinal).replace('.', ','))}" placeholder="100"></label>
       </div>
+      <label class="check ${k.preco_consultar ? 'marcado' : ''}" style="margin-top:-4px"><input type="checkbox" name="consultar" ${k.preco_consultar ? 'checked' : ''} ${so ? 'disabled' : ''}> Preço a consultar</label>
+      <span class="dica" style="margin-top:-8px">A cliente reserva a data e você passa o valor pelo WhatsApp.</span>
+      <div class="cartao ag-kit-qtd linha-flex entre" style="gap:10px;align-items:center;padding:10px 14px">
+        <span><b>Quantos deste kit você tem?</b><br><small class="dica">Comprou mais um? Aumente aqui.</small></span>
+        ${contador('kq', Math.max(1, Number(k.quantidade) || 1), 1, 50)}
+      </div>
+      <div class="campo">
+        <label class="check ${temas.length ? 'marcado' : ''}"><input type="checkbox" name="tem_temas" ${temas.length ? 'checked' : ''} ${so ? 'disabled' : ''}> Este kit tem vários temas</label>
+        <div id="area-temas" class="cartao coluna ${temas.length ? '' : 'oculto'}" style="padding:10px 12px;gap:8px"></div>
+      </div>
+      ${(estado.estruturas || []).length ? `<div class="campo">Usa quais peças compartilhadas?
+        <div class="ag-sug">${estado.estruturas.map((e) => `<label class="check ${(k.estruturas || []).some((x) => x.id === e.id) ? 'marcado' : ''}" style="flex:0 0 auto"><input type="checkbox" data-estr="${esc(e.id)}" ${(k.estruturas || []).some((x) => x.id === e.id) ? 'checked' : ''} ${so ? 'disabled' : ''}> ${esc(e.nome)}</label>`).join('')}</div></div>` : ''}
       <div class="campo">Peças do kit
         <div class="lista-pecas" id="lista-pecas"></div>
         ${so ? '' : '<button type="button" class="btn claro cheio" id="add-peca">＋ Adicionar mais uma peça</button>'}
@@ -2986,9 +3127,53 @@ function formKit(kit) {
       <label class="check ${k.ativo ? 'marcado' : ''}"><input type="checkbox" name="ativo" ${k.ativo ? 'checked' : ''}> Mostrar no link de reservas</label>
       <div class="erro oculto" id="erro-kit"></div>
       ${so ? '' : `<button class="btn principal cheio" type="submit">Salvar kit</button>`}
-      ${kit && !so ? `<button class="btn perigo cheio" type="button" id="apagar-kit">Apagar kit</button>` : ''}
+      ${kit && !so ? `<button class="btn contorno cheio" type="button" id="duplicar-kit">Duplicar kit</button><button class="btn perigo cheio" type="button" id="apagar-kit">Apagar kit</button>` : ''}
     </form>`, (p) => {
     const form = $('form', p);
+    const lerQtd = ligarContador(p, 'kq');
+    // ----- Preço a consultar -----
+    form.consultar.onchange = () => { form.consultar.closest('.check').classList.toggle('marcado', form.consultar.checked); $('#precos-kit', p).classList.toggle('oculto', form.consultar.checked); };
+    $$('[data-estr]', p).forEach((c) => (c.onchange = () => c.closest('.check').classList.toggle('marcado', c.checked)));
+    // ----- Temas do kit (artes com foto; cada uma sai 1 vez por dia) -----
+    const areaTemas = $('#area-temas', p);
+    const lerTemas = () => { $$('[data-tn]', areaTemas).forEach((i) => { const t = temas[Number(i.dataset.tn)]; if (t) t.nome = i.value.trim().slice(0, 60); }); };
+    const desenharTemas = () => {
+      areaTemas.innerHTML = `${temas.map((t, i) => `<div class="ag-tema">${t.foto ? `<img src="${esc(t.foto)}" alt="">` : '<span class="ag-tema-sem">🎨</span>'}
+          <input data-tn="${i}" value="${esc(t.nome || '')}" maxlength="60" placeholder="Nome do tema (ex.: Sonic)" ${so ? 'disabled' : ''}>
+          ${so ? '' : `<button type="button" class="mini-tirar" data-tt="${i}" aria-label="Tirar tema">×</button>`}</div>`).join('')}
+        ${Array.from({ length: enviandoTemas }, () => '<div class="ag-tema"><span class="ag-tema-sem">…</span><span class="dica">Enviando foto…</span></div>').join('')}
+        ${so ? '' : `<label class="btn claro mini" style="cursor:pointer;align-self:flex-start">＋ Adicionar temas (fotos)<input type="file" accept="image/*" multiple class="oculto" id="in-temas"></label>
+        <button type="button" class="link-btn" id="tema-sem-foto" style="align-self:flex-start">＋ Tema sem foto</button>`}
+        <span class="dica">A cliente escolhe o tema no link. Cada tema sai 1 vez por dia.</span>`;
+      $$('[data-tt]', areaTemas).forEach((b) => (b.onclick = () => { lerTemas(); temas.splice(Number(b.dataset.tt), 1); desenharTemas(); }));
+      const sf = $('#tema-sem-foto', areaTemas);
+      if (sf) sf.onclick = () => { lerTemas(); temas.push({ id: 't' + Math.random().toString(36).slice(2, 9), nome: '', foto: null }); desenharTemas(); const ult = $$('[data-tn]', areaTemas).pop(); if (ult) ult.focus(); };
+      const inp = $('#in-temas', areaTemas);
+      if (inp) inp.onchange = async () => {
+        lerTemas();
+        const arqs = [...inp.files].slice(0, 200 - temas.length); inp.value = '';
+        for (const a of arqs) {
+          enviandoTemas++; desenharTemas();
+          try { temas.push({ id: 't' + Math.random().toString(36).slice(2, 9), nome: a.name.replace(/\.[a-z0-9]+$/i, '').replace(/[_-]+/g, ' ').slice(0, 60), foto: await dados.enviarFoto(a) }); }
+          catch (e) { aviso(e.message); }
+          finally { enviandoTemas--; lerTemas(); desenharTemas(); }
+        }
+      };
+    };
+    desenharTemas();
+    form.tem_temas.onchange = () => {
+      form.tem_temas.closest('.check').classList.toggle('marcado', form.tem_temas.checked);
+      areaTemas.classList.toggle('oculto', !form.tem_temas.checked);
+    };
+    const dup = $('#duplicar-kit', p);
+    if (dup) dup.onclick = () => acao(dup, async () => {
+      const { id, criado_em, negocio_id, ...resto } = kit;
+      await dados.salvarKit({ ...resto, nome: (kit.nome + ' (cópia)').slice(0, 80), temas: (kit.temas || []).map((t) => ({ ...t })) });
+      await recarregar();
+      const novo = estado.kits.filter((x) => x.nome === (kit.nome + ' (cópia)').slice(0, 80)).pop();
+      aviso('Kit duplicado! Agora é só ajustar.');
+      if (novo) formKit(novo); else fecharPainel();
+    });
     const area = $('#foto-area', p);
     const desenharFotos = () => {
       const principal = fotos[0]
@@ -3001,7 +3186,17 @@ function formKit(kit) {
           ${so ? '' : `<button type="button" class="mini-tirar" data-tirar="${i}" aria-label="Tirar foto ${i + 1}">×</button>`}
         </div>`).join('');
       const carregando = Array.from({ length: enviando }, () => '<div class="mini-foto carregando-foto">…</div>').join('');
-      area.innerHTML = `${principal}${fotos.length + enviando > 0 ? `<div class="minis">${minis}${carregando}</div>` : ''}`;
+      area.innerHTML = `${principal}${fotos[0] && !so ? '<button type="button" class="btn claro mini" id="ajustar-foto" style="margin-top:6px">✂️ Ajustar esta foto (zoom e posição)</button>' : ''}${fotos.length + enviando > 0 ? `<div class="minis">${minis}${carregando}</div>` : ''}`;
+      const aj = $('#ajustar-foto', area);
+      if (aj) aj.onclick = () => acao(aj, async () => {
+        let blob;
+        try { const r = await fetch(fotos[0], { cache: 'no-store' }); if (!r.ok) throw new Error(); blob = await r.blob(); }
+        catch (e) { aviso('Não consegui abrir esta foto para ajustar. Tente colocar ela de novo.'); return; }
+        const pronta = await recortarFoto(blob, '');
+        if (!pronta) return;
+        enviando++; desenharFotos();
+        try { fotos[0] = await dados.enviarFoto(pronta); } catch (e) { aviso(e.message); } finally { enviando--; desenharFotos(); }
+      });
       if (typeof desenharVars === 'function') desenharVars();
       const add = $('#add-foto', p);
       if (add) {
@@ -3088,6 +3283,24 @@ function formKit(kit) {
     };
     const pecasIniciais = k.pecas.length ? k.pecas : ['', '', ''];
     pecasIniciais.forEach((v) => addPeca(v, false));
+    // Rascunho automático
+    if (!so) {
+      ligarFaixaRascunho(p, chRasc, (r) => formKit(kit, r));
+      let tRasc = 0;
+      const guardar = () => { clearTimeout(tRasc); tRasc = setTimeout(() => {
+        try { lerVars(); } catch (e) { /* segue */ }
+        lerTemas();
+        const nome = form.nome.value.trim();
+        const pecasR = $$('.peca', p).map((i) => i.value.trim()).filter(Boolean);
+        if (!kit && !nome && !fotos.length && !pecasR.length && !temas.length) return;
+        gravarRascunho(chRasc, { nome: form.nome.value, preco: form.preco.value === '' ? '' : numero(form.preco.value), sinal: form.sinal.value === '' ? '' : numero(form.sinal.value),
+          categoria: form.categoria.value === '__nova' ? (form.nova_categoria.value.trim() || null) : (form.categoria.value || null),
+          pecas: pecasR, fotos: fotos.filter((f) => !String(f).startsWith('data:')), foto_url: fotos[0] || null, ativo: form.ativo.checked,
+          quantidade: lerQtd(), preco_consultar: form.consultar.checked, temas: form.tem_temas.checked ? temas.map((t) => ({ ...t })) : [],
+          variacoes: form.tem_var && form.tem_var.checked ? vars.map((v) => ({ ...v })) : [] });
+      }, 500); };
+      form.addEventListener('input', guardar); form.addEventListener('change', guardar); p.addEventListener('click', () => setTimeout(guardar, 50));
+    }
     listaPecas.addEventListener('click', (e) => {
       const b = e.target.closest('.tirar-peca'); if (!b) return;
       b.closest('.linha-peca').remove();
@@ -3124,10 +3337,19 @@ function formKit(kit) {
       e.preventDefault();
       const caixa = $('#erro-kit', p);
       caixa.classList.add('oculto');
+      lerTemas();
+      const comTemas = form.tem_temas.checked && temas.length > 0;
+      if (comTemas && temas.some((t) => !t.nome)) { caixa.textContent = 'Dê um nome para cada tema (ex.: Sonic, Moana).'; caixa.classList.remove('oculto'); return; }
+      if (enviandoTemas) { caixa.textContent = 'Espere as fotos dos temas terminarem de enviar.'; caixa.classList.remove('oculto'); return; }
+      const consultar = form.consultar.checked;
       const novo = {
         nome: form.nome.value.trim(),
-        preco: numero(form.preco.value),
-        sinal: numero(form.sinal.value),
+        preco: consultar ? 0 : numero(form.preco.value),
+        sinal: consultar ? 0 : numero(form.sinal.value),
+        preco_consultar: consultar,
+        quantidade: lerQtd() || 1,
+        temas: comTemas ? temas.map((t) => ({ id: t.id, nome: t.nome, foto: t.foto || null, ...(t.qtd > 1 ? { qtd: t.qtd } : {}) })) : [],
+        ...((estado.estruturas || []).length ? { estruturas: $$('[data-estr]', p).filter((c) => c.checked).map((c) => ({ id: c.dataset.estr, qtd: ((k.estruturas || []).find((x) => x.id === c.dataset.estr) || {}).qtd || 1 })) } : {}),
         pecas: $$('.peca', p).map((i) => i.value.trim()).filter(Boolean).slice(0, 100),
         categoria: ((form.categoria.value === '__nova' ? form.nova_categoria.value : form.categoria.value).trim().replace(/\s+/g, ' ').slice(0, 40)) || null,
         fotos: fotos.slice(0, MAX_FOTOS),
@@ -3153,6 +3375,7 @@ function formKit(kit) {
       if (kit) novo.id = kit.id;
       await acao($('button[type=submit]', form), async () => {
         await dados.salvarKit(novo);
+        apagarRascunho(chRasc);
         fecharPainel(); aviso('Kit salvo!'); await recarregar();
       });
     };
@@ -3258,6 +3481,258 @@ function ligarAvisosLoja(tela) {
   };
 }
 
+// =====================================================================
+// Organização da agenda: festas por dia, confirmação das reservas,
+// dias fechados e (avançado) peças que os kits dividem.
+// A mesma regra roda no banco (agenda_motivo) e aqui (dados.motivoAgenda).
+// =====================================================================
+function ctxAgenda() {
+  return { kits: estado.kits || [], reservas: estado.reservas || [], estruturas: estado.estruturas || [], fechados: estado.fechados || [], limite_dia: (estado.negocio && estado.negocio.limite_dia) || null };
+}
+function contador(id, valor, min = 1, max = 200) {
+  return `<div class="ag-num" data-num="${id}" data-min="${min}" data-max="${max}"><button type="button" data-d="-1" aria-label="Diminuir">−</button><b>${valor}</b><button type="button" data-d="1" aria-label="Aumentar">+</button></div>`;
+}
+function ligarContador(raiz, id, aoMudar) {
+  const c = $(`[data-num="${id}"]`, raiz);
+  if (!c) return () => 0;
+  const b = $('b', c), min = Number(c.dataset.min), max = Number(c.dataset.max);
+  $$('button', c).forEach((bt) => (bt.onclick = () => {
+    const v = Math.min(max, Math.max(min, Number(b.textContent) + Number(bt.dataset.d)));
+    b.textContent = String(v); if (aoMudar) aoMudar(v);
+  }));
+  return () => Number(b.textContent);
+}
+function simulacaoTexto(limite) {
+  if (!limite) return `<div class="ag-sim"><div><span>Cada kit, no mesmo dia</span><b class="ag-ok">1 reserva por kit</b></div><div><span>Kits diferentes no mesmo dia</span><b class="ag-ok">✓ aceita</b></div></div>`;
+  const ok = limite === 1 ? '1º pedido' : `1º ao ${limite}º pedido`;
+  return `<div class="ag-sim"><div><span>Sábado: ${ok}</span><b class="ag-ok">✓ aceita</b></div><div><span>${limite + 1}º pedido no mesmo sábado</span><b class="ag-no">✗ dia lotado</b></div></div>`;
+}
+// Perguntas da agenda (contas novas logo depois de criar a loja; e "Refazer as perguntas" em Mais)
+function assistenteAgenda(depois) {
+  const n = estado.negocio;
+  let passo = 0, limite = n.limite_dia || 3, semLimite = n.limite_dia == null && !!n.agenda_config_em, confirmar = n.confirmar_whatsapp !== false;
+  const fim = () => { fecharPainel(); if (depois) depois(); };
+  const telas = [
+    () => `<div class="coluna ag-tela ag-centro">
+        <div style="font-size:56px" aria-hidden="true">🎈</div>
+        <h2 class="ag-titulo">Vamos deixar sua agenda do seu jeito</h2>
+        <p class="pequeno" style="margin:0">Só 2 perguntas para o app <b>nunca aceitar reserva a mais</b> do que você consegue entregar.</p>
+        <div class="ia-espaco"></div>
+        <button class="btn principal cheio" data-ir="1">Começar</button>
+        <button class="link-btn" data-fim style="align-self:center">Fazer depois</button></div>`,
+    () => `<div class="coluna ag-tela">
+        <div class="ia-passos"><i class="f"></i><i></i></div>
+        <p class="ia-perg" style="margin:0">Quantas festas você consegue atender no mesmo dia?</p>
+        <p class="pequeno" style="margin:-4px 0 4px">Somando todos os seus kits. Pense em carro, tempo e quem ajuda a entregar.</p>
+        <div class="${semLimite ? 'ag-apagado' : ''}" id="ag-num-caixa">${contador('limite', limite, 1, 200)}</div>
+        <button type="button" class="ia-opc ${semLimite ? 'sel' : ''}" id="ag-sem"><span class="ia-opc-ic">♾️</span><span><b>Não tenho limite</b><small>Cada kit só sai uma vez por dia</small></span></button>
+        <div class="ia-espaco"></div>
+        <button class="btn principal cheio" data-ir="2">Continuar</button></div>`,
+    () => `<div class="coluna ag-tela">
+        <div class="ia-passos"><i class="f"></i><i class="f"></i></div>
+        <p class="ia-perg" style="margin:0">Quando uma cliente pedir pelo seu link...</p>
+        <button type="button" class="ag-opc ${confirmar ? 'sel' : ''}" data-conf="1"><span class="ag-rec">RECOMENDADO</span><b>✅ Eu confirmo pelo WhatsApp antes do Pix</b><small>A data fica guardada até você aceitar.</small></button>
+        <button type="button" class="ag-opc ${confirmar ? '' : 'sel'}" data-conf="0"><b>⚡ Mostrar a chave Pix na hora</b><small>Se a data não der, você devolve o sinal.</small></button>
+        <div class="ia-espaco"></div>
+        <button class="btn principal cheio" data-salvar>Continuar</button></div>`,
+    () => `<div class="coluna ag-tela ag-centro">
+        <div style="font-size:50px" aria-hidden="true">🎉</div>
+        <h2 class="ag-titulo">Pronto!</h2>
+        ${simulacaoTexto(semLimite ? null : limite)}
+        ${estado.kits.length ? '' : `<p class="pequeno" style="margin:6px 0 0">Agora coloque seus kits no app:</p>
+        ${iaLigada() ? '<button type="button" class="ia-opc sel" data-kits="ia" style="padding:15px"><span class="ia-opc-ic">✨</span><span><b>Montar meu catálogo com IA</b><small>Mande fotos, prints, PDF ou a conversa do WhatsApp</small></span></button>' : ''}
+        <button type="button" class="ia-opc" data-kits="manual" style="padding:15px"><span class="ia-opc-ic">✍️</span><span><b>${iaLigada() ? 'Prefiro cadastrar sozinha' : 'Cadastrar meu primeiro kit'}</b></span></button>`}
+        <div class="ia-espaco"></div>
+        ${estado.kits.length ? '<button class="btn principal cheio" data-fim>Fechar</button>' : ''}
+        <button class="link-btn" data-ir="1" style="align-self:center">Mudar as respostas</button></div>`,
+  ];
+  const desenhar = () => abrirPainel(passo ? 'Sua agenda' : '', telas[passo](), (p) => {
+    $$('[data-ir]', p).forEach((b) => (b.onclick = () => { passo = Number(b.dataset.ir); desenhar(); }));
+    $$('[data-fim]', p).forEach((b) => (b.onclick = fim));
+    const lerLimite = ligarContador(p, 'limite', (v) => { limite = v; semLimite = false; const c = $('#ag-num-caixa', p); if (c) c.classList.remove('ag-apagado'); const sb = $('#ag-sem', p); if (sb) sb.classList.remove('sel'); });
+    const sem = $('#ag-sem', p);
+    if (sem) sem.onclick = () => { semLimite = !semLimite; sem.classList.toggle('sel', semLimite); $('#ag-num-caixa', p).classList.toggle('ag-apagado', semLimite); limite = lerLimite() || limite; };
+    $$('[data-conf]', p).forEach((b) => (b.onclick = () => { confirmar = b.dataset.conf === '1'; $$('[data-conf]', p).forEach((x) => x.classList.toggle('sel', x === b)); }));
+    const salvar = $('[data-salvar]', p);
+    if (salvar) salvar.onclick = () => acao(salvar, async () => {
+      estado.negocio = await dados.salvarNegocio({ limite_dia: semLimite ? null : limite, confirmar_whatsapp: confirmar, agenda_config_em: new Date().toISOString() });
+      passo = 3; desenhar();
+    });
+    $$('[data-kits]', p).forEach((b) => (b.onclick = () => { fecharPainel(); if (b.dataset.kits === 'ia') { irPara('kits'); setTimeout(iaEnviar, 300); } else { irPara('kits'); setTimeout(() => formKit(null), 300); } }));
+  }, passo > 0 ? () => { passo = Math.max(0, passo - 1); desenhar(); } : null);
+  desenhar();
+}
+
+// Mais › Organização da agenda (para todas; sem aviso para quem já usa o app)
+function painelOrganizacao() {
+  const n = estado.negocio;
+  const hoje = hojeISO();
+  const fechados = (estado.fechados || []).filter((f) => f.ate >= hoje);
+  const temEstr = (estado.estruturas || []).length > 0;
+  abrirPainel('Organização da agenda', `
+    <section class="cartao coluna">
+      <h2 style="margin:0">Festas no mesmo dia</h2>
+      <p class="pequeno" style="margin:0">Somando todos os kits. Quando chegar nesse número, o dia aparece lotado no seu link.</p>
+      <div class="linha-flex entre" style="gap:10px;align-items:center"><div class="${n.limite_dia == null ? 'ag-apagado' : ''}" id="org-num">${contador('lim', n.limite_dia || 3, 1, 200)}</div>
+        <label class="check ${n.limite_dia == null ? 'marcado' : ''}" style="flex:0 0 auto;white-space:nowrap"><input type="checkbox" id="org-sem" ${n.limite_dia == null ? 'checked' : ''}> Sem limite</label></div>
+    </section>
+    <section class="cartao coluna">
+      <h2 style="margin:0">Pedidos pelo link</h2>
+      <button type="button" class="ag-opc ${n.confirmar_whatsapp !== false ? 'sel' : ''}" data-conf="1"><b>✅ Eu confirmo pelo WhatsApp antes do Pix</b><small>A cliente só vê a chave Pix depois que você aceitar.</small></button>
+      <button type="button" class="ag-opc ${n.confirmar_whatsapp === false ? 'sel' : ''}" data-conf="0"><b>⚡ Mostrar a chave Pix na hora</b><small>Se a data não der, você devolve o sinal.</small></button>
+    </section>
+    <section class="cartao coluna">
+      <h2 style="margin:0">Dias fechados</h2>
+      <p class="pequeno" style="margin:0">Férias, viagem, feriado: esses dias aparecem indisponíveis no link.</p>
+      ${fechados.length ? fechados.map((f) => `<div class="linha-flex entre ag-fechado"><span><b>${esc(dataCurta(f.de))}${f.ate !== f.de ? ' a ' + esc(dataCurta(f.ate)) : ''}</b>${f.recado ? `<small>${esc(f.recado)}</small>` : ''}</span><button type="button" class="btn claro mini" data-tira="${esc(f.id)}">Reabrir</button></div>`).join('') : ''}
+      <button type="button" class="btn claro mini" id="org-fechar" style="align-self:flex-start">＋ Fechar dias</button>
+    </section>
+    <section class="cartao coluna">
+      <h2 style="margin:0">Kits que dividem peças</h2>
+      <p class="pequeno" style="margin:0">Avançado: só se kits diferentes usam a mesma mesa, escadinha ou outra peça que você tem em pouca quantidade.</p>
+      <button type="button" class="btn ${temEstr ? 'claro' : 'contorno'} mini" id="org-estr" style="align-self:flex-start">${temEstr ? `Minhas peças compartilhadas (${estado.estruturas.length})` : 'Configurar'}</button>
+    </section>
+    <button type="button" class="btn principal cheio" id="org-salvar">Salvar</button>
+    <button type="button" class="link-btn" id="org-perguntas" style="align-self:center">Refazer as perguntas</button>`, (p) => {
+    let confirmar = n.confirmar_whatsapp !== false;
+    const lerLim = ligarContador(p, 'lim', () => { $('#org-sem', p).checked = false; $('#org-sem', p).closest('label').classList.remove('marcado'); $('#org-num', p).classList.remove('ag-apagado'); });
+    $('#org-sem', p).onchange = (e) => { e.target.closest('label').classList.toggle('marcado', e.target.checked); $('#org-num', p).classList.toggle('ag-apagado', e.target.checked); };
+    $$('[data-conf]', p).forEach((b) => (b.onclick = () => { confirmar = b.dataset.conf === '1'; $$('[data-conf]', p).forEach((x) => x.classList.toggle('sel', x === b)); }));
+    $$('[data-tira]', p).forEach((b) => (b.onclick = () => acao(b, async () => { await dados.apagarFechado(b.dataset.tira); estado.fechados = await dados.listarFechados(); painelOrganizacao(); })));
+    $('#org-fechar', p).onclick = () => formFecharDias();
+    $('#org-estr', p).onclick = () => painelEstruturas();
+    $('#org-perguntas', p).onclick = () => assistenteAgenda(() => painelOrganizacao());
+    $('#org-salvar', p).onclick = (e) => acao(e.currentTarget, async () => {
+      const sem = $('#org-sem', p).checked;
+      estado.negocio = await dados.salvarNegocio({ limite_dia: sem ? null : lerLim(), confirmar_whatsapp: confirmar, agenda_config_em: n.agenda_config_em || new Date().toISOString() });
+      fecharPainel(); aviso('Agenda salva!'); desenharAba();
+    });
+  });
+}
+function formFecharDias() {
+  const h = hojeISO();
+  abrirPainel('Fechar dias', `<form class="coluna" novalidate>
+      <div class="grade-2"><label class="campo">De<input type="date" name="de" value="${h}" min="${h}"></label><label class="campo">Até<input type="date" name="ate" value="${h}" min="${h}"></label></div>
+      <label class="campo">Recado para as clientes (opcional)<input name="recado" maxlength="120" placeholder="Ex.: Estamos de férias, voltamos dia 25"></label>
+      <div id="fd-aviso"></div>
+      <div class="erro oculto" id="fd-erro"></div>
+      <button class="btn principal cheio" type="submit">Fechar esses dias</button></form>`, (p) => {
+    const form = $('form', p);
+    const conferir = () => {
+      const de = form.de.value, ate = form.ate.value;
+      if (form.ate.value < form.de.value) form.ate.value = form.de.value;
+      const tem = (estado.reservas || []).filter((r) => r.status !== 'cancelada' && dados.cruza(r, de, form.ate.value));
+      $('#fd-aviso', p).innerHTML = tem.length ? `<div class="nota-amarela pequeno">Já existe${tem.length > 1 ? 'm' : ''} ${plural(tem.length, 'reserva', 'reservas')} nesses dias. Nada é cancelado: só param de entrar pedidos novos.</div>` : '';
+    };
+    form.de.onchange = conferir; form.ate.onchange = conferir; conferir();
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      await acao($('button[type=submit]', form), async () => {
+        try {
+          await dados.salvarFechado({ de: form.de.value, ate: form.ate.value, recado: form.recado.value.trim() || null });
+          estado.fechados = await dados.listarFechados();
+          aviso('Dias fechados no seu link.'); painelOrganizacao();
+        } catch (err) { const c = $('#fd-erro', p); c.textContent = err.message; c.classList.remove('oculto'); }
+      });
+    };
+  }, () => painelOrganizacao());
+}
+// Avançado: peças que vários kits dividem (mesa, escadinha...)
+const SUGESTOES_PECAS = ['Mesa', 'Painel redondo', 'Painel retangular', 'Trio de cilindros', 'Suporte de arco', 'Escadinha', 'Cômoda', 'Boleira'];
+function painelEstruturas() {
+  const lista = estado.estruturas || [];
+  const usoDe = (id) => estado.kits.filter((k) => (k.estruturas || []).some((x) => x.id === id)).length;
+  abrirPainel('Peças compartilhadas', `
+    <div class="ia-dica">🛒 <b>Comprou mais uma?</b> Aumente aqui. Cada peça a mais abre mais uma vaga na sua agenda no mesmo dia.</div>
+    ${lista.map((e) => `<div class="ag-estr" data-e="${esc(e.id)}">
+      <div class="ag-estr-t"><b>${esc(e.nome)}</b><small>${plural(usoDe(e.id), 'kit usa', 'kits usam')}${e.fora_qtd && e.fora_ate >= hojeISO() ? ` · ${e.fora_qtd} em conserto até ${esc(dataCurta(e.fora_ate))}` : ''}</small></div>
+      ${contador('e' + e.id, e.quantidade, 0, 200)}
+      <div class="ag-estr-bt"><button type="button" class="btn claro mini" data-kits-e="${esc(e.id)}">Quais kits usam?</button><button type="button" class="btn claro mini" data-conserto="${esc(e.id)}">Em conserto</button><button type="button" class="link-btn" data-apaga="${esc(e.id)}">Apagar</button></div>
+    </div>`).join('') || '<p class="pequeno">Nenhuma peça cadastrada. Toque abaixo para começar.</p>'}
+    <div class="ag-sug">${SUGESTOES_PECAS.filter((s) => !lista.some((e) => e.nome.toLowerCase() === s.toLowerCase())).map((s) => `<button type="button" class="btn claro mini" data-nova="${esc(s)}">＋ ${esc(s)}</button>`).join('')}<button type="button" class="btn claro mini" data-nova="">＋ Outra</button></div>
+    <button type="button" class="btn principal cheio" id="es-salvar">Salvar</button>`, (p) => {
+    const leitores = lista.map((e) => [e, ligarContador(p, 'e' + e.id)]);
+    $$('[data-nova]', p).forEach((b) => (b.onclick = () => acao(b, async () => {
+      let nome = b.dataset.nova;
+      if (!nome) { nome = (prompt('Nome da peça (ex.: Mesa redonda):') || '').trim(); if (!nome) return; }
+      const nova = await dados.salvarEstrutura({ nome: nome.slice(0, 40), quantidade: 1 });
+      estado.estruturas = await dados.listarEstruturas();
+      escolherKitsDaPeca(nova.id);
+    })));
+    $$('[data-kits-e]', p).forEach((b) => (b.onclick = () => escolherKitsDaPeca(b.dataset.kitsE)));
+    $$('[data-conserto]', p).forEach((b) => (b.onclick = () => formConserto(b.dataset.conserto)));
+    $$('[data-apaga]', p).forEach((b) => (b.onclick = () => acao(b, async () => {
+      if (!confirm('Apagar esta peça? Os kits deixam de dividir ela.')) return;
+      await dados.apagarEstrutura(b.dataset.apaga);
+      [estado.estruturas, estado.kits] = await Promise.all([dados.listarEstruturas(), dados.listarKits()]);
+      painelEstruturas();
+    })));
+    $('#es-salvar', p).onclick = (ev) => acao(ev.currentTarget, async () => {
+      for (const [e, ler] of leitores) {
+        const novo = ler();
+        if (novo === e.quantidade) continue;
+        if (novo < e.quantidade && !(await confirmarDiminuir(e, novo))) return;
+        await dados.salvarEstrutura({ id: e.id, quantidade: novo });
+      }
+      estado.estruturas = await dados.listarEstruturas();
+      aviso('Peças salvas!'); painelOrganizacao();
+    });
+  }, () => painelOrganizacao());
+}
+// Antes de diminuir: mostra os dias que ficariam sem peça (nada é cancelado)
+async function confirmarDiminuir(e, novo) {
+  const h = hojeISO();
+  const usoDe = (r) => { const k = kitDe(r.kit_id); const x = (k.estruturas || []).find((y) => y.id === e.id); return x ? Math.max(1, Number(x.qtd) || 1) : 0; };
+  const dias = {};
+  (estado.reservas || []).filter((r) => r.status !== 'cancelada' && r.data_devolucao >= h && usoDe(r)).forEach((r) => {
+    for (let x = r.data_retirada < h ? h : r.data_retirada; x <= r.data_devolucao; x = dados.somaDias(x, 1)) dias[x] = (dias[x] || 0) + usoDe(r);
+  });
+  const ruins = Object.entries(dias).filter(([, v]) => v > novo).sort();
+  if (!ruins.length) return true;
+  return confirm(`${e.nome}: de ${e.quantidade} para ${novo}.\n\n${ruins.slice(0, 5).map(([d, v]) => `${dataCurta(d)}: ${v} reservas usam ${e.nome.toLowerCase()} (${v - novo} fica sem)`).join('\n')}\n\nNenhuma reserva é cancelada. Combine com as clientes. Diminuir mesmo assim?`);
+}
+function escolherKitsDaPeca(id) {
+  const e = (estado.estruturas || []).find((x) => x.id === id);
+  if (!e) return painelEstruturas();
+  abrirPainel(`Quais kits usam ${e.nome.toLowerCase()}?`, `
+    <p class="pequeno" style="margin:0">Marque todos os kits que levam ${esc(e.nome.toLowerCase())}.</p>
+    <div class="coluna" style="gap:6px">${estado.kits.map((k) => `<label class="check ${(k.estruturas || []).some((x) => x.id === id) ? 'marcado' : ''}"><input type="checkbox" data-k="${esc(k.id)}" ${(k.estruturas || []).some((x) => x.id === id) ? 'checked' : ''}> ${esc(k.nome)}</label>`).join('') || '<p class="pequeno">Cadastre seus kits primeiro.</p>'}</div>
+    <div class="linha-flex" style="gap:8px"><button type="button" class="btn claro mini" id="pk-todos">Marcar todos</button></div>
+    <button type="button" class="btn principal cheio" id="pk-salvar">Salvar</button>`, (p) => {
+    $$('input[data-k]', p).forEach((c) => (c.onchange = () => c.closest('label').classList.toggle('marcado', c.checked)));
+    $('#pk-todos', p).onclick = () => $$('input[data-k]', p).forEach((c) => { c.checked = true; c.closest('label').classList.add('marcado'); });
+    $('#pk-salvar', p).onclick = (ev) => acao(ev.currentTarget, async () => {
+      for (const c of $$('input[data-k]', p)) {
+        const k = kitDe(c.dataset.k); const tem = (k.estruturas || []).some((x) => x.id === id);
+        if (c.checked === tem) continue;
+        const nova = c.checked ? [...(k.estruturas || []), { id, qtd: 1 }] : (k.estruturas || []).filter((x) => x.id !== id);
+        await dados.salvarKit({ id: k.id, estruturas: nova });
+      }
+      estado.kits = await dados.listarKits();
+      aviso('Kits ligados!'); painelEstruturas();
+    });
+  }, () => painelEstruturas());
+}
+function formConserto(id) {
+  const e = (estado.estruturas || []).find((x) => x.id === id);
+  const h = hojeISO();
+  abrirPainel(`${e.nome}: em conserto`, `<form class="coluna" novalidate>
+      <p class="pequeno" style="margin:0">Nesses dias, o app conta ${esc(e.nome.toLowerCase())} a menos.</p>
+      <label class="campo">Quantas estão fora de uso?${contador('fq', Math.max(1, e.fora_qtd || 1), 1, Math.max(1, e.quantidade))}</label>
+      <div class="grade-2"><label class="campo">De<input type="date" name="de" value="${e.fora_de || h}"></label><label class="campo">Até<input type="date" name="ate" value="${e.fora_ate || h}"></label></div>
+      <button class="btn principal cheio" type="submit">Salvar</button>
+      ${e.fora_qtd ? '<button class="btn contorno cheio" type="button" id="fq-volta">Já voltou do conserto</button>' : ''}</form>`, (p) => {
+    const form = $('form', p); const ler = ligarContador(p, 'fq');
+    form.onsubmit = (ev) => { ev.preventDefault(); acao($('button[type=submit]', form), async () => {
+      if (form.ate.value < form.de.value) form.ate.value = form.de.value;
+      await dados.salvarEstrutura({ id, fora_qtd: ler(), fora_de: form.de.value, fora_ate: form.ate.value });
+      estado.estruturas = await dados.listarEstruturas(); painelEstruturas();
+    }); };
+    const v = $('#fq-volta', p);
+    if (v) v.onclick = () => acao(v, async () => { await dados.salvarEstrutura({ id, fora_qtd: 0, fora_de: null, fora_ate: null }); estado.estruturas = await dados.listarEstruturas(); painelEstruturas(); });
+  }, () => painelEstruturas());
+}
+
 function abaMais(tela) {
   const link = linkPublico(estado.negocio.slug);
   const mostrarInstalar = !DEMO_SITE && !appInstalado() && !ehComputador();
@@ -3283,6 +3758,7 @@ function abaMais(tela) {
       </div>
     </section>
     <section class="coluna mais-atalhos">
+      <button class="cartao clicavel" id="organizacao"><div style="font-weight:800">Organização da agenda</div><div class="pequeno">Festas por dia, confirmação dos pedidos e dias fechados</div></button>
       <button class="cartao clicavel" id="mensagens"><div style="font-weight:800">Mensagens do WhatsApp</div><div class="pequeno">Escreva seus textos de sinal, confirmação, retirada e devolução</div></button>
       ${DEMO_SITE ? '' : '<button class="cartao clicavel" id="meu-contrato"><div style="font-weight:800">Meu contrato</div><div class="pequeno">Seu modelo de contrato para enviar em cada reserva</div></button>'}
       ${estado.assinatura && estado.assinatura.admin ? '<a class="cartao clicavel" style="text-decoration:none; background: var(--tinta); color: #fff; border-color: var(--tinta)" href="admin.html"><div style="font-weight:800">Painel do administrador</div><div class="pequeno" style="color:#D9CFE6">Clientes, renovações, leads e acessos</div></a>' : ''}
@@ -3309,6 +3785,7 @@ function abaMais(tela) {
   $('#copiar', tela).onclick = () => copiarMeuLink();
   $('#meus-dados', tela).onclick = painelNegocio;
   $('#mensagens', tela).onclick = painelMensagens;
+  const org = $('#organizacao', tela); if (org) org.onclick = painelOrganizacao;
   const sairBtn = $('#sair', tela);
   if (sairBtn) sairBtn.onclick = async () => { await dados.sair(); location.hash = ''; telaLogin('entrar'); };
   const iaZ = $('#demo-ia-zerar', tela);
@@ -3446,8 +3923,9 @@ function painelMensagens() {
   });
 }
 
-function formReserva(pre, existente) {
+function formReserva(pre, existente, rascunho) {
   if (!podeEditar()) return aviso('Sua assinatura não está ativa.');
+  const chRasc = chaveRascunho('res', existente && existente.id);
   const kitsAtivos = estado.kits.filter((k) => k.ativo || (existente && k.id === existente.kit_id));
   if (!kitsAtivos.length) { aviso('Cadastre um kit primeiro.'); irPara('kits'); return; }
   const n = estado.negocio;
@@ -3456,8 +3934,10 @@ function formReserva(pre, existente) {
   const festa0 = r.data_festa || pre.data_festa || hojeISO();
   abrirPainel(existente ? 'Editar reserva' : 'Nova reserva', `
     <form class="coluna" novalidate>
+      ${rascunho ? '' : faixaRascunho(chRasc)}
       <label class="campo">Kit<select name="kit">${kitsAtivos.map((k) => `<option value="${esc(k.id)}" ${k.id === kit0.id ? 'selected' : ''}>${esc(k.nome)}</option>`).join('')}</select></label>
       <label class="campo oculto" id="campo-variacao">Opção do kit<select name="variacao"></select></label>
+      <label class="campo oculto" id="campo-tema">Tema<select name="tema"></select></label>
       <label class="campo">Data da festa<input type="date" name="festa" value="${festa0}" required></label>
       <div class="grade-2">
         <label class="campo">Retirada<input type="date" name="retirada" value="${r.data_retirada || somaDias(festa0, -n.dias_antes)}"></label>
@@ -3486,6 +3966,16 @@ function formReserva(pre, existente) {
     };
     const variacaoEscolhida = () => variacoesDe(kitDe(form.kit.value)).find((v) => v.id === form.variacao.value) || null;
     encherVariacoes(kit0.id, r.variacao || null);
+    // Temas do kit escolhido
+    const encherTemas = (kitId, temaAtual) => {
+      const ts = kitDe(kitId).temas || [];
+      $('#campo-tema', p).classList.toggle('oculto', !ts.length);
+      form.tema.innerHTML = '<option value="">Escolha o tema</option>' + ts.map((t) => `<option value="${esc(t.id)}" ${t.id === temaAtual ? 'selected' : ''}>${esc(t.nome)}</option>`).join('')
+        + (temaAtual && !ts.some((t) => t.id === temaAtual) && r.tema ? `<option value="${esc(temaAtual)}" selected>${esc(r.tema)} (tema antigo)</option>` : '');
+    };
+    encherTemas(kit0.id, r.tema_id || null);
+    // Retirada e devolução combinadas à mão não são trocadas quando muda a data da festa
+    let datasManuais = !!existente && (r.data_retirada !== somaDias(r.data_festa, -n.dias_antes) || r.data_devolucao !== somaDias(r.data_festa, n.dias_depois));
     if (!existente) { const v0 = variacaoEscolhida(); if (v0) { form.valor.value = String(v0.preco).replace('.', ','); form.sinal.value = String(v0.sinal).replace('.', ','); } }
     form.variacao.onchange = () => {
       const v = variacaoEscolhida();
@@ -3496,27 +3986,48 @@ function formReserva(pre, existente) {
       const ini = form.retirada.value; const fim = form.devolucao.value;
       const disp = $('#disp', p);
       if (!ini || !fim) { disp.innerHTML = ''; return; }
-      const conflito = estado.reservas.find((x) => x.id !== r.id && x.kit_id === kitId && x.status !== 'cancelada' && cruza(x, ini, fim));
-      disp.innerHTML = conflito
-        ? `<div class="erro">Esse kit já está com ${esc(conflito.cliente_nome)} de ${dataCurta(conflito.data_retirada)} a ${dataCurta(conflito.data_devolucao)}.</div>`
-        : `<span class="etiqueta et-livre">Kit livre nessas datas</span>`;
+      const m = dados.motivoAgenda(ctxAgenda(), kitId, form.tema.value || null, ini, fim, r.id || null, true);
+      const qtd = Math.max(1, Number(kitDe(kitId).quantidade) || 1);
+      const conflito = m === 'kit' && qtd === 1 ? estado.reservas.find((x) => x.id !== r.id && x.kit_id === kitId && x.status !== 'cancelada' && cruza(x, ini, fim)) : null;
+      disp.innerHTML = !m ? `<span class="etiqueta et-livre">Kit livre nessas datas</span>`
+        : m === 'kit' ? `<div class="erro">${conflito ? `Esse kit já está com ${esc(conflito.cliente_nome)} de ${dataCurta(conflito.data_retirada)} a ${dataCurta(conflito.data_devolucao)}.` : `Os ${qtd} deste kit já estão reservados nessas datas.`}</div>`
+        : m === 'tema' ? `<div class="erro">Esse tema já está reservado nessas datas. Escolha outro tema.</div>`
+        : `<div class="nota-amarela pequeno">⚠️ ${m === 'fechado' ? 'Você marcou esses dias como fechados.' : m === 'limite' ? `Esse dia já tem ${estado.negocio.limite_dia} festas (o seu limite).` : `Falta ${esc(m.replace('estrutura:', '').toLowerCase())} nesses dias.`} Você pode salvar mesmo assim.</div>`;
     };
     form.festa.onchange = () => {
       if (!form.festa.value) return;
-      form.retirada.value = somaDias(form.festa.value, -n.dias_antes);
-      form.devolucao.value = somaDias(form.festa.value, n.dias_depois);
+      if (!datasManuais || form.retirada.value > form.festa.value || form.devolucao.value < form.festa.value) {
+        form.retirada.value = somaDias(form.festa.value, -n.dias_antes);
+        form.devolucao.value = somaDias(form.festa.value, n.dias_depois);
+      }
       checar();
     };
+    form.tema.onchange = checar;
     form.kit.onchange = () => {
       const k = kitDe(form.kit.value);
       encherVariacoes(k.id, null);
+      encherTemas(k.id, null);
       const v = variacaoEscolhida();
       if (!existente || v) { form.valor.value = String(v ? v.preco : k.preco).replace('.', ','); form.sinal.value = String(v ? v.sinal : k.sinal).replace('.', ','); }
       checar();
     };
-    form.retirada.onchange = checar;
-    form.devolucao.onchange = checar;
+    form.retirada.onchange = () => { datasManuais = true; checar(); };
+    form.devolucao.onchange = () => { datasManuais = true; checar(); };
     if (form.pago) form.pago.onchange = () => form.pago.closest('.check').classList.toggle('marcado', form.pago.checked);
+    // Rascunho: recupera o que estava preenchido e guarda enquanto digita
+    if (rascunho) {
+      if (rascunho.kit && kitsAtivos.some((x) => x.id === rascunho.kit)) { form.kit.value = rascunho.kit; encherVariacoes(rascunho.kit, null); encherTemas(rascunho.kit, rascunho.tema || null); }
+      ['variacao', 'tema', 'festa', 'retirada', 'devolucao', 'nome', 'zap', 'valor', 'sinal', 'obs'].forEach((c) => { if (form[c] && rascunho[c] != null && rascunho[c] !== '') form[c].value = rascunho[c]; });
+      datasManuais = true;
+    }
+    ligarFaixaRascunho(p, chRasc, (r) => formReserva(pre, existente, r));
+    let tRasc = 0;
+    const guardar = () => { clearTimeout(tRasc); tRasc = setTimeout(() => {
+      if (!existente && !form.nome.value.trim() && !form.zap.value.trim() && !form.obs.value.trim()) return;
+      const d = {}; ['kit', 'variacao', 'tema', 'festa', 'retirada', 'devolucao', 'nome', 'zap', 'valor', 'sinal', 'obs'].forEach((c) => { if (form[c]) d[c] = form[c].value; });
+      gravarRascunho(chRasc, d);
+    }, 500); };
+    form.addEventListener('input', guardar); form.addEventListener('change', guardar);
     checar();
 
     form.onsubmit = async (e) => {
@@ -3535,6 +4046,9 @@ function formReserva(pre, existente) {
         valor_sinal: numero(form.sinal.value),
         obs: form.obs.value.trim() || null,
       };
+      const temaSel = (kitDe(campos.kit_id).temas || []).find((t) => t.id === form.tema.value);
+      if ((kitDe(campos.kit_id).temas || []).length || r.tema_id) { campos.tema_id = form.tema.value || null; campos.tema = temaSel ? temaSel.nome : (form.tema.value && form.tema.value === r.tema_id ? r.tema : null); }
+      if (campos.valor_total > 0 && r.valor_a_combinar) campos.valor_a_combinar = false;
       // Opção do kit: guarda o nome e as peças (kit + extras da opção)
       const kitSel = kitDe(campos.kit_id);
       const vSel = variacaoEscolhida();
@@ -3563,6 +4077,7 @@ function formReserva(pre, existente) {
             const pago = form.pago && form.pago.checked;
             salva = await dados.criarReserva({ ...campos, status: pago ? 'confirmada' : 'aguardando_sinal', sinal_recebido: !!pago });
           }
+          apagarRascunho(chRasc);
           await recarregar();
           aviso(existente ? 'Reserva atualizada!' : 'Reserva criada!');
           abrirReserva(salva.id);
@@ -3572,6 +4087,31 @@ function formReserva(pre, existente) {
   }, existente ? () => abrirReserva(existente.id) : null);
 }
 
+// Alterar só a retirada e a devolução (como combinado com a cliente)
+function alterarDatas(r) {
+  abrirPainel('Alterar retirada e devolução', `<form class="coluna" novalidate>
+      <p class="pequeno" style="margin:0">Festa: <b>${esc(dataLonga(r.data_festa))}</b></p>
+      <div class="grade-2"><label class="campo">Retirada<input type="date" name="ret" value="${r.data_retirada}" max="${r.data_festa}"></label>
+        <label class="campo">Devolução<input type="date" name="dev" value="${r.data_devolucao}" min="${r.data_festa}"></label></div>
+      <div id="ad-disp"></div><div class="erro oculto" id="ad-erro"></div>
+      <button class="btn principal cheio" type="submit">Salvar datas</button></form>`, (p) => {
+    const form = $('form', p);
+    const checar = () => {
+      const m = form.ret.value && form.dev.value ? dados.motivoAgenda(ctxAgenda(), r.kit_id, r.tema_id || null, form.ret.value, form.dev.value, r.id, true) : null;
+      $('#ad-disp', p).innerHTML = !m ? '<span class="etiqueta et-livre">Livre nessas datas</span>'
+        : m === 'kit' || m === 'tema' ? `<div class="erro">${esc(dados.mensagemAgenda(m))}</div>`
+        : '<div class="nota-amarela pequeno">⚠️ Esses dias passam do seu limite ou estão fechados. Você pode salvar mesmo assim.</div>';
+    };
+    form.ret.onchange = checar; form.dev.onchange = checar; checar();
+    form.onsubmit = (e) => { e.preventDefault(); const c = $('#ad-erro', p); c.classList.add('oculto');
+      if (!(form.ret.value && form.dev.value && form.ret.value <= r.data_festa && r.data_festa <= form.dev.value)) { c.textContent = 'A retirada precisa ser antes ou no dia da festa, e a devolução depois ou no dia.'; c.classList.remove('oculto'); return; }
+      acao($('button[type=submit]', form), async () => {
+        try { await dados.atualizarReserva(r.id, { data_retirada: form.ret.value, data_devolucao: form.dev.value }); await recarregar(); aviso('Datas alteradas!'); abrirReserva(r.id); }
+        catch (err) { c.textContent = err.message; c.classList.remove('oculto'); }
+      });
+    };
+  }, () => abrirReserva(r.id));
+}
 function abrirReserva(id) {
   const r = estado.reservas.find((x) => x.id === id);
   if (!r) { fecharPainel(); return; }
@@ -3581,8 +4121,9 @@ function abrirReserva(id) {
   const botoes = [];
   if (ed) {
     if (r.status === 'aguardando_sinal') {
-      botoes.push(`<a class="btn contorno cheio" href="${esc(linkZap(r.cliente_whatsapp, mensagem('sinal', r)))}" target="_blank" rel="noopener">${ICONE.zap} Cobrar o sinal</a>`);
-      botoes.push('<button class="btn verde cheio" data-acao="confirmar">Sinal recebido: confirmar</button>');
+      botoes.push(`<a class="btn verde cheio" href="${esc(linkZap(r.cliente_whatsapp, mensagem('sinal', r)))}" target="_blank" rel="noopener">✅ Aceitar e cobrar o sinal</a>`);
+      botoes.push('<button class="btn contorno cheio" data-acao="confirmar">Sinal recebido: confirmar reserva</button>');
+      botoes.push('<button class="btn contorno cheio" data-acao="naovai">Não vai dar (avisar a cliente)</button>');
     }
     if (r.status === 'confirmada') {
       botoes.push('<button class="btn principal cheio" data-acao="retirar">Entregar kit (conferir peças)</button>');
@@ -3606,15 +4147,15 @@ function abrirReserva(id) {
   };
 
   abrirPainel(nomeKitReserva(r), `
-    <div class="linha-flex entre">${estaAtrasada(r) ? etiqueta('atrasada', 'Atrasada') : etiqueta(r.status)}${r.origem === 'link' ? '<span class="pequeno">Pedido pelo link</span>' : ''}</div>
+    <div class="linha-flex entre">${estaAtrasada(r) ? etiqueta('atrasada', 'Atrasada') : r.status === 'aguardando_sinal' && r.origem === 'link' ? '<span class="etiqueta et-aguardando_sinal">Pré-reserva · aguardando você</span>' : etiqueta(r.status)}${r.origem === 'link' ? '<span class="pequeno">Pedido pelo link</span>' : ''}</div>
     <div class="cartao coluna">
       <div class="linha-flex entre"><div><div style="font-weight:800">${esc(r.cliente_nome)}</div>
         <div class="pequeno">${esc(zapFormatado(r.cliente_whatsapp))}</div></div>
         <a class="btn claro mini" href="${esc(linkZap(r.cliente_whatsapp, `Oi, ${r.cliente_nome.split(' ')[0]}!`))}" target="_blank" rel="noopener">${ICONE.zap} Chamar</a></div>
       <div class="grade-2">
         <div><div class="pequeno">Festa</div><b>${dataCurta(r.data_festa)}</b></div>
-        <div><div class="pequeno">Retirada → devolução</div><b>${dataCurta(r.data_retirada)} → ${dataCurta(r.data_devolucao)}</b></div>
-        <div><div class="pequeno">Valor total</div><b>${reais(r.valor_total)}</b></div>
+        <div><div class="pequeno">Retirada → devolução</div><b>${dataCurta(r.data_retirada)} → ${dataCurta(r.data_devolucao)}</b>${ed && r.status !== 'concluida' ? ' <button type="button" class="btn claro mini" data-acao="datas" style="min-height:30px;padding:0 10px">✏️ Alterar</button>' : ''}</div>
+        <div><div class="pequeno">Valor total</div><b>${r.valor_a_combinar && !Number(r.valor_total) ? '<span class="etiqueta et-aguardando_sinal">combinar valor</span>' : reais(r.valor_total)}</b></div>
         <div><div class="pequeno">Sinal</div><b>${reais(r.valor_sinal)}</b> ${r.sinal_recebido ? '<span class="etiqueta et-concluida">pago</span>' : ''}</div>
       </div>
       ${['retirada', 'concluida'].includes(r.status) ? resumoChecklist('Retirada', r.checklist_retirada) : ''}
@@ -3642,6 +4183,23 @@ function abrirReserva(id) {
       });
     }
     const ligar = (nome, fn) => { const b = $(`[data-acao="${nome}"]`, p); if (b) b.addEventListener(b.type === 'checkbox' ? 'change' : 'click', () => fn(b)); };
+    ligar('datas', () => alterarDatas(r));
+    ligar('naovai', (b) => {
+      const primeiro = r.cliente_nome.split(' ')[0];
+      const txt = `Oi, ${primeiro}! Infelizmente ${dataCurta(r.data_festa)} não vai dar para o ${kitComPalavra(nomeKitReserva(r))}. 😕 Quer escolher outra data ou outro kit? Veja aqui: ${linkPublico(estado.negocio.slug)}`;
+      abrirPopup(`
+        <h2 class="centro" style="font-size:22px;margin:0">Avisar ${esc(primeiro)} e liberar a data?</h2>
+        <p class="centro pequeno" style="margin:0">A mensagem abre pronta no WhatsApp e a reserva é cancelada, liberando a data no seu link.</p>
+        <div class="bolha-zap">${esc(txt)}</div>
+        <a class="btn verde cheio" id="nv-ok" href="${esc(linkZap(r.cliente_whatsapp, txt))}" target="_blank" rel="noopener">${ICONE.zap} Avisar e liberar a data</a>
+        <button class="link-btn" id="nv-nao">Voltar</button>`, (pp) => {
+        $('#nv-nao', pp).onclick = () => abrirReserva(r.id);
+        $('#nv-ok', pp).addEventListener('click', () => acao(null, async () => {
+          await dados.atualizarReserva(r.id, { status: 'cancelada' });
+          await recarregar(); fecharPainel(); aviso('Cliente avisada e data liberada.');
+        }));
+      });
+    });
     ligar('confirmar', (b) => acao(b, async () => {
       await dados.atualizarReserva(r.id, { status: 'confirmada', sinal_recebido: true });
       await recarregar();

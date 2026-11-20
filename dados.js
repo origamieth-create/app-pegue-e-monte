@@ -9,10 +9,32 @@ import { SUPABASE_URL, SUPABASE_ANON_KEY, DEMO_SITE } from './config.js?v=202611
 export const MODO_DEMO = !/^https:\/\/.+\.supabase\.co\/?$/.test(SUPABASE_URL);
 
 let sb = null;
+// Modo suporte em várias abas: cada aba diz ao banco qual loja está atendendo
+export function lojaSuporteDaAba() { try { return sessionStorage.getItem('apm-suporte-loja') || null; } catch (e) { return null; } }
+function guardarLojaSuporte(id) { try { if (id) sessionStorage.setItem('apm-suporte-loja', id); else sessionStorage.removeItem('apm-suporte-loja'); } catch (e) { /* segue */ } }
+// A aba aberta pelo painel chega com ?suporte=<loja>: guarda nesta aba e limpa o endereço
+try {
+  const q = new URLSearchParams(location.search).get('suporte');
+  if (q && /^[0-9a-fA-F-]{36}$/.test(q) && !/reservar|contrato/.test(location.pathname)) {
+    guardarLojaSuporte(q.toLowerCase());
+    const u = new URL(location.href); u.searchParams.delete('suporte');
+    history.replaceState(null, '', u.pathname + u.search + u.hash);
+  }
+} catch (e) { /* segue */ }
+export function sairDaLojaNestaAba() { guardarLojaSuporte(null); }
 async function cliente() {
   if (!sb) {
     const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
-    sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const loja = lojaSuporteDaAba();
+    // O cabeçalho vai só para o banco (rest/v1); fotos e login seguem como sempre
+    const comLoja = (input, init = {}) => {
+      const url = typeof input === 'string' ? input : (input && input.url) || '';
+      if (!url.includes('/rest/v1/')) return fetch(input, init);
+      const h = new Headers(init.headers || (typeof input !== 'string' && input.headers) || undefined);
+      h.set('x-loja', loja);
+      return fetch(input, { ...init, headers: h });
+    };
+    sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, loja ? { global: { fetch: comLoja } } : undefined);
   }
   return sb;
 }
@@ -20,7 +42,7 @@ async function cliente() {
 // Traduz erros técnicos para mensagens que a dona entende.
 function erroAmigavel(e) {
   const msg = (e && (e.message || e.error_description)) || String(e);
-  if (e && e.code === '23P01') return 'Esse kit já está reservado nesse período. Escolha outra data ou outro kit.';
+  if (e && e.code === '23P01') return /reservad|lotad|atendendo/.test(msg) ? msg : 'Esse kit já está reservado nesse período. Escolha outra data ou outro kit.';
   if (e && e.code === '23505' && msg.includes('slug')) return 'Esse link já está em uso. Escolha outro.';
   if (/Invalid login credentials/i.test(msg)) return 'E-mail ou senha incorretos.';
   if (/Email not confirmed/i.test(msg)) return 'Confirme seu e-mail pelo link que enviamos antes de entrar.';
@@ -51,6 +73,56 @@ export function somaDias(iso, n) {
   return isoDe(new Date(a, m - 1, d + n));
 }
 export function cruza(r, ini, fim) { return r.data_retirada <= fim && r.data_devolucao >= ini; }
+
+// ---------------------------------------------------------------------
+// Regra da agenda (a mesma do banco: agenda_motivo). Devolve null se cabe,
+// ou o motivo: 'kit' | 'tema' | 'limite' | 'fechado' | 'estrutura:<nome>'.
+// tudo = false confere só kit e tema (o resto é aviso para a dona).
+// ---------------------------------------------------------------------
+export function motivoAgenda(c, kitId, temaId, ret, dev, ignorar = null, tudo = true) {
+  const kits = c.kits || [], reservas = (c.reservas || []).filter((r) => r.status !== 'cancelada' && r.id !== ignorar);
+  const k = kits.find((x) => x.id === kitId);
+  if (!k || !ret || !dev || dev < ret) return 'kit';
+  const qtdKit = Math.max(1, Number(k.quantidade) || 1);
+  const tema = temaId ? (k.temas || []).find((t) => t.id === temaId) : null;
+  const qtdTema = tema ? Math.max(1, Number(tema.qtd) || 1) : 1;
+  const est = (k.estruturas || []).map((e) => ({ ...e, s: (c.estruturas || []).find((x) => x.id === e.id) })).filter((e) => e.s);
+  const usoDe = (r, id) => { const kk = kits.find((x) => x.id === r.kit_id); const e = kk && (kk.estruturas || []).find((x) => x.id === id); return e ? Math.max(1, Number(e.qtd) || 1) : 0; };
+  for (let x = ret, n = 0; x <= dev && n <= 60; x = somaDias(x, 1), n++) {
+    const no = reservas.filter((r) => r.data_retirada <= x && r.data_devolucao >= x);
+    if (no.filter((r) => r.kit_id === kitId).length >= qtdKit) return 'kit';
+    if (temaId && no.filter((r) => r.kit_id === kitId && r.tema_id === temaId).length >= qtdTema) return 'tema';
+    if (!tudo) continue;
+    if ((c.fechados || []).some((f) => x >= f.de && x <= f.ate)) return 'fechado';
+    if (c.limite_dia && no.length >= c.limite_dia) return 'limite';
+    for (const e of est) {
+      const fora = e.s.fora_de && x >= e.s.fora_de && x <= (e.s.fora_ate || e.s.fora_de) ? Number(e.s.fora_qtd) || 0 : 0;
+      const usados = no.reduce((t, r) => t + usoDe(r, e.id), 0);
+      if (usados + Math.max(1, Number(e.qtd) || 1) > (Number(e.s.quantidade) || 0) - fora) return 'estrutura:' + e.s.nome;
+    }
+  }
+  return null;
+}
+const COLLATOR = typeof Intl !== 'undefined' ? new Intl.Collator('pt-BR', { numeric: true, sensitivity: 'base' }) : null;
+// Ordem dos kits (a mesma no app e no link): A–Z com números na ordem certa (Kit 2 antes do Kit 10)
+export function ordenarKits(kits, modo) {
+  const az = (a, b) => (COLLATOR ? COLLATOR.compare(a.nome || '', b.nome || '') : String(a.nome).localeCompare(String(b.nome)));
+  const num = (k) => { const m = String(k.nome || '').match(/\d+/); return m ? Number(m[0]) : Infinity; };
+  const preco = (k) => (k.preco_consultar ? Infinity : Number(k.preco) || 0);
+  const l = [...(kits || [])];
+  if (modo === 'numero') return l.sort((a, b) => num(a) - num(b) || az(a, b));
+  if (modo === 'menor') return l.sort((a, b) => preco(a) - preco(b) || az(a, b));
+  if (modo === 'maior') return l.sort((a, b) => (b.preco_consultar ? -Infinity : Number(b.preco) || 0) - (a.preco_consultar ? -Infinity : Number(a.preco) || 0) || az(a, b));
+  if (modo === 'novos') return l.sort((a, b) => String(b.criado_em || '').localeCompare(String(a.criado_em || '')) || az(a, b));
+  return l.sort(az);
+}
+export function mensagemAgenda(m) {
+  if (!m) return null;
+  if (m === 'kit') return 'Esse kit já está reservado nessas datas.';
+  if (m === 'tema') return 'Esse tema já está reservado nessas datas. Escolha outro tema.';
+  if (m === 'fechado') return 'A loja não está atendendo nessa data. Escolha outra data.';
+  return 'Essa data já está lotada. Escolha outra data.';
+}
 
 // =====================================================================
 // MODO DEMONSTRAÇÃO
@@ -121,9 +193,9 @@ function demoLer() {
 let demo = null;
 function D() { if (!demo) demo = demoLer(); return demo; }
 function demoSalvar() { try { localStorage.setItem(CHAVE_DEMO, JSON.stringify(demo)); } catch (e) { /* ignora */ } }
-function demoConflito(res, ignorarId) {
-  return D().reservas.some((x) => x.id !== ignorarId && x.kit_id === res.kit_id && x.status !== 'cancelada'
-    && cruza(x, res.data_retirada, res.data_devolucao));
+function demoCtx() { const d = D(); return { kits: d.kits, reservas: d.reservas, estruturas: d.estruturas || [], fechados: d.fechados || [], limite_dia: d.negocio.limite_dia || null }; }
+function demoConflito(res, ignorarId, tudo = false) {
+  return motivoAgenda(demoCtx(), res.kit_id, res.tema_id || null, res.data_retirada, res.data_devolucao, ignorarId, tudo);
 }
 export function demoReiniciar() { demo = demoInicial(); demo.logado = true; demoSalvar(); }
 export const DEMONSTRACAO_SITE = DEMO_SITE;
@@ -191,13 +263,14 @@ export async function suporteAtual() {
 export async function suporteSair() {
   if (MODO_DEMO) return { ok: true };
   const s = await cliente();
-  return ok(s.rpc('suporte_sair'));
+  const r = await ok(s.rpc('suporte_sair'));
+  guardarLojaSuporte(null);
+  return r;
 }
 export async function adminEntrarLoja(email, soLeitura) {
   if (MODO_DEMO) throw new Error('Na demonstração não dá para entrar na loja de uma cliente.');
   const s = await cliente();
-  if (soLeitura) return ok(s.rpc('admin_entrar_loja', { p_email: email, p_leitura: true }));
-  return ok(s.rpc('admin_entrar_loja', { p_email: email }));
+  return ok(s.rpc('admin_entrar_loja', { p_email: email, p_leitura: !!soLeitura }));
 }
 export async function adminSuporteLog() {
   if (MODO_DEMO) return [];
@@ -227,7 +300,7 @@ export async function linkDisponivel(slug) {
   return ok(s.rpc('link_disponivel', { p_slug: slug }));
 }
 export async function salvarNegocio(campos) {
-  if (MODO_DEMO) { Object.assign(D().negocio, campos); demoSalvar(); return D().negocio; }
+  if (MODO_DEMO) { D().negocio = Object.assign(D().negocio || { id: 'demo-negocio', criado_em: new Date().toISOString(), limite_dia: null, confirmar_whatsapp: true }, campos); demoSalvar(); return D().negocio; }
   const s = await cliente();
   const { data: u } = await s.auth.getUser();
   const atual = await meuNegocio();
@@ -363,7 +436,8 @@ export async function listarReservas() {
 }
 export async function criarReserva(res) {
   if (MODO_DEMO) {
-    if (demoConflito(res)) throw new Error(erroAmigavel({ code: '23P01' }));
+    const m = demoConflito(res, null, res.origem === 'link');
+    if (m && (res.origem === 'link' || m === 'kit' || m === 'tema')) throw new Error(mensagemAgenda(m));
     const k = D().kits.find((x) => x.id === res.kit_id);
     const nova = { id: uid(), negocio_id: 'n1', origem: 'app', sinal_recebido: res.status === 'confirmada',
       restante_recebido: false, pecas: [...k.pecas], checklist_retirada: k.pecas.map(() => false),
@@ -379,7 +453,9 @@ export async function atualizarReserva(id, campos) {
   if (MODO_DEMO) {
     const r = D().reservas.find((x) => x.id === id);
     const teste = { ...r, ...campos };
-    if (teste.status !== 'cancelada' && demoConflito(teste, id)) throw new Error(erroAmigavel({ code: '23P01' }));
+    const mudou = ['kit_id', 'tema_id', 'data_retirada', 'data_devolucao'].some((c) => c in campos && campos[c] !== r[c]) || (r.status === 'cancelada' && teste.status !== 'cancelada');
+    const m = teste.status !== 'cancelada' && mudou ? demoConflito(teste, id, false) : null;
+    if (m) throw new Error(mensagemAgenda(m));
     Object.assign(r, campos); demoSalvar(); return r;
   }
   const s = await cliente();
@@ -416,9 +492,10 @@ export async function catalogoPublico(slug) {
   if (MODO_DEMO) {
     const n = D().negocio;
     if (slug !== n.slug) return null;
-    return { nome: n.nome, whatsapp: n.whatsapp, chave_pix: n.chave_pix, logo_url: n.logo_url, recado: n.recado_link || null, instagram: n.instagram || null,
-      dias_antes: n.dias_antes, dias_depois: n.dias_depois,
-      kits: D().kits.filter((k) => k.ativo).map(({ id, nome, preco, sinal, foto_url, fotos, categoria, pecas, variacoes }) => ({ id, nome, preco, sinal, foto_url, fotos: fotos || [], categoria: categoria || null, pecas: pecas || [], variacoes: variacoes || [] })) };
+    return { nome: n.nome, whatsapp: n.whatsapp, chave_pix: n.confirmar_whatsapp ? null : n.chave_pix, confirmar: !!n.confirmar_whatsapp, logo_url: n.logo_url, recado: n.recado_link || null, instagram: n.instagram || null,
+      dias_antes: n.dias_antes, dias_depois: n.dias_depois, ordem_kits: n.ordem_kits || 'az',
+      fechado: (D().fechados || []).filter((f) => f.ate >= hojeISO()),
+      kits: D().kits.filter((k) => k.ativo).map(({ id, nome, preco, sinal, foto_url, fotos, categoria, pecas, variacoes, temas, preco_consultar, criado_em }) => ({ id, nome, preco, sinal, foto_url, fotos: fotos || [], categoria: categoria || null, pecas: pecas || [], variacoes: variacoes || [], temas: temas || [], preco_consultar: !!preco_consultar, criado_em: criado_em || null })) };
   }
   const s = await cliente();
   return ok(s.rpc('catalogo_publico', { p_slug: slug }));
@@ -428,30 +505,87 @@ export async function datasOcupadas(slug, kitId, de, ate) {
     const n = D().negocio; const fora = [];
     for (let d = de; d <= ate; d = somaDias(d, 1)) {
       const ini = somaDias(d, -n.dias_antes); const fim = somaDias(d, n.dias_depois);
-      if (D().reservas.some((r) => r.kit_id === kitId && r.status !== 'cancelada' && cruza(r, ini, fim))) fora.push(d);
+      if (motivoAgenda(demoCtx(), kitId, null, ini, fim, null, true)) fora.push(d);
     }
     return fora;
   }
   const s = await cliente();
   return ok(s.rpc('datas_ocupadas', { p_slug: slug, p_kit: kitId, p_de: de, p_ate: ate }));
 }
-export async function solicitarReserva(slug, kitId, dataFesta, nome, whatsapp, variacaoId) {
+export async function solicitarReserva(slug, kitId, dataFesta, nome, whatsapp, variacaoId, temaId) {
   if (MODO_DEMO) {
     const n = D().negocio; const k = D().kits.find((x) => x.id === kitId);
     const v = (k.variacoes || []).find((x) => x.id === variacaoId) || null;
+    const t = (k.temas || []).length ? (k.temas || []).find((x) => x.id === temaId) : null;
+    if ((k.temas || []).length && !t) throw new Error('Escolha o tema do kit');
     const zap = String(whatsapp).replace(/\D/g, '');
     if (zap.length < 10) throw new Error('Informe um WhatsApp válido, com DDD');
+    const consultar = !!k.preco_consultar;
+    const sinal = consultar ? 0 : v ? v.sinal : k.sinal;
     await criarReserva({ kit_id: kitId, data_festa: dataFesta, data_retirada: somaDias(dataFesta, -n.dias_antes),
       data_devolucao: somaDias(dataFesta, n.dias_depois), status: 'aguardando_sinal', origem: 'link',
-      cliente_nome: nome.trim(), cliente_whatsapp: zap, valor_total: v ? v.preco : k.preco, valor_sinal: v ? v.sinal : k.sinal,
-      ...(v ? { variacao: v.nome, pecas: [...(k.pecas || []), ...(v.extras || [])] } : {}) })
-      .catch(() => { throw new Error('Este kit acabou de ser reservado para essa data. Escolha outra data ou outro kit.'); });
-    return { whatsapp: n.whatsapp, chave_pix: n.chave_pix, sinal: v ? v.sinal : k.sinal, kit: k.nome + (v ? ' – ' + v.nome : '') };
+      cliente_nome: nome.trim(), cliente_whatsapp: zap, valor_total: consultar ? 0 : v ? v.preco : k.preco, valor_sinal: sinal,
+      valor_a_combinar: consultar, tema_id: t ? t.id : null, tema: t ? t.nome : null,
+      ...(v ? { variacao: v.nome, pecas: [...(k.pecas || []), ...(v.extras || [])] } : {}) });
+    return { whatsapp: n.whatsapp, chave_pix: n.confirmar_whatsapp ? null : n.chave_pix, confirmar: !!n.confirmar_whatsapp, consultar,
+      sinal, tema: t ? t.nome : null, kit: k.nome + (v ? ' – ' + v.nome : '') };
   }
   const s = await cliente();
   const args = { p_slug: slug, p_kit: kitId, p_data_festa: dataFesta, p_nome: nome, p_whatsapp: whatsapp };
-  if (variacaoId) args.p_variacao = variacaoId;
+  if (variacaoId || temaId) args.p_variacao = variacaoId || null;
+  if (temaId) args.p_tema = temaId;
   return ok(s.rpc('solicitar_reserva', args));
+}
+export async function temasOcupados(slug, kitId, data) {
+  if (MODO_DEMO) {
+    const n = D().negocio; const k = D().kits.find((x) => x.id === kitId);
+    return (k.temas || []).filter((t) => motivoAgenda(demoCtx(), kitId, t.id, somaDias(data, -n.dias_antes), somaDias(data, n.dias_depois), null, false) === 'tema').map((t) => t.id);
+  }
+  const s = await cliente();
+  return ok(s.rpc('temas_ocupados', { p_slug: slug, p_kit: kitId, p_data: data }));
+}
+
+// ---------- Organização da agenda (estruturas e dias fechados) ----------
+export async function listarEstruturas() {
+  if (MODO_DEMO) return [...(D().estruturas || [])];
+  const s = await cliente();
+  return ok(s.from('estruturas').select('*').order('nome'));
+}
+export async function salvarEstrutura(e) {
+  if (MODO_DEMO) {
+    const d = D(); if (!d.estruturas) d.estruturas = [];
+    if (e.id) Object.assign(d.estruturas.find((x) => x.id === e.id), e); else { e = { ...e, id: uid() }; d.estruturas.push(e); }
+    demoSalvar(); return e;
+  }
+  const s = await cliente();
+  const { id, ...campos } = e;
+  if (id) return ok(s.from('estruturas').update(campos).eq('id', id).select().single());
+  const neg = await meuNegocio();
+  return ok(s.from('estruturas').insert({ ...campos, negocio_id: neg.id }).select().single());
+}
+export async function apagarEstrutura(id) {
+  if (MODO_DEMO) { const d = D(); d.estruturas = (d.estruturas || []).filter((x) => x.id !== id); d.kits.forEach((k) => { k.estruturas = (k.estruturas || []).filter((x) => x.id !== id); }); demoSalvar(); return; }
+  const s = await cliente();
+  const neg = await meuNegocio();
+  const { data: ks } = await s.from('kits').select('id, estruturas').eq('negocio_id', neg.id);
+  for (const k of ks || []) if ((k.estruturas || []).some((x) => x.id === id)) await ok(s.from('kits').update({ estruturas: k.estruturas.filter((x) => x.id !== id) }).eq('id', k.id));
+  await ok(s.from('estruturas').delete().eq('id', id));
+}
+export async function listarFechados() {
+  if (MODO_DEMO) return [...(D().fechados || [])];
+  const s = await cliente();
+  return ok(s.from('agenda_fechada').select('*').gte('ate', somaDias(hojeISO(), -30)).order('de'));
+}
+export async function salvarFechado(f) {
+  if (MODO_DEMO) { const d = D(); if (!d.fechados) d.fechados = []; const novo = { ...f, id: uid() }; d.fechados.push(novo); demoSalvar(); return novo; }
+  const s = await cliente();
+  const neg = await meuNegocio();
+  return ok(s.from('agenda_fechada').insert({ ...f, negocio_id: neg.id }).select().single());
+}
+export async function apagarFechado(id) {
+  if (MODO_DEMO) { const d = D(); d.fechados = (d.fechados || []).filter((x) => x.id !== id); demoSalvar(); return; }
+  const s = await cliente();
+  await ok(s.from('agenda_fechada').delete().eq('id', id));
 }
 
 // ---------- Montar catálogo com IA ----------
@@ -510,7 +644,7 @@ async function chamarFuncaoIA(corpo, bruto = false) {
     r = await fetch(`${SUPABASE_URL}/functions/v1/catalogo-ia`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session && data.session.access_token}`, apikey: SUPABASE_ANON_KEY },
-      body: JSON.stringify(corpo),
+      body: JSON.stringify(lojaSuporteDaAba() ? { ...corpo, loja: lojaSuporteDaAba() } : corpo),
     });
   } catch (e) { throw new Error('Sem conexão. Confira a internet e tente de novo.'); }
   if (bruto && r.ok) return r;
@@ -560,7 +694,7 @@ export async function iaSalvar(id, kits) {
       if (['guardado', 'publicado'].includes(k.situacao) || !kits[i]) return k;
       let sit = ['conferir', 'aprovado', 'descartado', 'publicado'].includes(kits[i].situacao) || (kits[i].situacao === 'guardado' && teste) ? kits[i].situacao : k.situacao;
       if (sit === 'publicado' && teste) { if (publicou >= cabe) sit = 'aprovado'; else publicou++; }
-      return { ...k, ...kits[i], situacao: sit, fotos: (kits[i].fotos || []).filter((f) => (k.fotos_todas || []).includes(f) || String(f).startsWith('data:')).slice(0, 5) };
+      return { ...k, ...kits[i], situacao: sit, fotos: (kits[i].fotos || []).filter((f) => (k.fotos_todas || []).includes(f) || String(f).startsWith('data:')).slice(0, 30) };
     });
     ia.usados += publicou;
     if (!l.kits.some((k) => ['conferir', 'aprovado', 'guardado'].includes(k.situacao))) l.status = 'fechado';
@@ -763,6 +897,41 @@ function demoAdmin() {
     historico: [5, 4, 3, 2, 1, 0].map((n, i) => ({ mes: mes(n), vendas: [0, 0, 0, 1, 2, 2][i], renovacoes: [0, 0, 0, 0, 1, 1][i], cancelamentos: [0, 0, 0, 0, 1, 0][i], faturamento: [0, 0, 0, 29.9, 328.8, 328.8][i] })),
   };
   return { clientes, eventos, resumo };
+}
+// Painel: pagamentos, vendas, renovações, assinantes e tempo do teste até assinar (SQL 23)
+export async function adminPainel() {
+  if (MODO_DEMO) return demoPainel();
+  const s = await cliente();
+  return ok(s.rpc('admin_painel'));
+}
+export async function adminMensagemAlvos(id) {
+  if (MODO_DEMO) return [{ email: 'cliente1@exemplo.com', loja: 'Festas da Lu', viu_em: new Date().toISOString(), clicou_em: null, fechou_em: new Date().toISOString() }, { email: 'cliente2@exemplo.com', loja: 'Doce Decor', viu_em: null, clicou_em: null, fechou_em: null }];
+  const s = await cliente();
+  return ok(s.rpc('admin_mensagem_alvos', { p_id: id }));
+}
+function demoPainel() {
+  const dia = 864e5, agora = Date.now(), pg = [];
+  const nomes = ['Ana Souza', 'Bia Melo', 'Carla Reis', 'Dani Faria', 'Elis Torres', 'Fernanda Lima', 'Gabi Rocha', 'Helo Dias'];
+  for (let i = 0; i < 90; i++) {
+    const q = new Date(agora - (i * 0.37 + (i % 3) * 0.11) * dia).toISOString();
+    const pl = i % 3 === 0 ? 'mensal' : 'anual', fo = i % 2 ? 'cartao' : 'pix';
+    const st = i % 11 === 4 ? 'recusado' : i % 13 === 6 ? 'pix_pendente' : i % 17 === 8 ? 'pendente' : i % 29 === 9 ? 'cancelado' : 'pago';
+    const b = pl === 'anual' ? 167 : 29.9;
+    const n = nomes[i % nomes.length];
+    pg.push({ q, st, ev: st === 'pago' ? (i % 4 === 1 ? 'subscription_renewed' : 'purchase_approved') : st === 'recusado' ? 'purchase_refused' : st === 'pix_pendente' ? 'pix_gerado' : st === 'pendente' ? 'subscription_late' : 'refund',
+      tp: st === 'pago' ? (i % 4 === 1 ? 'renovacao' : 'nova') : null, pl, fo: st === 'pix_pendente' ? 'pix' : fo, b, l: st === 'pago' ? Math.round(b * 0.93 * 100) / 100 : null,
+      em: n.split(' ')[0].toLowerCase() + i + '@exemplo.com', no: n });
+  }
+  const meses = [];
+  for (let k = 11; k >= 0; k--) {
+    const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - k);
+    const f = 12 - k;
+    meses.push({ mes: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`, bruto: k > 6 ? 0 : 900 * f, liquido: k > 6 ? 0 : 840 * f, ativos: k > 6 ? 0 : 14 * f, contas_novas: 20 + 9 * f });
+  }
+  const testes = [];
+  for (let i = 0; i < 60; i++) testes.push({ t: new Date(agora - i * 0.5 * dia).toISOString(), a: i % 3 === 0 });
+  return { agora: new Date().toISOString(), pagamentos: pg, ativas: { total: 142, anual: 96, mensal: 46, pix: 58, cartao: 84, manual: 2 },
+    teste_ate_assinar: { total: 40, media: 2.4, mesmo_dia: 14, d1_3: 16, d4_7: 8, depois: 2 }, testes, meses };
 }
 export async function adminResumo() {
   if (MODO_DEMO) return demoAdmin().resumo;

@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="Pegue e Monte">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito+Sans:wght@400;600;700;800&display=swap">
-<link rel="stylesheet" href="estilo.css?v=20261120a">
+<link rel="stylesheet" href="estilo.css?v=20261121a">
 <style>
   body { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
   #faixa { position: sticky; top: 0; z-index: 40; }
@@ -102,7 +102,7 @@
   main:has(> .perfil-topo) > section.cartao.mais-link { order: 2; grid-column: 2; }
   main:has(> .perfil-topo) > .bf-card { order: 3; }
   main:has(> .perfil-topo) > .avisos-loja, main:has(> .perfil-topo) > .instalar { order: 4; grid-column: auto; }
-  main:has(> .perfil-topo) > .mais-atalhos { order: 5; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+  main:has(> .perfil-topo) > .mais-atalhos { order: 5; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
   main:has(> .perfil-topo) > .mais-atalhos > .cartao { margin: 0; padding: 20px; display: flex; flex-direction: column; justify-content: center; gap: 4px; min-height: 96px; }
   main:has(> .perfil-topo) > section.cartao.mais-ajuda { order: 6; grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: center; }
   main:has(> .perfil-topo) > .mais-ajuda > h2, main:has(> .perfil-topo) > .mais-ajuda > .dica { grid-column: 1 / -1; margin: 0; }
@@ -127,6 +127,6 @@
 <div id="raiz"><div class="carregando">Carregando…</div></div>
 <div id="painel"></div>
 <div id="toast" class="toast oculto" role="status" aria-live="polite"></div>
-<script type="module" src="app.js?v=20261120b"></script>
+<script type="module" src="app.js?v=20261121a"></script>
 </body>
 </html>

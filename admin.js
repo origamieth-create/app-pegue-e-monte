@@ -3,7 +3,7 @@
 // Só abre para e-mails cadastrados na tabela "administradores".
 // Quem confere é o banco de dados: esta página só mostra o resultado.
 // =====================================================================
-import * as dados from './dados.js?v=20261120a';
+import * as dados from './dados.js?v=20261121a';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=20261117c';
 
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -113,8 +113,8 @@ function msgDoDia(dia, c = {}) {
   return m(1);
 }
 function rotuloOrigem(o) {
-  if (!o || !o.utm_source) return '<span class="tag-origem">💬 WhatsApp / direto</span>';
-  return [`📣 ${o.utm_source === 'meta' ? 'Anúncio' : esc(o.utm_source)}${o.utm_campaign ? ': ' + esc(o.utm_campaign) : ''}`,
+  if (!o || !o.utm_source) return '<span class="tag-origem">WhatsApp / direto</span>';
+  return [`${o.utm_source === 'meta' ? 'Anúncio' : esc(o.utm_source)}${o.utm_campaign ? ': ' + esc(o.utm_campaign) : ''}`,
     o.utm_medium ? `Conjunto: ${esc(o.utm_medium)}` : '', o.utm_content ? `Anúncio: ${esc(o.utm_content)}` : '']
     .filter(Boolean).map((t) => `<span class="tag-origem">${t}</span>`).join('');
 }
@@ -146,9 +146,8 @@ function telaAviso(titulo, texto, botao) {
 
 async function carregar() {
   estado.carregadoEm = new Date();
-  [estado.resumo, estado.clientes, estado.eventos, estado.origem, estado.fin, estado.taxas] = await Promise.all([
-    dados.adminResumo(), dados.adminClientes(), dados.adminEventos(120), dados.adminTestesOrigem().catch(() => null),
-    dados.adminFinanceiro().catch(() => null), dados.adminTaxas().catch(() => []),
+  [estado.resumo, estado.clientes, estado.origem, estado.painel] = await Promise.all([
+    dados.adminResumo(), dados.adminClientes(), dados.adminTestesOrigem().catch(() => null), dados.adminPainel().catch(() => null),
   ]);
   [estado.crm, estado.crmMsgs, estado.logos, estado.saude] = await Promise.all([dados.adminCrm().catch(() => null), dados.adminCrmMensagens().catch(() => ({})),
     dados.adminLogos().catch(() => ({})), dados.adminSaude().catch(() => null)]);
@@ -243,9 +242,9 @@ const ETAPAS = [
   [2, 'Criou a loja', 'terminou a primeira tela', 'Sem kit'],
   [3, 'Cadastrou kit', 'pode ser só de teste', 'Só kit teste'],
   [4, 'Catálogo', '2+ kits com foto', 'Catálogo'],
-  [5, 'Divulgou', 'copiou o link ou teve visitas', 'Divulgou'],
-  [6, 'Reserva real', 'pelo link, de outro número', 'Reserva real'],
-  [7, 'Usando', '3+ reservas ou contrato', 'Usando'],
+  [5, 'Divulgou', 'catálogo + 5 visitas no link ou visita do Instagram', 'Divulgou'],
+  [6, 'Reserva real', '1 reserva de cliente (pelo link ou anotada no app)', 'Reserva real'],
+  [7, 'Usando', '3+ reservas de clientes ou contrato', 'Usando'],
 ];
 const DIA_MS = 864e5;
 function crmAssinou(p) { return !!(p.assinou_em || ['mensal', 'anual'].includes(p.plano)); }
@@ -254,10 +253,10 @@ function crmDiasSemUso(p) { return p.ultimo_uso ? Math.floor((Date.now() - new D
 function crmDiaDoTeste(p) { return Math.min(7, Math.max(1, Math.floor((Date.now() - new Date(p.teste_inicio).getTime()) / DIA_MS) + 1)); }
 function crmAtividade(p) { const d = crmDiasSemUso(p); return d <= 1 ? 'ativa' : d <= 3 ? 'esfriando' : 'sumiu'; }
 function crmFiltrados() {
-  const dias = Number(estado.funilDias || 30);
+  const per = String(estado.funilDias ?? 30);
   const origem = estado.funilOrigem || 'todas';
   return (estado.crm || []).filter((p) => {
-    if (dias && Date.now() - new Date(p.teste_inicio).getTime() > dias * DIA_MS) return false;
+    if (per !== '0' && !noPeriodo(p.teste_inicio, per)) return false;
     if (origem === 'todas') return true;
     if (origem === 'sem') return !p.campanha;
     return p.campanha === origem;
@@ -265,11 +264,11 @@ function crmFiltrados() {
 }
 function filtrosCrm() {
   const camps = [...new Set((estado.crm || []).map((p) => p.campanha).filter(Boolean))].sort();
-  const per = [['7', '7 dias'], ['30', '30 dias'], ['90', '90 dias'], ['0', 'Desde o início']];
+  const per = [['hoje', 'Hoje'], ['ontem', 'Ontem'], ['7', '7 dias'], ['30', '30 dias'], ['90', '90 dias'], ['0', 'Desde o início']];
   const ori = [['todas', 'Todas as origens'], ...camps.map((c) => [c, c]), ['sem', 'Sem anúncio']];
   const d = String(estado.funilDias ?? 30), o = estado.funilOrigem || 'todas';
   return `<div class="filtros-crm">
-    <label>Período<select id="f-dias">${per.map(([v, t]) => `<option value="${v}" ${v === d ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
+    <label>Começaram o teste<select id="f-dias">${per.map(([v, t]) => `<option value="${v}" ${v === d ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
     <label>Origem do anúncio<select id="f-origem">${ori.map(([v, t]) => `<option value="${esc(v)}" ${v === o ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
   </div>`;
 }
@@ -406,7 +405,7 @@ function motivosHoje(p) {
   if (p.ultimo_contato_em && p.ultimo_uso && new Date(p.ultimo_uso) > new Date(p.ultimo_contato_em) && g !== 'assinou') m.push(['Mexeu no app depois do seu contato', 't-grn']);
   return m;
 }
-const ABAS_ABORD = [['geral', 'Resumo geral'], ...ETAPAS.map(([n, , , c]) => [String(n), c]), ['nao', 'Não assinou']];
+const ABAS_ABORD = [['geral', 'Resumo geral'], ...ETAPAS.map(([n, , , c]) => [String(n), c]), ['nao', 'Não assinou'], ['assinou', 'Assinaram']];
 
 function abaAbordagem(tela) {
   if (!estado.crm) { tela.innerHTML = '<div class="cartao">Não consegui carregar os dados. Toque em Atualizar.</div>'; return; }
@@ -446,11 +445,11 @@ function abaAbordagem(tela) {
     tela.innerHTML = `${filtrosCrm()}${abas}
       <div class="wrap-abord">
         <div class="lista-abord">${lista.length ? `
-          <div class="la cab"><span></span><span>Loja</span><span>${sub === 'nao' ? 'Teste acabou' : 'Dia do teste'}</span><span>Último uso</span><span>Contato</span></div>
+          <div class="la cab"><span></span><span>Loja</span><span>${sub === 'nao' ? 'Teste acabou' : sub === 'assinou' ? 'Assinou' : 'Dia do teste'}</span><span>Último uso</span><span>Contato</span></div>
           ${lista.map((p) => `<button class="la ${sel && sel.email === p.email ? 'sel' : ''}" data-email="${esc(p.email)}">
             <i class="dot ${{ ativa: 'd-g', esfriando: 'd-y', sumiu: 'd-r' }[crmAtividade(p)]}"></i>
             <b>${esc(p.loja || p.email)}</b>
-            <span>${sub === 'nao' ? quandoCurto(p.teste_ate) : 'Dia ' + crmDiaDoTeste(p) + ' de 7'}</span>
+            <span>${sub === 'nao' ? quandoCurto(p.teste_ate) : sub === 'assinou' ? quandoCurto(p.assinou_em) : 'Dia ' + crmDiaDoTeste(p) + ' de 7'}</span>
             <span class="c">${quandoCurto(p.ultimo_uso)}</span>
             <span class="c">${p.ultimo_contato_em ? new Date(p.ultimo_contato_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '—'}</span></button>`).join('')}`
           : '<p class="pequeno" style="padding:18px">Ninguém nesta etapa agora.</p>'}
@@ -466,7 +465,7 @@ function abaAbordagem(tela) {
       const p = (estado.crm || []).find((x) => x.email === b.dataset.email);
       if (!p) return;
       const g = grupoAbordagem(p);
-      estado.abordAba = g === 'assinou' ? 'geral' : g;
+      estado.abordAba = g;
       estado.abordSel = p.email;
       desenhar();
       const f = $('#ficha'); if (f && window.innerWidth < 1024) f.scrollIntoView({ behavior: 'smooth' });
@@ -481,7 +480,7 @@ function fichaPessoa(p) {
     ['Criou a conta', p.conta_em || p.teste_inicio],
     ['Criou a loja', p.loja_em],
     ['Cadastrou o 1º kit', p.primeiro_kit_em],
-    ['Divulgou o link', p.link_copiado_em],
+    ['Copiou o link', p.link_copiado_em],
     ['1ª reserva de cliente real', p.primeira_reserva_real_em],
   ];
   const et = g === 'nao' ? 0 : Number(p.etapa) || 1;
@@ -492,7 +491,7 @@ function fichaPessoa(p) {
   return `<section class="cartao ficha">
     <span class="tag t-lil">${esc(g === 'nao' ? 'Não assinou' : g === 'assinou' ? 'Assinou' : ETAPAS[(p.etapa || 1) - 1][3])}</span>
     <h2 style="margin:6px 0 2px">${esc(p.loja || 'Ainda sem loja')}</h2>
-    <div class="pequeno">${esc(p.email)}${g === 'nao' ? ` · teste acabou ${quandoCurto(p.teste_ate)}` : ` · dia ${crmDiaDoTeste(p)} de 7 · acaba ${new Date(p.teste_ate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`}${p.campanha ? ` · origem: ${esc(p.campanha)}` : ''}</div>
+    <div class="pequeno">${esc(p.email)}${g === 'nao' ? ` · teste acabou ${quandoCurto(p.teste_ate)}` : g === 'assinou' ? ` · assinou ${quandoCurto(p.assinou_em)}${p.plano ? ' · ' + (p.plano === 'anual' ? 'anual' : 'mensal') : ''}` : ` · dia ${crmDiaDoTeste(p)} de 7 · acaba ${new Date(p.teste_ate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`}${p.campanha ? ` · origem: ${esc(p.campanha)}` : ''}</div>
     <div class="tl">
       ${marcos.map(([t, d]) => `<div class="${d ? '' : 'no'}">${esc(t)}<small>${d ? dataHora(d) : 'ainda não'}</small></div>`).join('')}
       <div>Último uso do app<small>${p.ultimo_uso ? dataHora(p.ultimo_uso) : '—'}${p.ultimo_contato_em ? (depois ? ' · <b style="color:var(--pos)">mexeu no app depois do seu contato</b>' : ' · <b style="color:var(--warn)">não mexeu depois do seu contato</b>') : ''}</small></div>
@@ -508,9 +507,9 @@ function fichaPessoa(p) {
     <p class="dica" style="margin-top:-6px">Use <b>{dias}</b> no texto para o app colocar quantos dias faltam do teste.</p>
     <div class="botoes-ficha">
       ${tel ? `<a class="btn verde" id="ficha-zap" href="${esc(linkZap(tel, msg))}" target="_blank" rel="noopener">Abrir no WhatsApp</a>` : '<span class="pequeno">Sem telefone cadastrado</span>'}
-      ${p.slug ? `<a class="btn contorno" href="${esc(linkVerLoja(p.slug))}" target="_blank" rel="noopener">👀 Ver loja</a>` : ''}
+      ${p.slug ? `<a class="btn contorno" href="${esc(linkVerLoja(p.slug))}" target="_blank" rel="noopener">Ver loja</a>` : ''}
       ${p.slug ? '<button class="btn principal" id="ficha-loja">Entrar na loja</button>' : ''}
-      ${p.slug ? '<button class="btn contorno" id="ficha-leitura" title="Vê tudo por dentro, sem poder alterar nada">🔒 Só olhar por dentro</button>' : ''}
+      ${p.slug ? '<button class="btn contorno" id="ficha-leitura" title="Vê tudo por dentro, sem poder alterar nada">Só olhar por dentro</button>' : ''}
     </div>
     <b class="pequeno" style="color:var(--tinta)">Contatos e anotações</b>
     ${(p.contatos || []).length ? `<div class="hist">${p.contatos.map((c) => `<div><b>${dataHora(c.quando)}</b>${c.nota ? ` · <i>"${esc(c.nota)}"</i>` : ' · contato feito'}</div>`).join('')}</div>` : '<p class="pequeno">Nenhum contato registrado ainda.</p>'}
@@ -525,14 +524,14 @@ function ligarFicha(tela, p) {
   const lj = $('#ficha-loja', tela);
   if (lj) lj.onclick = async () => {
     lj.disabled = true; lj.textContent = 'Entrando…';
-    try { await dados.adminEntrarLoja(p.email); location.href = 'index.html'; }
+    try { await entrarNaLoja(p.email); lj.disabled = false; lj.textContent = 'Entrar na loja'; }
     catch (e) { aviso(e.message); lj.disabled = false; lj.textContent = 'Entrar na loja'; }
   };
   const lt = $('#ficha-leitura', tela);
   if (lt) lt.onclick = async () => {
     lt.disabled = true; lt.textContent = 'Entrando…';
-    try { await dados.adminEntrarLoja(p.email, true); location.href = 'index.html'; }
-    catch (e) { aviso(e.message); lt.disabled = false; lt.textContent = '🔒 Só olhar por dentro'; }
+    try { await entrarNaLoja(p.email, true); lt.disabled = false; lt.textContent = 'Só olhar por dentro'; }
+    catch (e) { aviso(e.message); lt.disabled = false; lt.textContent = 'Só olhar por dentro'; }
   };
   const sv = $('#msg-salvar', tela);
   if (sv) sv.onclick = async () => {
@@ -624,8 +623,8 @@ function abaEstudo(tela) {
   tela.innerHTML = `${filtrosCrm()}
     <div class="grade-estudo">
       <section class="cartao"><div class="cab-crm"><h2>Em que etapa estavam quando assinaram</h2><span>${assinaram.length} assinaturas</span></div>
-        ${barrasH(ETAPAS.slice(1).map(([n, t], i) => [`${n}. ${t}`, naEtapa[i + 1]]), Math.max(1, ...naEtapa))}
-        ${assinaram.length ? `<div class="nota-crm">${ate5} de ${assinaram.length} assinantes já tinham <b>divulgado o link</b> quando assinaram. A etapa mais comum na hora de assinar é <b>${esc(ETAPAS[top][1].toLowerCase())}</b>.</div>` : '<p class="pequeno">Ainda não há assinaturas no período.</p>'}
+        ${barrasH(ETAPAS.map(([n, t], i) => [`${n}. ${t}`, naEtapa[i]]), Math.max(1, ...naEtapa))}
+        ${assinaram.length ? `<div class="nota-crm">${ate5} de ${assinaram.length} assinantes já tinham <b>divulgado o link</b> (ou passado dessa etapa) quando assinaram. A etapa mais comum na hora de assinar é <b>${esc(ETAPAS[top][1].toLowerCase())}</b>.</div>` : '<p class="pequeno">Ainda não há assinaturas no período.</p>'}
         ${aprox ? `<p class="dica" style="margin-top:8px">${aprox} assinatura(s) antigas usam a etapa atual, porque aconteceram antes de o app começar a guardar a etapa no momento da compra.</p>` : ''}
       </section>
       <section class="cartao"><div class="cab-crm"><h2>Chance de assinar pela etapa que alcançou</h2><span>só quem já terminou o teste</span></div>
@@ -648,7 +647,7 @@ function abaEstudo(tela) {
 // Popups e ofertas
 // ---------------------------------------------------------------------
 async function abaPopups(tela) {
-  const dias = String(estado.funilDias ?? 30);
+  const dias = { hoje: '1', ontem: '2' }[String(estado.funilDias ?? 30)] || String(estado.funilDias ?? 30);
   tela.innerHTML = '<div id="popups-c" class="coluna" style="gap:16px"><div class="cartao">Carregando…</div></div>';
   const alvo = $('#popups-c', tela);
   let lista = [];
@@ -657,10 +656,12 @@ async function abaPopups(tela) {
   const soma = (k) => lista.reduce((t, x) => t + Number(x[k] || 0), 0);
   const viram = soma('viram'), cliques = soma('clicaram'), ck = soma('checkout'), ass = soma('assinaram');
   const melhor = lista.filter((x) => x.viram >= 5).map((x) => [x, x.assinaram / x.viram]).sort((a, b) => b[1] - a[1])[0];
-  const per = [['7', '7 dias'], ['30', '30 dias'], ['90', '90 dias'], ['0', 'Desde o início']];
+  const per = [['hoje', 'Hoje'], ['ontem', 'Hoje e ontem'], ['7', '7 dias'], ['30', '30 dias'], ['90', '90 dias'], ['0', 'Desde o início']];
+  const escolhido = String(estado.funilDias ?? 30);
   alvo.innerHTML = `
+    <div class="nota-crm" style="margin:0">Os popups que você mesma envia (com a lista de quem recebeu) ficam em <button class="link-btn" id="ir-msgs">Mensagens › Mensagens enviadas</button>. Ninguém recebe a mesma mensagem duas vezes.</div>
     ${blocoNiveis()}
-    <div class="filtros-crm"><label>Período<select id="f-dias">${per.map(([v, t]) => `<option value="${v}" ${v === dias ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label></div>
+    <div class="filtros-crm"><label>Período<select id="f-dias">${per.map(([v, t]) => `<option value="${v}" ${v === escolhido ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label></div>
     <div class="kpis-crm">
       <div class="kpi"><small>Pessoas que viram ofertas</small><b>${viram}</b><i>somando todos os popups</i></div>
       <div class="kpi"><small>Clicaram para assinar</small><b>${cliques}</b><i class="p">${viram ? Math.round((cliques / viram) * 100) : 0}% de quem viu</i></div>
@@ -684,6 +685,8 @@ async function abaPopups(tela) {
     </section>`;
   const d = $('#f-dias', alvo);
   if (d) d.onchange = () => { estado.funilDias = d.value; desenhar(); };
+  const im = $('#ir-msgs', alvo);
+  if (im) im.onclick = () => { estado.aba = 'mensagens'; desenhar(); window.scrollTo(0, 0); };
   ligarNiveis(alvo);
 }
 
@@ -809,100 +812,89 @@ function cartaoNum(rotulo, valor, classe = '') {
   return `<div class="num-cartao ${classe}"><span class="rot">${esc(rotulo)}</span><b>${esc(valor)}</b></div>`;
 }
 
+// Períodos (no fuso do aparelho): Hoje, Ontem, 7 dias, 30 dias, Mês
+function faixaPeriodo(p) {
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+  const menos = (n) => { const d = new Date(hoje); d.setDate(d.getDate() - n); return d.getTime(); };
+  if (p === 'hoje') return [hoje.getTime(), Infinity];
+  if (p === 'ontem') return [menos(1), hoje.getTime()];
+  if (p === 'mes') return [new Date(hoje.getFullYear(), hoje.getMonth(), 1).getTime(), Infinity];
+  const n = Number(p);
+  if (n > 0) return [menos(n - 1), Infinity];
+  return [0, Infinity];
+}
+function noPeriodo(iso, p) { const t = new Date(iso).getTime(); const [a, b] = faixaPeriodo(p); return t >= a && t < b; }
+function abasPeriodo(lista, atual, attr) {
+  return `<div class="etabas" style="margin-bottom:14px">${lista.map(([v, t]) => `<button class="${v === atual ? 'on' : ''}" ${attr}="${v}">${esc(t)}</button>`).join('')}</div>`;
+}
+function linhaBarra(rot, v, max, dir, sub) {
+  return `<div class="lb"><span>${esc(rot)}</span><div class="b"><i style="width:${max ? Math.max(v > 0 ? 2 : 0, Math.round((v / max) * 100)) : 0}%"></i></div><span class="v">${dir}${sub ? `<small>${sub}</small>` : ''}</span></div>`;
+}
+const FORMA_NOME = { pix: 'Pix', cartao: 'Cartão', boleto: 'Boleto', outro: 'Outra forma' };
+
 function abaResumo(tela) {
-  const r = estado.resumo;
-  const m = r.mes || {};
-  const nomeMes = new Date().toLocaleDateString('pt-BR', { month: 'long' });
-  const hist = r.historico || [];
-  const maior = Math.max(1, ...hist.map((h) => Number(h.faturamento) || 0));
-  const partes = [`${r.ativas_mensal} mensal`, `${r.ativas_anual} anual`];
-  if (r.ativas_manual) partes.push(`${r.ativas_manual} liberada(s) por você`);
+  const P = estado.painel, r = estado.resumo || {};
+  const per = estado.resPer || 'hoje';
+  if (!P) {
+    tela.innerHTML = `${cartaoNotificacoes()}<div class="cartao">Não consegui carregar os números do painel. Toque em Atualizar.</div>`;
+    return;
+  }
+  const pagos = P.pagamentos.filter((x) => x.st === 'pago' && noPeriodo(x.q, per));
+  const soma = (l, k) => l.reduce((t, x) => t + Number(x[k] || 0), 0);
+  const novas = pagos.filter((x) => x.tp === 'nova'), renov = pagos.filter((x) => x.tp === 'renovacao');
+  const testes = (P.testes || []).filter((t) => noPeriodo(t.t, per));
+  const viraram = testes.filter((t) => t.a).length;
+  const at = P.ativas || {};
+  const semForma = Math.max(0, (at.total || 0) - (at.pix || 0) - (at.cartao || 0));
+  const ta = P.teste_ate_assinar || {};
+  const faixasTa = [['No mesmo dia', ta.mesmo_dia], ['1 a 3 dias', ta.d1_3], ['4 a 7 dias', ta.d4_7], ['Depois do teste', ta.depois]];
+  const meses = (P.meses || []);
+  const primeiro = meses.findIndex((m) => Number(m.bruto) || Number(m.ativos));
+  const mm = primeiro < 0 ? meses.slice(-6) : meses.slice(Math.max(primeiro, meses.length - 12));
+  const maxFat = Math.max(1, ...mm.map((m) => Number(m.liquido) || 0));
+  const maxAt = Math.max(1, ...mm.map((m) => Number(m.ativos) || 0));
+  const qtdPlano = (l) => { const a = l.filter((x) => x.pl === 'anual').length; return `${a} anual · ${l.length - a} mensal`; };
+  const qtdForma = (l) => `Pix ${l.filter((x) => x.fo === 'pix').length} · Cartão ${l.filter((x) => x.fo === 'cartao').length}`;
+  const pend = (r.carencia || 0), canc = (r.canceladas || 0), bloq = (r.suspensas || 0);
 
   tela.innerHTML = `
-    <div class="destaque">
-      <span class="rot">Clientes ativas</span>
-      <span class="num">${r.ativas}</span>
-      <span class="sub">${esc(partes.join(' · '))}</span>
-      <span class="rot" style="margin-top:8px">${estado.fin
-        ? `Comissão mensal estimada (já sem as taxas da Cakto): <b style="color:#fff">${reais(estado.fin.mensal_estimado_liquido)}</b>`
-        : `Receita mensal estimada: <b style="color:#fff">${reais(r.receita_mensal_estimada)}</b>`}</span>
-    </div>
     ${cartaoNotificacoes()}
-
-    <h2>Em ${esc(nomeMes)}</h2>
-    <div class="grade-num">
-      ${cartaoNum('Vendas novas', m.vendas, 'bom')}
-      ${cartaoNum('Renovações pagas', m.renovacoes, 'bom')}
-      ${cartaoNum('Faturamento bruto', reais(estado.fin ? estado.fin.mes_bruto : m.faturamento), 'bom')}
-      ${estado.fin ? cartaoNum('Comissão líquida (sem taxas)', reais(estado.fin.mes_liquido), 'bom') : ''}
-      ${cartaoNum('Pagamentos recusados', m.falhas, m.falhas ? 'alerta' : '')}
-      ${cartaoNum('Cancelamentos', m.cancelamentos, m.cancelamentos ? 'ruim' : '')}
-      ${cartaoNum('Reembolsos', m.reembolsos, m.reembolsos ? 'ruim' : '')}
+    ${abasPeriodo([['hoje', 'Hoje'], ['ontem', 'Ontem'], ['7', '7 dias'], ['mes', 'Mês']], per, 'data-res-per')}
+    <div class="kpis-crm k4">
+      <div class="kpi"><small>Faturamento líquido</small><b>${esc(reais(soma(pagos, 'l')))}</b><i>bruto ${esc(reais(soma(pagos, 'b')))}</i></div>
+      <div class="kpi"><small>Vendas novas</small><b>${novas.length}</b><i>${esc(novas.length ? qtdPlano(novas) + ' · ' + qtdForma(novas) : 'nenhuma no período')}</i></div>
+      <div class="kpi"><small>Renovações</small><b>${renov.length}</b><i>${esc(renov.length ? qtdForma(renov) : 'nenhuma no período')}</i></div>
+      <div class="kpi"><small>Testes iniciados</small><b>${testes.length}</b><i class="${viraram ? 'p' : ''}">${testes.length ? `${pct(viraram, testes.length)}% viraram assinantes` : 'nenhum no período'}</i></div>
     </div>
-
-    <h2>Situação das assinaturas</h2>
-    <div class="grade-num">
-      ${cartaoNum('Pagamento pendente', r.carencia, r.carencia ? 'alerta' : '')}
-      ${cartaoNum('Canceladas', r.canceladas)}
-      ${cartaoNum('Bloqueadas', r.suspensas, r.suspensas ? 'ruim' : '')}
+    <div class="res-grade">
+      <section class="cartao"><div class="cab-crm"><h2>Assinaturas ativas</h2><span>agora</span></div>
+        <div class="mini-num"><div><small>Total</small><b>${at.total || 0}</b></div><div><small>Anual</small><b>${at.anual || 0}</b></div><div><small>Mensal</small><b>${at.mensal || 0}</b></div></div>
+        <div class="mini-num d2" style="margin-top:10px"><div><small>No Pix</small><b>${at.pix || 0}</b></div><div><small>No cartão</small><b>${at.cartao || 0}</b></div></div>
+        ${semForma ? `<p class="dica" style="margin-top:8px">${semForma} sem a forma de pagamento informada pela Cakto.</p>` : ''}
+        ${at.manual ? `<p class="dica" style="margin-top:4px">Mais ${at.manual} liberada(s) por você, sem pagamento.</p>` : ''}
+        ${pend || canc || bloq ? `<div class="lista-crm" style="margin-top:8px">
+          ${pend ? `<div><span><i class="dot d-y"></i>Pagamento pendente</span><b>${pend}</b></div>` : ''}
+          ${canc ? `<div><span><i class="dot d-c"></i>Canceladas</span><b>${canc}</b></div>` : ''}
+          ${bloq ? `<div><span><i class="dot d-r"></i>Bloqueadas</span><b>${bloq}</b></div>` : ''}</div>` : ''}
+      </section>
+      <section class="cartao"><div class="cab-crm"><h2>Do teste grátis até assinar</h2><span>${ta.total ? `média ${esc(num1(ta.media || 0))} dias` : ''}</span></div>
+        ${ta.total ? faixasTa.map(([t, v]) => linhaBarra(t, Number(v) || 0, ta.total, `${pct(Number(v) || 0, ta.total)}%`, `${Number(v) || 0} ${Number(v) === 1 ? 'pessoa' : 'pessoas'}`)).join('')
+          : '<p class="pequeno">Ainda não há assinaturas vindas do teste.</p>'}
+      </section>
     </div>
-
-    <h2>Teste grátis de 7 dias</h2>
-    <div class="grade-num">
-      ${cartaoNum('Em teste agora', (r.teste || {}).em_teste || 0)}
-      ${cartaoNum('Acabou sem assinar', (r.teste || {}).encerrados || 0, (r.teste || {}).encerrados ? 'alerta' : '')}
-      ${cartaoNum('Viraram assinantes', (r.teste || {}).convertidos || 0, 'bom')}
-      ${cartaoNum('Conversão do teste', (r.teste || {}).total ? Math.round(((r.teste.convertidos || 0) / r.teste.total) * 100) + '%' : '—', 'bom')}
-    </div>
-
-    ${estado.origem ? `<h2>Testes por origem</h2>
-    <div class="grade-num">
-      ${cartaoNum('Anúncio: testes', estado.origem.anuncio.total)}
-      ${cartaoNum('Anúncio: viraram assinantes', estado.origem.anuncio.convertidos, 'bom')}
-      ${cartaoNum('WhatsApp/direto: testes', estado.origem.direto.total)}
-      ${cartaoNum('WhatsApp/direto: assinantes', estado.origem.direto.convertidos, 'bom')}
-    </div>
-    ${(estado.origem.por_campanha || []).length ? `<section class="cartao coluna"><h3>Por campanha</h3>${estado.origem.por_campanha.map((x) => `<div class="linha-flex entre pequeno"><span>${esc(x.campanha)}</span><b>${x.total} testes · ${x.convertidos} assinantes</b></div>`).join('')}</section>` : ''}` : ''}
-
-    ${estado.fin ? `<h2>Comissão líquida</h2>
-    <div class="grade-num">
-      ${cartaoNum('Total bruto recebido', reais(estado.fin.total_bruto))}
-      ${cartaoNum('Total líquido (sem taxas)', reais(estado.fin.total_liquido), 'bom')}
-      ${cartaoNum('Migraram para o anual', estado.fin.migraram_anual || 0)}
-    </div>
-    <p class="pequeno" style="margin:0">O líquido é a comissão que a própria Cakto informa em cada venda (já sem as taxas).</p>
-    ${estado.fin.taxas_configuradas ? '' : '<div class="cartao pequeno nota-amarela">Alguma venda antiga veio sem a comissão da Cakto. Para ela, o app usa as taxas abaixo: preencha para o valor ficar certo.</div>'}
-    <details class="cartao coluna" id="taxas"><summary style="font-weight:800;cursor:pointer">Taxas da Cakto (só para vendas sem a comissão informada)</summary>
-      ${(estado.taxas || []).map((t) => `<div class="linha-taxa" data-forma="${esc(t.forma)}">
-        <b>${esc(({ pix: 'Pix', pix_auto: 'Pix Automático', credit_card: 'Cartão', boleto: 'Boleto', outro: 'Outros' })[t.forma] || t.forma)}</b>
-        <label>% <input type="number" step="0.01" min="0" max="100" value="${Number(t.percentual)}" data-campo="percentual"></label>
-        <label>R$ <input type="number" step="0.01" min="0" value="${Number(t.fixo)}" data-campo="fixo"></label>
-      </div>`).join('')}
-      <button class="btn principal cheio" id="salvar-taxas">Salvar taxas</button>
-    </details>` : ''}
-
-    <h2>Uso do app</h2>
-    <div class="grade-num">
-      ${cartaoNum('Contas criadas', r.contas)}
-      ${cartaoNum('Com kit cadastrado', r.contas_usando)}
-      ${cartaoNum('Contas novas no mês', m.contas_novas)}
-      ${cartaoNum('Reservas no mês', r.reservas_mes)}
-      ${cartaoNum('Cortesias', r.cortesias)}
-    </div>
-
-    <section class="cartao">
-      <h2>Faturamento dos últimos 6 meses</h2>
-      <div class="barras">
-        ${hist.map((h, i) => `<div class="barra ${i === hist.length - 1 ? 'atual' : ''}" title="${esc(reais(h.faturamento))}">
-          <span>${Number(h.faturamento) ? esc(Math.round(h.faturamento)) : ''}</span>
-          <i style="height:${Math.round((Number(h.faturamento) || 0) / maior * 100)}%"></i>
-          <span>${esc(mesCurto(h.mes))}</span></div>`).join('')}
-      </div>
-      <p class="pequeno" style="margin-top:10px">Valores em reais, pelos avisos de pagamento da Cakto.</p>
+    <section class="cartao"><div class="cab-crm"><h2>Faturamento por mês</h2><span>líquido (já sem as taxas da Cakto) · bruto embaixo</span></div>
+      ${mm.map((m) => linhaBarra(mesCurto(m.mes), Number(m.liquido) || 0, maxFat, esc(reais(m.liquido)), `bruto ${esc(reais(m.bruto))}`)).join('')}
     </section>
-
-    <button class="btn contorno cheio" id="atualizar">Atualizar</button>`;
-  $('#atualizar', tela).onclick = (e) => atualizar(e.currentTarget);
+    <section class="cartao"><div class="cab-crm"><h2>Assinantes mês a mês</h2><span>ativas no fim do mês · contas novas embaixo</span></div>
+      ${mm.map((m) => linhaBarra(mesCurto(m.mes), Number(m.ativos) || 0, maxAt, String(Number(m.ativos) || 0), `+${Number(m.contas_novas) || 0} contas`)).join('')}
+    </section>
+    ${estado.origem ? `<section class="cartao"><div class="cab-crm"><h2>Testes por origem</h2><span>desde o início</span></div>
+      <div class="lista-crm">
+        <div><span>Anúncio</span><b>${estado.origem.anuncio.total} testes · ${estado.origem.anuncio.convertidos} assinantes</b></div>
+        <div><span>WhatsApp / direto</span><b>${estado.origem.direto.total} testes · ${estado.origem.direto.convertidos} assinantes</b></div>
+        ${(estado.origem.por_campanha || []).map((x) => `<div><span>${esc(x.campanha)}</span><b>${x.total} testes · ${x.convertidos} assinantes</b></div>`).join('')}
+      </div></section>` : ''}`;
+  $$('[data-res-per]', tela).forEach((b) => (b.onclick = () => { estado.resPer = b.dataset.resPer; desenhar(); }));
 }
 
 // ---------------------------------------------------------------------
@@ -958,6 +950,20 @@ async function ativarAvisos(botao) {
     botao.disabled = false; botao.textContent = texto;
   }
 }
+// Modo suporte: cada loja abre numa aba nova; o painel continua aberto nesta.
+async function entrarNaLoja(email, soLeitura) {
+  let aba = null;
+  try { aba = window.open('', '_blank'); if (aba) aba.document.write('<p style="font:16px sans-serif;padding:24px">Abrindo a loja…</p>'); } catch (e) { aba = null; }
+  try {
+    const r = await dados.adminEntrarLoja(email, soLeitura);
+    const url = 'index.html?suporte=' + encodeURIComponent(r.negocio_id);
+    if (aba && !aba.closed) aba.location.href = url; else location.href = url;
+  } catch (e) {
+    try { if (aba) aba.close(); } catch (x) { /* segue */ }
+    throw e;
+  }
+}
+
 // Registro dos acessos do modo suporte (só aparece aqui no painel).
 async function desenharLogSuporte(tela) {
   let log = [];
@@ -981,18 +987,6 @@ function ligarResumoExtras(tela) {
     catch (e) { aviso(e.message); }
     te.disabled = false;
   };
-  const st = $('#salvar-taxas', tela);
-  if (st) st.onclick = async () => {
-    st.disabled = true; st.textContent = 'Salvando…';
-    try {
-      for (const linha of $$('.linha-taxa', tela)) {
-        const pct = Number(linha.querySelector('[data-campo="percentual"]').value || 0);
-        const fixo = Number(linha.querySelector('[data-campo="fixo"]').value || 0);
-        await dados.adminDefinirTaxa(linha.dataset.forma, pct, fixo);
-      }
-      await carregar(); desenhar(); aviso('Taxas salvas. Os valores líquidos já foram recalculados.');
-    } catch (e) { aviso(e.message); st.disabled = false; st.textContent = 'Salvar taxas'; }
-  };
 }
 
 function filtrados() {
@@ -1007,17 +1001,17 @@ function abaClientes(tela) {
     : f === 'parada' ? estado.clientes.filter(estaParada).length
     : estado.clientes.filter((c) => c.situacao === f).length);
   tela.innerHTML = `
-    <form class="cartao coluna" id="liberar-form" novalidate>
-      <h2>Liberar acesso sem prazo</h2>
+    <label class="campo"><span>Buscar</span><input type="search" id="busca" placeholder="Nome, e-mail, telefone ou negócio" value="${esc(estado.busca)}"></label>
+    <div class="filtros">${FILTROS.map(([f, t]) => `<button class="filtro ${estado.filtro === f ? 'ativo' : ''}" data-f="${f}">${esc(t)} (${contagem(f)})</button>`).join('')}</div>
+    <div class="nota-crm" style="margin:0"><b>Leads</b> = pessoas que passaram pela Cakto (geraram Pix, tiveram cartão recusado ou abriram o checkout) mas ainda não têm teste nem assinatura. Vale chamar no WhatsApp.</div>
+    <div class="linha-flex entre"><span class="pequeno" id="qtd"></span><button class="btn mini contorno" id="exportar">Baixar lista (planilha)</button></div>
+    <section class="cartao lista-cli"><div id="lista"></div></section>
+    <details class="cartao coluna"><summary style="font-weight:800;cursor:pointer">Liberar acesso sem prazo</summary>
+    <form class="coluna" id="liberar-form" novalidate style="margin-top:10px">
       <p class="pequeno">Para testadoras, parcerias ou quem pagou por fora. A pessoa cria a conta no app com este e-mail. (O teste de 7 dias já é automático para todo novo cadastro.)</p>
       <label class="campo"><span>E-mail</span><input type="email" name="email" inputmode="email" autocomplete="off" placeholder="cliente@email.com" required></label>
       <button class="btn principal cheio" type="submit" data-tipo="acesso">Liberar acesso sem prazo</button>
-    </form>
-
-    <label class="campo"><span>Buscar</span><input type="search" id="busca" placeholder="Nome, e-mail, telefone ou negócio" value="${esc(estado.busca)}"></label>
-    <div class="filtros">${FILTROS.map(([f, t]) => `<button class="filtro ${estado.filtro === f ? 'ativo' : ''}" data-f="${f}">${esc(t)} (${contagem(f)})</button>`).join('')}</div>
-    <div class="linha-flex entre"><span class="pequeno" id="qtd"></span><button class="btn mini contorno" id="exportar">Baixar lista (planilha)</button></div>
-    <div class="coluna" id="lista"></div>`;
+    </form></details>`;
 
   $('#liberar-form', tela).onsubmit = async (e) => {
     e.preventDefault();
@@ -1052,7 +1046,10 @@ function cartaoPessoa(c) {
   if (c.plano === 'manual') infos.push(['Plano', 'Liberado por você']);
   if (tel) infos.push(['Telefone', telefoneBonito(tel)]);
   if (c.negocio) infos.push(['Negócio', c.negocio]);
-  infos.push(['Conta no app', c.tem_conta ? 'Criada' : 'Ainda não criou']);
+  if (c.tem_conta && c.conta_criada_em) {
+    const d = Math.floor((Date.now() - new Date(c.conta_criada_em).getTime()) / 864e5);
+    infos.push(['No app há', `${d <= 0 ? 'menos de 1 dia' : d === 1 ? '1 dia' : d + ' dias'} (desde ${data(c.conta_criada_em)})`]);
+  } else infos.push(['Conta no app', c.tem_conta ? 'Criada' : 'Ainda não criou']);
   if (c.tem_conta) infos.push(['Kits / reservas', `${c.kits || 0} / ${c.reservas || 0}`]);
   if (c.tem_conta) infos.push(['Último uso', haQuanto(c.ultimo_acesso)]);
   if (c.primeira_compra) infos.push(['Cliente desde', data(c.primeira_compra)]);
@@ -1077,22 +1074,32 @@ function cartaoPessoa(c) {
     </div>
     ${parada ? '<div class="aviso-parada">Ainda não cadastrou nenhum kit. Vale chamar hoje.</div>' : ''}
     ${tel ? `<div class="acoes">
-      <a class="btn mini verde" href="${esc(linkZap(tel, textoMsg(nomeMsg)))}" target="_blank" rel="noopener">💬 Mensagem: ${esc(rotuloMsg)}</a>
+      <a class="btn mini verde" href="${esc(linkZap(tel, textoMsg(nomeMsg)))}" target="_blank" rel="noopener">Mensagem: ${esc(rotuloMsg)}</a>
       <button class="btn mini contorno" data-msgs="${esc(c.email)}">Outras mensagens</button>
     </div>` : ''}` : '';
   const origem = (c.teste_inicio || c.origem) ? `<div class="linha-flex" style="gap:6px;flex-wrap:wrap">${rotuloOrigem(c.origem)}</div>` : '';
 
   const semLoja = c.tem_conta && !c.negocio;
-  return `<article class="cartao pessoa" data-email="${esc(c.email)}">
-    <div class="cab"><div style="min-width:0"><div class="nome">${esc(nome)}</div><div class="email">${esc(c.email)}</div></div>${sit(c.situacao)}</div>
+  const aberta = (estado.abertos || new Set()).has(c.email);
+  const rotulo = c.situacao === 'ativa' && ['anual', 'mensal'].includes(c.plano) ? `Ativa · ${c.plano === 'anual' ? 'Anual' : 'Mensal'}`
+    : c.situacao === 'teste' ? `Em teste · dia ${dia || 1}` : (SITUACAO[c.situacao] || c.situacao);
+  const direita = c.tem_conta ? `${c.kits || 0} kit${Number(c.kits) === 1 ? '' : 's'} · ${c.reservas || 0} reserva${Number(c.reservas) === 1 ? '' : 's'}`
+    : c.ultimo_aviso_evento ? `${(EVENTO[c.ultimo_aviso_evento] || [c.ultimo_aviso_evento])[0]} ${data(c.ultimo_aviso).slice(0, 5)}` : '';
+  return `<article class="cli pessoa ${aberta ? 'aberta' : ''}" data-email="${esc(c.email)}">
+    <button class="cli-cab" data-abrir="1" aria-expanded="${aberta}">
+      <span class="sit sit-${esc(c.situacao)}">${esc(rotulo)}</span>
+      <span class="n"><b>${esc(c.negocio || nome)}</b><small>${esc(c.email)}</small></span>
+      <span class="r">${esc(direita)}</span><span class="seta" aria-hidden="true">›</span>
+    </button>
+    <div class="cli-corpo" ${aberta ? '' : 'hidden'}>
     ${semLoja ? '<div class="aviso-parada">Criou a conta, mas <b>ainda não criou a loja</b> (parou na primeira tela). Vale chamar para ajudar a terminar o cadastro.</div>' : ''}
     ${blocoTeste}
     ${origem}
     <div class="infos">${infos.map(([k, v]) => `<div>${esc(k)}<br><b>${esc(v)}</b></div>`).join('')}</div>
     <div class="acoes">
-      ${c.slug ? `<a class="btn mini contorno" href="${esc(linkVerLoja(c.slug))}" target="_blank" rel="noopener">👀 Ver loja</a>` : ''}
+      ${c.slug ? `<a class="btn mini contorno" href="${esc(linkVerLoja(c.slug))}" target="_blank" rel="noopener">Ver loja</a>` : ''}
       ${c.slug ? `<button class="btn mini principal" data-suporte="1">Entrar na loja para ajudar</button>` : ''}
-      ${c.slug ? `<button class="btn mini contorno" data-leitura="1">🔒 Só olhar</button>` : ''}
+      ${c.slug ? `<button class="btn mini contorno" data-leitura="1">Só olhar</button>` : ''}
       ${tel ? `<a class="btn mini verde" href="${esc(linkZap(tel, msg))}" target="_blank" rel="noopener">WhatsApp</a>` : ''}
       <a class="btn mini contorno" href="mailto:${esc(c.email)}">E-mail</a>
       ${c.tem_conta || c.teste_inicio || c.plano ? '<button class="btn mini contorno" data-editar="1">Editar dados</button>' : ''}
@@ -1100,6 +1107,7 @@ function cartaoPessoa(c) {
       ${liberada
         ? `<button class="btn mini perigo" data-acao="bloquear">Bloquear acesso</button>`
         : `<button class="btn mini claro" data-acao="liberar">Liberar acesso</button>`}
+    </div>
     </div>
   </article>`;
 }
@@ -1180,6 +1188,18 @@ function desenharLista() {
   lista.innerHTML = itens.length
     ? itens.map(cartaoPessoa).join('')
     : '<p class="pequeno centro" style="padding:20px 0">Ninguém por aqui ainda.</p>';
+  $$('[data-abrir]', lista).forEach((b) => {
+    b.onclick = () => {
+      const art = b.closest('.cli');
+      const ab = estado.abertos || (estado.abertos = new Set());
+      const email = art.dataset.email;
+      if (ab.has(email)) ab.delete(email); else ab.add(email);
+      const on = ab.has(email);
+      art.classList.toggle('aberta', on);
+      b.setAttribute('aria-expanded', String(on));
+      art.querySelector('.cli-corpo').hidden = !on;
+    };
+  });
   $$('[data-msgs]', lista).forEach((b) => {
     b.onclick = () => {
       const c = estado.clientes.find((x) => x.email === b.dataset.msgs);
@@ -1200,8 +1220,8 @@ function desenharLista() {
       const email = b.closest('[data-email]').dataset.email;
       b.disabled = true; b.textContent = 'Entrando…';
       try {
-        await dados.adminEntrarLoja(email);
-        location.href = 'index.html';
+        await entrarNaLoja(email);
+        b.disabled = false; b.textContent = 'Entrar na loja para ajudar';
       } catch (e) {
         aviso(e.message || 'Não deu para entrar na loja.');
         b.disabled = false; b.textContent = 'Entrar na loja para ajudar';
@@ -1211,8 +1231,8 @@ function desenharLista() {
   $$('[data-leitura]', lista).forEach((b) => {
     b.onclick = async () => {
       b.disabled = true; b.textContent = 'Entrando…';
-      try { await dados.adminEntrarLoja(b.closest('[data-email]').dataset.email, true); location.href = 'index.html'; }
-      catch (e) { aviso(e.message || 'Não deu para entrar na loja.'); b.disabled = false; b.textContent = '🔒 Só olhar'; }
+      try { await entrarNaLoja(b.closest('[data-email]').dataset.email, true); b.disabled = false; b.textContent = 'Só olhar'; }
+      catch (e) { aviso(e.message || 'Não deu para entrar na loja.'); b.disabled = false; b.textContent = 'Só olhar'; }
     };
   });
   $$('[data-acao]', lista).forEach((b) => {
@@ -1299,24 +1319,46 @@ function exportar() {
 // ---------------------------------------------------------------------
 // Pagamentos (histórico dos avisos da Cakto)
 // ---------------------------------------------------------------------
+const ST_PAG = { pago: 'Pago', pix_pendente: 'Pix pendente', pendente: 'Pendente', recusado: 'Recusado', cancelado: 'Cancelado' };
+const EV_CANCEL = { refund: 'reembolso', chargeback: 'contestação', subscription_canceled: 'cancelou' };
 function abaPagamentos(tela) {
-  const ev = estado.eventos;
+  const P = estado.painel;
+  if (!P) { tela.innerHTML = '<div class="cartao">Não consegui carregar os pagamentos. Toque em Atualizar.</div>'; return; }
+  const f = estado.pagF || (estado.pagF = { per: '7', st: '', plano: '', forma: '', tipo: '' });
+  const doPer = P.pagamentos.filter((x) => noPeriodo(x.q, f.per));
+  const filtro = (x) => (!f.plano || x.pl === f.plano) && (!f.forma || x.fo === f.forma) && (!f.tipo || x.tp === f.tipo);
+  const base = doPer.filter(filtro);
+  const lista = base.filter((x) => !f.st || x.st === f.st);
+  const conta = (st) => base.filter((x) => x.st === st);
+  const pagos = conta('pago');
+  const cart = (st, rot, sub) => `<button class="kpi ${f.st === st ? 'on' : ''}" data-pag-st="${st}"><small>${esc(rot)}</small><b>${conta(st).length}</b><i>${esc(sub)}</i></button>`;
+  const pill = (campo, v, t) => `<button class="${f[campo] === v ? 'on' : ''}" data-pag-c="${campo}" data-pag-v="${v}">${esc(t)}</button>`;
   tela.innerHTML = `
-    <p class="pequeno">Tudo o que a Cakto avisou, do mais novo para o mais antigo.</p>
-    <div class="coluna">
-      ${ev.length ? ev.map((e) => {
-        const [rotulo, cor] = EVENTO[e.evento] || [e.evento, '#6B6470'];
-        return `<div class="cartao evento">
-          <span class="bola" style="background:${cor}"></span>
-          <div class="txt"><div style="font-weight:800">${esc(rotulo)}${e.plano && !String(e.evento).startsWith('admin_') ? ` · ${e.plano === 'anual' ? 'Anual' : 'Mensal'}` : ''}</div>
-            <div class="quem">${esc(e.nome ? `${e.nome} · ${e.email}` : e.email || 'sem e-mail')}</div>
-            <div class="pequeno">${esc(dataHora(e.recebido_em))}</div></div>
-          ${e.valor ? `<span class="valor">${esc(reais(e.valor))}</span>` : ''}
-        </div>`;
-      }).join('') : '<p class="pequeno centro" style="padding:20px 0">Nenhum aviso da Cakto ainda. Eles aparecem aqui assim que a primeira compra acontecer.</p>'}
+    ${abasPeriodo([['hoje', 'Hoje'], ['ontem', 'Ontem'], ['7', '7 dias'], ['30', '30 dias']], f.per, 'data-pag-per')}
+    <div class="kpis-crm k4">
+      ${cart('pago', 'Pagos', reais(pagos.reduce((t, x) => t + Number(x.b || 0), 0)))}
+      ${cart('pix_pendente', 'Pix pendente', 'Pix gerado, não pago')}
+      ${cart('pendente', 'Pendentes', 'cobrança atrasada')}
+      ${cart('recusado', 'Recusados', 'cartão recusado')}
     </div>
-    <button class="btn contorno cheio" id="atualizar">Atualizar</button>`;
-  $('#atualizar', tela).onclick = (e) => atualizar(e.currentTarget);
+    <div class="pills-adm" style="margin:4px 0 2px">
+      ${pill('plano', '', 'Todos')}${pill('plano', 'anual', 'Anual')}${pill('plano', 'mensal', 'Mensal')}
+      <span style="width:10px"></span>${pill('forma', '', 'Pix e cartão')}${pill('forma', 'pix', 'Só Pix')}${pill('forma', 'cartao', 'Só cartão')}
+      <span style="width:10px"></span>${pill('tipo', '', 'Novas e renovações')}${pill('tipo', 'nova', 'Vendas novas')}${pill('tipo', 'renovacao', 'Renovações')}
+    </div>
+    ${f.st ? `<p class="pequeno" style="margin:0">Mostrando só: <b>${esc(ST_PAG[f.st])}</b> · <button class="link-btn" data-pag-st="${f.st}">ver todos</button></p>` : ''}
+    <section class="cartao">
+      ${lista.length ? `<div class="pg-lista">${lista.slice(0, 300).map((x) => `<div class="pg">
+        <span class="st st-${esc(x.st)}">${esc(x.st === 'cancelado' ? (EV_CANCEL[x.ev] || 'Cancelado').replace(/^./, (c) => c.toUpperCase()) : ST_PAG[x.st] || x.st)}</span>
+        <div style="min-width:0"><b class="t">${esc([x.pl === 'anual' ? 'Anual' : x.pl === 'mensal' ? 'Mensal' : '', FORMA_NOME[x.fo] || '', x.tp === 'nova' ? 'venda nova' : x.tp === 'renovacao' ? 'renovação' : ''].filter(Boolean).join(' · '))}</b>
+          <small>${esc([x.no, x.em, dataHora(x.q)].filter(Boolean).join(' · '))}</small></div>
+        <span class="v">${x.b ? esc(reais(x.b)) : ''}</span></div>`).join('')}</div>`
+        : '<p class="pequeno centro" style="padding:16px 0">Nenhum pagamento neste período com esses filtros.</p>'}
+    </section>
+    <p class="dica">Aqui aparecem só pagamentos. "Criou a conta" e "começou o teste" ficam em Clientes. Pix que já foi pago aparece só como Pago.</p>`;
+  $$('[data-pag-per]', tela).forEach((b) => (b.onclick = () => { f.per = b.dataset.pagPer; desenhar(); }));
+  $$('[data-pag-st]', tela).forEach((b) => (b.onclick = () => { f.st = f.st === b.dataset.pagSt ? '' : b.dataset.pagSt; desenhar(); }));
+  $$('[data-pag-c]', tela).forEach((b) => (b.onclick = () => { f[b.dataset.pagC] = b.dataset.pagV; desenhar(); }));
 }
 
 // =====================================================================
@@ -1455,7 +1497,7 @@ async function abaMensagens(tela) {
       ${f.quando === 'agendar' ? `<input type="datetime-local" id="m-data" value="${esc(f.data)}"><span class="dica">Sai na hora marcada (pode atrasar até 1 hora).</span>` : ''}
       <label class="campo"><span>Fica no app por</span><select id="m-dias">${[1, 3, 7, 15, 30].map((d) => `<option value="${d}" ${Number(f.dias) === d ? 'selected' : ''}>${d} dia${d > 1 ? 's' : ''}</option>`).join('')}</select></label>
       <div class="linha-flex entre" style="margin-top:auto"><b>Vai para <span style="color:var(--acc)">${alvo.length} ${alvo.length === 1 ? 'pessoa' : 'pessoas'}</span></b><button class="btn principal" id="m-enviar" ${alvo.length ? '' : 'disabled'}>${f.quando === 'agendar' ? 'Agendar' : 'Enviar'}</button></div>
-      <p class="dica" style="margin:0">Aparece como popup na próxima vez que a pessoa abrir o app (uma vez só) e vira notificação no celular de quem ativou os avisos.</p>
+      <p class="dica" style="margin:0">Aparece como popup na próxima vez que a pessoa abrir o app (uma vez só) e vira notificação no celular de quem ativou os avisos. Quem já recebeu uma mensagem com o mesmo título não recebe de novo.</p>
     </section>
     <section class="cartao"><h2 style="margin:0 0 10px">Prévia no celular</h2>
       <div class="celular-previa"><div class="notif-previa">🔔 <b>${esc(f.titulo || 'Título da mensagem')}</b><br>Toque para ver no app.</div>
@@ -1508,7 +1550,7 @@ async function abaMensagens(tela) {
         publico, dias: f.dias, enviar_em: f.quando === 'agendar' ? new Date(f.data).toISOString() : null,
       }, pessoas);
       estado.msgForm = null;
-      aviso(`Mensagem ${f.quando === 'agendar' ? 'agendada' : 'enviada'} para ${r.pessoas} pessoas.`);
+      aviso(`Mensagem ${f.quando === 'agendar' ? 'agendada' : 'enviada'} para ${r.pessoas} ${r.pessoas === 1 ? 'pessoa' : 'pessoas'}.${r.ja_receberam ? ` ${r.ja_receberam} já tinham recebido e ficaram de fora.` : ''}`);
       desenhar();
     } catch (err) { aviso(err.message); b.disabled = false; b.textContent = f.quando === 'agendar' ? 'Agendar' : 'Enviar'; }
   };
@@ -1522,8 +1564,20 @@ async function abaMensagens(tela) {
     ${lista.length ? `<div class="tabela t-msgs"><div class="tr th"><span>Mensagem</span><span>Para</span><span>Viram</span><span>Clicaram</span><span>Fecharam</span><span>Assinaram</span><span></span></div>
     ${lista.map((m) => `<div class="tr"><span>${esc(m.titulo)}<small>${esc(SIT[m.status] || m.status)} · ${esc(dataHora(m.enviar_em))} · ${esc(m.publico || '')}</small></span>
       <span>${m.pessoas}</span><span>${m.viram}<small>${pct(m.viram, m.pessoas)}%</small></span><span>${m.clicaram}<small>${pct(m.clicaram, m.viram)}% de quem viu</small></span><span>${m.fecharam}</span><b class="${m.assinaram ? 'pos' : ''}">${m.assinaram}</b>
-      <span class="acoes-linha">${m.status === 'enviada' || m.status === 'agendada' ? `<button class="btn contorno mini" data-msg="${m.id}" data-st="pausada">Pausar</button>` : ''}${m.status === 'pausada' ? `<button class="btn contorno mini" data-msg="${m.id}" data-st="agendada">Retomar</button>` : ''}${m.status !== 'encerrada' ? `<button class="btn contorno mini" data-msg="${m.id}" data-st="encerrada">Encerrar</button>` : ''}</span></div>`).join('')}</div>`
+      <span class="acoes-linha"><button class="btn contorno mini" data-alvos="${m.id}">Quem recebeu</button>${m.status === 'enviada' || m.status === 'agendada' ? `<button class="btn contorno mini" data-msg="${m.id}" data-st="pausada">Pausar</button>` : ''}${m.status === 'pausada' ? `<button class="btn contorno mini" data-msg="${m.id}" data-st="agendada">Retomar</button>` : ''}${m.status !== 'encerrada' ? `<button class="btn contorno mini" data-msg="${m.id}" data-st="encerrada">Encerrar</button>` : ''}</span></div>`).join('')}</div>`
     : '<p class="pequeno">Nenhuma mensagem enviada ainda.</p>'}`;
+  $$('[data-alvos]', hist).forEach((b) => (b.onclick = async () => {
+    const linha = b.closest('.tr');
+    const ja = linha.nextElementSibling;
+    if (ja && ja.classList.contains('alvos')) { ja.remove(); return; }
+    b.disabled = true;
+    try {
+      const l = await dados.adminMensagemAlvos(Number(b.dataset.alvos));
+      const st = (a) => (a.clicou_em ? 'clicou' : a.viu_em ? (a.fechou_em ? 'viu e fechou' : 'viu') : 'ainda não abriu o app');
+      linha.insertAdjacentHTML('afterend', `<div class="alvos">${l.length ? l.map((a) => `<div><span>${esc(a.loja || a.email)} <small>${esc(a.email)}</small></span><small>${esc(st(a))}${a.viu_em ? ' · ' + esc(dataHora(a.viu_em)) : ''}</small></div>`).join('') : '<p class="pequeno">Ninguém nesta mensagem.</p>'}</div>`);
+    } catch (e) { aviso(e.message); }
+    b.disabled = false;
+  }));
   $$('[data-msg]', hist).forEach((b) => (b.onclick = async () => {
     b.disabled = true;
     try { await dados.adminMudarMensagem(Number(b.dataset.msg), b.dataset.st); desenhar(); } catch (e) { aviso(e.message); b.disabled = false; }
@@ -1819,7 +1873,7 @@ async function abaMontagem(tela) {
   }));
   $$('[data-mt-loja]', alvo).forEach((b) => (b.onclick = async () => {
     b.disabled = true; b.textContent = 'Entrando…';
-    try { await dados.adminEntrarLoja(b.dataset.mtLoja); location.href = 'index.html'; } catch (e) { aviso(e.message); b.disabled = false; b.textContent = 'Entrar na loja'; }
+    try { await entrarNaLoja(b.dataset.mtLoja); b.disabled = false; b.textContent = 'Entrar na loja'; } catch (e) { aviso(e.message); b.disabled = false; b.textContent = 'Entrar na loja'; }
   }));
 }
 

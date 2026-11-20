@@ -2,7 +2,7 @@
 // App Pegue e Monte — link público de reservas (a cliente final usa)
 // Endereço: reservar.html?l=<link-do-negocio>
 // =====================================================================
-import * as dados from './dados.js?v=20261120a';
+import * as dados from './dados.js?v=20261121a';
 
 // Demonstração do site: botões de WhatsApp mostram um aviso em vez de abrir conversa.
 if (dados.DEMONSTRACAO_SITE) {
@@ -33,7 +33,8 @@ function galeria(fotos) {
   if (!fotos.length) return '';
   if (fotos.length === 1) return fotoCaixa(fotos[0]);
   return `<div><div class="galeria" id="galeria">${fotos.map((f, i) => fotoCaixa(f, `Foto ${i + 1} do kit`, i > 0)).join('')}</div>
-    <div class="pontos-galeria">${fotos.map((_, i) => `<i class="${i ? '' : 'on'}"></i>`).join('')}</div></div>`;
+    ${fotos.length > 8 ? `<div class="pontos-galeria contagem"><span id="galeria-n">1</span> / ${fotos.length}</div>`
+      : `<div class="pontos-galeria">${fotos.map((_, i) => `<i class="${i ? '' : 'on'}"></i>`).join('')}</div>`}</div>`;
 }
 function ligarGaleria(p) {
   const g = p.querySelector('#galeria');
@@ -42,6 +43,7 @@ function ligarGaleria(p) {
   g.addEventListener('scroll', () => {
     const atual = Math.round(g.scrollLeft / g.clientWidth);
     pontos.forEach((pt, i) => pt.classList.toggle('on', i === atual));
+    const n = p.querySelector('#galeria-n'); if (n) n.textContent = String(atual + 1);
   }, { passive: true });
 }
 const reais = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -120,13 +122,16 @@ async function iniciar() {
   }
   if (!loja) { raiz.innerHTML = '<div class="erro">Este link de reservas não está disponível.</div>'; return; }
   document.title = `Reservas · ${loja.nome}`;
+  loja.kits = dados.ordenarKits(loja.kits, loja.ordem_kits || 'az');
+  const fechadoAgora = (loja.fechado || []).find((f) => f.ate >= hojeISO() && f.de <= dados.somaDias(hojeISO(), 30));
   const categorias = [...new Set(loja.kits.map((k) => (k.categoria || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
   raiz.innerHTML = `
     <header class="cabeca">
       ${loja.logo_url ? `<img src="${esc(loja.logo_url)}" alt="Logo de ${esc(loja.nome)}">` : ''}
       <h1>${esc(loja.nome)}</h1>
       <p class="recado-loja">${esc(loja.recado || recadoPadrao(loja.nome))}</p>
-      <p class="pequeno">Escolha o kit e veja as datas livres. A reserva é confirmada depois do sinal.</p>
+      <p class="pequeno">Escolha o kit e veja as datas livres. ${loja.confirmar ? 'A loja confere a data e confirma pelo WhatsApp.' : 'A reserva é confirmada depois do sinal.'}</p>
+      ${fechadoAgora ? `<p class="nota-amarela pequeno" style="margin:6px 0 0">🔒 ${esc(fechadoAgora.recado || 'A loja não vai atender')} (${esc(dataCurta2(fechadoAgora.de))}${fechadoAgora.ate !== fechadoAgora.de ? ' a ' + esc(dataCurta2(fechadoAgora.ate)) : ''})</p>` : ''}
       <div class="botoes-loja">
         <a class="btn verde mini" href="${esc(linkZap(loja.whatsapp, 'Oi! Vim pelo link de reservas e tenho uma dúvida.'))}" target="_blank" rel="noopener">Dúvidas? Fale no WhatsApp</a>
         ${loja.instagram ? `<a class="btn insta mini" href="https://instagram.com/${encodeURIComponent(loja.instagram)}" target="_blank" rel="noopener">${ICONE_INSTA} Instagram</a>` : ''}
@@ -174,7 +179,9 @@ async function iniciar() {
 
 // Variações do kit (opções com preço, sinal, peças extras e foto próprios)
 function variacoesDe(k) { return Array.isArray(k && k.variacoes) ? k.variacoes : []; }
+function dataCurta2(iso) { const [a, m, d] = iso.split('-'); return `${d}/${m}`; }
 function precoTexto(k) {
+  if (k.preco_consultar) return 'Preço a consultar';
   const v = variacoesDe(k);
   if (!v.length) return reais(k.preco);
   return 'a partir de ' + reais(Math.min(...v.map((x) => Number(x.preco) || 0)));
@@ -231,25 +238,39 @@ async function escolherData(kit) {
         <button class="fechar" id="prox" aria-label="Próximo mês">${DIR}</button>
       </div>
       <div class="cal">${html}</div>
-      <p class="dica" style="margin-top:8px">Datas riscadas já estão reservadas.</p>`;
+      <p class="dica" style="margin-top:8px">Datas riscadas já estão reservadas${(loja.fechado || []).some((f) => f.ate >= ini && f.de <= fim) ? ` ou com a loja fechada${(loja.fechado.find((f) => f.ate >= ini && f.de <= fim) || {}).recado ? ` (${esc(loja.fechado.find((f) => f.ate >= ini && f.de <= fim).recado)})` : ''}` : ''}.</p>`;
     const muda = (delta) => { mes = dados.isoDe(new Date(ano, m - 1 + delta, 1)).slice(0, 7); desenhar(p); };
     $('#ant', area).onclick = () => { if (mes > h.slice(0, 7)) muda(-1); };
     $('#prox', area).onclick = () => muda(1);
     $$('[data-d]', area).forEach((b) => (b.onclick = () => { escolhida = b.dataset.d; desenhar(p); mostrarForm(p); }));
   };
 
-  const mostrarForm = (p) => {
+  const mostrarForm = async (p) => {
     const f = $('#form', p);
     f.classList.remove('oculto');
     $('#data-escolhida', p).textContent = dataLonga(escolhida);
+    const ta = $('#temas-area', p);
+    if (ta) {
+      ta.innerHTML = '<div class="carregando">Vendo os temas livres…</div>';
+      try { ocupadosTema = await dados.temasOcupados(slug, kit.id, escolhida); } catch (e) { ocupadosTema = []; }
+      if (tema && ocupadosTema.includes(tema)) tema = null;
+      const pintar = () => { ta.innerHTML = temasHtml(); $$('[data-tema]', ta).forEach((b) => (b.onclick = () => { tema = b.dataset.tema; pintar(); })); };
+      pintar();
+    }
     f.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   };
 
   const vars = variacoesDe(kit);
   let opcao = vars[0] || null;
   const fotosDaOpcao = () => (opcao && Array.isArray(opcao.fotos) && opcao.fotos.length ? opcao.fotos : fotosDe(kit));
-  const precoHtml = () => `<span class="preco" style="font-family:'Fredoka',sans-serif;font-size:22px;font-weight:600">${reais(opcao ? opcao.preco : kit.preco)}</span>
+  const temas = Array.isArray(kit.temas) ? kit.temas : [];
+  let tema = null, ocupadosTema = [];
+  const precoHtml = () => kit.preco_consultar
+    ? `<span class="preco" style="font-family:'Fredoka',sans-serif;font-size:21px;font-weight:600;color:#4A2F73">Preço a consultar</span><span class="pequeno">Escolha a data e peça a reserva: a loja passa o valor pelo WhatsApp.</span>`
+    : `<span class="preco" style="font-family:'Fredoka',sans-serif;font-size:22px;font-weight:600">${reais(opcao ? opcao.preco : kit.preco)}</span>
       ${Number(opcao ? opcao.sinal : kit.sinal) > 0 ? `<span class="pequeno">Sinal para reservar: <b>${reais(opcao ? opcao.sinal : kit.sinal)}</b></span>` : ''}`;
+  const temasHtml = () => `<div class="temas-link">${temas.map((t) => { const oc = ocupadosTema.includes(t.id); return `<button type="button" class="tema-link ${tema === t.id ? 'sel' : ''}" data-tema="${esc(t.id)}" ${oc ? 'disabled' : ''}>
+      ${t.foto ? `<img src="${esc(t.foto)}" alt="">` : '<span class="tema-sem">🎨</span>'}<b>${esc(t.nome)}</b>${oc ? '<small>já reservado</small>' : ''}</button>`; }).join('')}</div>`;
   const pecasHtml = () => {
     const base = Array.isArray(kit.pecas) ? kit.pecas : [];
     const extras = opcao && Array.isArray(opcao.extras) ? opcao.extras.filter(Boolean) : [];
@@ -267,11 +288,12 @@ async function escolherData(kit) {
     <div class="cartao" id="cal"></div>
     <form id="form" class="coluna oculto" novalidate>
       <div class="cartao" style="background: var(--lilas)"><div class="pequeno">Data da festa</div><b id="data-escolhida"></b></div>
+      ${temas.length ? '<h3 style="margin:4px 0 0">Escolha o tema</h3><div id="temas-area"></div>' : ''}
       <label class="campo">Seu nome<input name="nome" maxlength="80" autocomplete="name" required></label>
       <label class="campo">Seu WhatsApp<div class="campo-pre"><span>+55</span><input name="zap" inputmode="tel" autocomplete="tel" placeholder="(51) 99999-0000" required></div></label>
       <div class="erro oculto" id="erro"></div>
       <button class="btn principal cheio" type="submit">Pedir reserva</button>
-      <p class="dica centro">Seu pedido segura a data até a loja confirmar o sinal.</p>
+      <p class="dica centro">${loja.confirmar ? 'A loja confere a data e confirma pelo WhatsApp.' : 'Seu pedido segura a data até a loja confirmar o sinal.'}</p>
     </form>`, (p) => {
     ligarGaleria(p);
     desenhar(p);
@@ -296,16 +318,19 @@ async function escolherData(kit) {
       let zap = form.zap.value.replace(/\D/g, '').replace(/^0+/, '');
       if (zap.length > 11 && zap.startsWith('55')) zap = zap.slice(2);
       if (!escolhida) { erro.textContent = 'Escolha a data da festa no calendário.'; erro.classList.remove('oculto'); return; }
+      if (temas.length && !tema) { erro.textContent = 'Escolha o tema da festa.'; erro.classList.remove('oculto'); return; }
       if (nome.length < 2) { erro.textContent = 'Digite seu nome.'; erro.classList.remove('oculto'); return; }
       if (zap.length < 10 || zap.length > 11) { erro.textContent = 'Confira seu WhatsApp: digite o DDD e o número, por exemplo (51) 99999-0000.'; erro.classList.remove('oculto'); return; }
       const b = $('button[type=submit]', form);
       b.disabled = true; b.textContent = 'Enviando…';
       try {
-        const r = await dados.solicitarReserva(slug, kit.id, escolhida, nome, zap, opcao ? opcao.id : null);
-        sucesso({ ...kit, nome: opcao ? `${kit.nome} – ${opcao.nome}` : kit.nome }, escolhida, nome, zap, r);
+        const r = await dados.solicitarReserva(slug, kit.id, escolhida, nome, zap, opcao ? opcao.id : null, tema);
+        const nomeTema = r.tema || (temas.find((t) => t.id === tema) || {}).nome;
+        sucesso({ ...kit, nome: (opcao ? `${kit.nome} – ${opcao.nome}` : kit.nome) + (nomeTema ? ` (tema ${nomeTema})` : '') }, escolhida, nome, zap, r);
       } catch (err) {
         erro.textContent = err.message; erro.classList.remove('oculto');
         delete cache[escolhida.slice(0, 7)];
+        if (/tema/i.test(err.message)) mostrarForm(p);
         b.disabled = false; b.textContent = opcao ? `Pedir reserva: ${opcao.nome}` : 'Pedir reserva';
       }
     };
@@ -321,24 +346,25 @@ function zapFormatado(n) {
 
 function sucesso(kit, data, nome, zap, r) {
   const temSinal = Number(r.sinal) > 0;
+  const confirmar = !!r.confirmar;
   const texto = `Olá! Acabei de pedir uma reserva pelo link:\n\n`
     + `Kit: ${kit.nome}\nFesta: ${dataLonga(data)}\nNome: ${nome}\nWhatsApp: ${zapFormatado(zap)}\n\n`
-    + (temSinal ? `Vou fazer o Pix do sinal de ${reais(r.sinal)} e mando o comprovante aqui.` : 'Como faço para confirmar?');
+    + (r.consultar ? 'Qual o valor? Pode me passar?' : confirmar ? 'Pode confirmar se a data está livre?' : temSinal ? `Vou fazer o Pix do sinal de ${reais(r.sinal)} e mando o comprovante aqui.` : 'Como faço para confirmar?');
   const link = linkZap(r.whatsapp, texto);
-  abrirPainel('Falta só um passo', `
-    <p>Sua data está guardada. Agora <b>envie o pedido para a loja pelo WhatsApp</b> para ela confirmar sua reserva.</p>
+  abrirPainel(confirmar ? 'Pedido enviado!' : 'Falta só um passo', `
+    <p>${confirmar ? 'Sua data está <b>pré-reservada</b>. Envie o pedido pelo WhatsApp: a loja confere e confirma por lá. <b>Só faça o Pix depois da confirmação.</b>' : 'Sua data está guardada. Agora <b>envie o pedido para a loja pelo WhatsApp</b> para ela confirmar sua reserva.'}</p>
     <a class="btn verde cheio" id="enviar-zap" href="${esc(link)}" target="_blank" rel="noopener" style="min-height:56px;font-size:18px">Enviar pedido pelo WhatsApp</a>
     <div class="cartao" style="background: var(--lilas)">
       <div class="pequeno">Seu pedido</div>
       <b>${esc(kit.nome)}</b> · ${esc(dataLonga(data))}
     </div>
-    ${temSinal ? `
+    ${temSinal && !confirmar ? `
       <div class="cartao coluna">
         <b>Depois, faça o Pix do sinal de ${reais(r.sinal)}</b>
         ${r.chave_pix ? `<div class="pequeno">Chave Pix:</div><div class="pix">${esc(r.chave_pix)}</div><button class="btn claro cheio" id="copiar-pix">Copiar chave Pix</button>` : '<p class="pequeno">A loja vai te passar a chave Pix pelo WhatsApp.</p>'}
         <p class="pequeno">Mande o comprovante na mesma conversa do WhatsApp.</p>
       </div>` : ''}
-    <p class="dica centro">A reserva fica confirmada quando a loja receber o sinal.</p>`, (p) => {
+    <p class="dica centro">${confirmar ? 'A reserva fica confirmada depois que a loja aceitar e receber o sinal.' : 'A reserva é confirmada pela loja. Se a data não puder ser atendida, a loja devolve o sinal.'}</p>`, (p) => {
     const c = $('#copiar-pix', p);
     if (c) c.onclick = async () => {
       try { await navigator.clipboard.writeText(r.chave_pix); aviso('Chave Pix copiada!'); }
