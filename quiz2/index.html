@@ -158,8 +158,9 @@ h2.t{font-family:'Fredoka',sans-serif;font-weight:600;font-size:24px;text-align:
 (function () {
   // ======================= CONFIGURAÇÃO =======================
   var CHECKOUT = {
-    anual: 'https://pay.cakto.com.br/mjrcoxc',          // anual R$ 167
-    mensal: 'https://pay.cakto.com.br/3bnawbt_1255298'  // mensal R$ 29,90
+    // Checkout próprio: a página de assinatura do app (é ela que avisa o InitiateCheckout)
+    anual: 'https://app.pegueemonte.com/assinar/?plano=anual&abrir=1&src=quiz2',
+    mensal: 'https://app.pegueemonte.com/assinar/?plano=mensal&abrir=1&src=quiz2'
   };
   var VALOR = { anual: 167, mensal: 29.9 };
   // VÍDEO (VSL): arquivo dentro da pasta quiz2/videos
@@ -355,7 +356,7 @@ h2.t{font-family:'Fredoka',sans-serif;font-weight:600;font-size:24px;text-align:
   document.querySelectorAll('[data-plano]').forEach(function (a) {
     a.href = linkCheckout(CHECKOUT[a.dataset.plano]);
     a.addEventListener('click', function () {
-      pixel('track', 'InitiateCheckout', { content_name: a.dataset.plano, value: VALOR[a.dataset.plano], currency: 'BRL' });
+      // (o InitiateCheckout agora sai só na página de assinatura, para não contar duas vezes)
       registrar('checkout_' + a.dataset.plano);
     });
   });
@@ -366,17 +367,6 @@ h2.t{font-family:'Fredoka',sans-serif;font-weight:600;font-size:24px;text-align:
   if (url.get('refazer')) { try { localStorage.removeItem('apm-quiz2-feito'); localStorage.removeItem('apm-quiz2-botao'); } catch (e) { /* segue */ } }
   else if (ler('apm-quiz2-feito') === '1') abrirVsl();
 })();
-</script>
-<script type="module">
-// Checkout próprio (Pagar.me): quando estiver ligado, o pagamento acontece aqui mesmo, sem ir para a Cakto
-import { abrirCheckout, checkoutAtivo } from '../checkout.js?v=20261121e';
-let ativo = false;
-checkoutAtivo().then((v) => { ativo = v; });
-document.querySelectorAll('[data-plano]').forEach((a) => a.addEventListener('click', (e) => {
-  if (!ativo) return;
-  e.preventDefault();
-  abrirCheckout({ plano: a.dataset.plano, contexto: 'venda', linkReserva: a.href, appUrl: new URL('../', location.href).href });
-}));
 </script>
 </body>
 </html>
