@@ -150,6 +150,7 @@ async function carregar() {
     dados.adminResumo(), dados.adminClientes(), dados.adminTestesOrigem().catch(() => null), dados.adminPainel().catch(() => null),
     dados.adminCancelarCakto().catch(() => []),
   ]);
+  estado.recup = await carregarRecuperacao().catch(() => null);
   [estado.crm, estado.crmMsgs, estado.logos, estado.saude] = await Promise.all([dados.adminCrm().catch(() => null), dados.adminCrmMensagens().catch(() => ({})),
     dados.adminLogos().catch(() => ({})), dados.adminSaude().catch(() => null)]);
 }
@@ -1330,45 +1331,107 @@ function exportar() {
 // ---------------------------------------------------------------------
 // Pagamentos (histórico dos avisos da Cakto)
 // ---------------------------------------------------------------------
-const ST_PAG = { pago: 'Pago', pix_pendente: 'Pix pendente', pendente: 'Pendente', recusado: 'Recusado', cancelado: 'Cancelado' };
+const ST_PAG = { pago: 'Pago', pix_pendente: 'Pix pendente', pendente: 'Atrasado', recusado: 'Recusado', cancelado: 'Cancelado', abandono: 'Abandonou' };
 const EV_CANCEL = { refund: 'reembolso', chargeback: 'contestação', subscription_canceled: 'cancelou' };
+const EMAIL_REC = { carrinho: 'E-mail de carrinho', checkout: 'E-mail de carrinho', pix_pendente: 'Pix por e-mail', pix_vencido: 'Pix não pago', cartao_recusado: 'E-mail de recusa' };
+const ZAP_REC = {
+  abandono: 'Oi{nome}! Vi que você começou a assinar o App Pegue e Monte e não terminou. Ficou alguma dúvida? Te ajudo a finalizar por aqui 😊',
+  pix_pendente: 'Oi{nome}! Vi que você gerou o Pix do App Pegue e Monte, mas ele não foi pago. Quer que eu te ajude a finalizar? Se o Pix venceu, te mando o link para gerar outro 😊',
+  recusado: 'Oi{nome}! Vi que o pagamento no cartão não passou. Quer tentar no Pix ou começar pelo plano mensal? Te ajudo por aqui 😊',
+};
+// Dados da recuperação (abandonos, telefones, e-mails enviados e vendas recuperadas)
+async function carregarRecuperacao() {
+  if (dados.MODO_DEMO) {
+    const h = (m) => new Date(Date.now() - m * 6e4).toISOString();
+    return { abandonos: [{ q: h(65), em: 'juliana.festas@exemplo.com', no: 'Juliana Mendes', pl: 'anual', v: 167 }, { q: h(190), em: 'carla.kits@exemplo.com', no: 'Carla Souza', pl: 'mensal', v: 29.9 }],
+      recuperados: [{ q: h(30), em: 'ana@exemplo.com', v: 167, pl: 'anual', de: 'pix_gerado' }],
+      contatos: { 'juliana.festas@exemplo.com': { tel: '5511987654321', emails: [{ t: 'carrinho', q: h(5), ab: true, cl: false }] }, 'carla.kits@exemplo.com': { tel: '21996541122', emails: [] } } };
+  }
+  const sessao = await dados.sessaoAtual();
+  if (!sessao || !sessao.access_token) return null;
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/admin_recuperacao`, {
+    method: 'POST', body: '{}',
+    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${sessao.access_token}`, 'Content-Type': 'application/json' },
+  });
+  if (!r.ok) return null; // banco ainda sem a atualização 26: a tela continua funcionando sem essa parte
+  return r.json();
+}
+function zapRecuperacao(tel, tipo, nome) {
+  if (String(tel || '').replace(/\D/g, '').length < 10) return '';
+  const n = String(nome || '').trim().split(/\s+/)[0] || '';
+  return linkZap(tel, (ZAP_REC[tipo] || ZAP_REC.abandono).replace('{nome}', n ? ', ' + n.charAt(0).toUpperCase() + n.slice(1).toLowerCase() : ''));
+}
+function telBonito(tel) {
+  const d = String(tel || '').replace(/\D/g, '').replace(/^55(?=\d{10,11}$)/, '');
+  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return d;
+}
+function emailsRec(c) {
+  return (c && c.emails || []).map((m) => `<span class="em-rec">✉ ${esc(EMAIL_REC[m.t] || m.t)}: <i class="${m.ab || m.cl ? '' : 'na'}">enviado ${esc(dataHora(m.q))}${m.pr ? ' · ' + esc(m.pr) : m.cl ? ' · clicou' : m.ab ? ' · abriu' : ''}</i></span>`).join('');
+}
 function abaPagamentos(tela) {
   const P = estado.painel;
   if (!P) { tela.innerHTML = '<div class="cartao">Não consegui carregar os pagamentos. Toque em Atualizar.</div>'; return; }
-  const f = estado.pagF || (estado.pagF = { per: '7', st: '', plano: '', forma: '', tipo: '' });
-  const doPer = P.pagamentos.filter((x) => noPeriodo(x.q, f.per));
+  const R = estado.recup || { abandonos: [], recuperados: [], contatos: {} };
+  const f = estado.pagF || (estado.pagF = { per: '7', aba: 'pago', plano: '', forma: '', tipo: '' });
+  if (!f.aba) f.aba = 'pago';
   const filtro = (x) => (!f.plano || x.pl === f.plano) && (!f.forma || x.fo === f.forma) && (!f.tipo || x.tp === f.tipo);
-  const base = doPer.filter(filtro);
-  const lista = base.filter((x) => !f.st || x.st === f.st);
-  const conta = (st) => base.filter((x) => x.st === st);
-  const pagos = conta('pago');
-  const cart = (st, rot, sub) => `<button class="kpi ${f.st === st ? 'on' : ''}" data-pag-st="${st}"><small>${esc(rot)}</small><b>${conta(st).length}</b><i>${esc(sub)}</i></button>`;
+  const doPer = P.pagamentos.filter((x) => noPeriodo(x.q, f.per)).filter(filtro);
+  const aband = (R.abandonos || []).filter((x) => noPeriodo(x.q, f.per) && (!f.plano || x.pl === f.plano))
+    .map((x) => ({ ...x, st: 'abandono', b: x.v }));
+  const grupo = { pago: doPer.filter((x) => x.st === 'pago'), pix_pendente: doPer.filter((x) => x.st === 'pix_pendente'),
+    recusado: doPer.filter((x) => x.st === 'recusado'), abandono: aband, outros: doPer.filter((x) => x.st === 'pendente' || x.st === 'cancelado') };
+  const recup = (R.recuperados || []).filter((x) => noPeriodo(x.q, f.per) && (!f.plano || x.pl === f.plano));
+  const somaRec = recup.reduce((t, x) => t + Number(x.v || 0), 0);
+  const cart = (k, rot, sub) => `<button class="kpi ${f.aba === k ? 'on' : ''}" data-pag-aba="${k}"><small>${esc(rot)}</small><b>${grupo[k].length}</b><i>${esc(sub)}</i></button>`;
   const pill = (campo, v, t) => `<button class="${f[campo] === v ? 'on' : ''}" data-pag-c="${campo}" data-pag-v="${v}">${esc(t)}</button>`;
+  const PER_NOME = { hoje: 'hoje', ontem: 'ontem', 7: 'nos 7 dias', 30: 'nos 30 dias' };
+  const EXPLICA = {
+    pago: 'Pagamentos aprovados (vendas novas e renovações).',
+    pix_pendente: 'Gerou o Pix e não pagou. Quem pagar depois sai daqui e conta como recuperada.',
+    recusado: 'Cartão recusado e não pagou de outro jeito. Quem pagar depois sai daqui e conta como recuperada.',
+    abandono: 'Deixou nome, e-mail e WhatsApp no checkout e saiu sem pagar. Quando a pessoa paga, sai daqui sozinha e conta como recuperada.',
+    outros: 'Cobranças atrasadas, cancelamentos, reembolsos e contestações.',
+  };
+  const lista = grupo[f.aba] || [];
+  const linha = (x) => {
+    const c = (R.contatos || {})[x.em] || {};
+    const zap = x.st === 'pago' || x.st === 'cancelado' || x.st === 'pendente' ? '' : zapRecuperacao(c.tel, x.st, x.no);
+    const etiqueta = x.st === 'cancelado' ? (EV_CANCEL[x.ev] || 'Cancelado').replace(/^./, (l) => l.toUpperCase()) : ST_PAG[x.st] || x.st;
+    const titulo = [x.pl === 'anual' ? 'Anual' : x.pl === 'mensal' ? 'Mensal' : '', FORMA_NOME[x.fo] || '', x.tp === 'nova' ? 'venda nova' : x.tp === 'renovacao' ? 'renovação' : ''].filter(Boolean).join(' · ');
+    return `<div class="pg-ab">
+      <div style="min-width:0"><b class="t">${esc(x.no || x.em)}</b>
+        <small>${esc([x.no ? x.em : '', telBonito(c.tel)].filter(Boolean).join(' · '))}</small>
+        <small><span class="st st-${esc(x.st)}">${esc(etiqueta)}</span> ${esc([titulo, dataHora(x.q), x.st === 'abandono' ? 'Cakto' : x.gw === 'pagarme' ? 'Pagar.me' : 'Cakto'].filter(Boolean).join(' · '))}</small>
+        ${x.cp || x.pp ? `<small>${esc([x.cp ? 'Anúncio: ' + x.cp : '', x.pp ? 'Popup: ' + (NOMES_POPUP[x.pp] || x.pp) : ''].filter(Boolean).join(' · '))}</small>` : ''}
+        ${x.st === 'pago' ? '' : emailsRec(c)}</div>
+      <div class="ld"><span class="v">${x.b ? esc(reais(x.b)) : ''}</span>${zap ? `<a class="zapb" href="${esc(zap)}" target="_blank" rel="noopener">Chamar no WhatsApp</a>` : ''}</div></div>`;
+  };
   tela.innerHTML = `
     ${abasPeriodo([['hoje', 'Hoje'], ['ontem', 'Ontem'], ['7', '7 dias'], ['30', '30 dias']], f.per, 'data-pag-per')}
     <div class="kpis-crm k4">
-      ${cart('pago', 'Pagos', reais(pagos.reduce((t, x) => t + Number(x.b || 0), 0)))}
-      ${cart('pix_pendente', 'Pix pendente', 'Pix gerado, não pago')}
-      ${cart('pendente', 'Pendentes', 'cobrança atrasada')}
+      ${cart('pago', 'Pagos', reais(grupo.pago.reduce((t, x) => t + Number(x.b || 0), 0)))}
+      ${cart('pix_pendente', 'Pix pendentes', 'gerou o Pix e não pagou')}
       ${cart('recusado', 'Recusados', 'cartão recusado')}
+      ${cart('abandono', 'Abandonados', 'deixou os dados e saiu')}
     </div>
+    ${estado.recup ? `<div class="rec-faixa">✓ Recuperados ${esc(PER_NOME[f.per] || '')}: ${recup.length} ${recup.length === 1 ? 'venda' : 'vendas'} · ${esc(reais(somaRec))} <span>(pagaram 1 hora ou mais depois de sair sem pagar)</span></div>` : ''}
     <div class="pills-adm" style="margin:4px 0 2px">
       ${pill('plano', '', 'Todos')}${pill('plano', 'anual', 'Anual')}${pill('plano', 'mensal', 'Mensal')}
       <span style="width:10px"></span>${pill('forma', '', 'Pix e cartão')}${pill('forma', 'pix', 'Só Pix')}${pill('forma', 'cartao', 'Só cartão')}
       <span style="width:10px"></span>${pill('tipo', '', 'Novas e renovações')}${pill('tipo', 'nova', 'Vendas novas')}${pill('tipo', 'renovacao', 'Renovações')}
+      ${grupo.outros.length ? `<span style="width:10px"></span><button class="${f.aba === 'outros' ? 'on' : ''}" data-pag-aba="outros">Atrasados e cancelamentos (${grupo.outros.length})</button>` : ''}
     </div>
-    ${f.st ? `<p class="pequeno" style="margin:0">Mostrando só: <b>${esc(ST_PAG[f.st])}</b> · <button class="link-btn" data-pag-st="${f.st}">ver todos</button></p>` : ''}
     <section class="cartao">
-      ${lista.length ? `<div class="pg-lista">${lista.slice(0, 300).map((x) => `<div class="pg">
-        <span class="st st-${esc(x.st)}">${esc(x.st === 'cancelado' ? (EV_CANCEL[x.ev] || 'Cancelado').replace(/^./, (c) => c.toUpperCase()) : ST_PAG[x.st] || x.st)}</span>
-        <div style="min-width:0"><b class="t">${esc([x.pl === 'anual' ? 'Anual' : x.pl === 'mensal' ? 'Mensal' : '', FORMA_NOME[x.fo] || '', x.tp === 'nova' ? 'venda nova' : x.tp === 'renovacao' ? 'renovação' : ''].filter(Boolean).join(' · '))}</b>
-          <small>${esc([x.no, x.em, dataHora(x.q), x.gw === 'pagarme' ? 'Pagar.me' : 'Cakto'].filter(Boolean).join(' · '))}</small></div>
-        <span class="v">${x.b ? esc(reais(x.b)) : ''}</span></div>`).join('')}</div>`
-        : '<p class="pequeno centro" style="padding:16px 0">Nenhum pagamento neste período com esses filtros.</p>'}
+      <p class="pequeno" style="margin:0 0 4px">${esc(EXPLICA[f.aba] || '')}</p>
+      ${f.aba === 'abandono' && !estado.recup ? '<p class="pequeno centro" style="padding:16px 0">Os abandonos aparecem depois da atualização do banco (passo 1).</p>'
+        : lista.length ? `<div class="pg-lista">${lista.slice(0, 300).map(linha).join('')}</div>`
+        : '<p class="pequeno centro" style="padding:16px 0">Ninguém aqui neste período com esses filtros.</p>'}
     </section>
-    <p class="dica">Aqui aparecem só pagamentos. "Criou a conta" e "começou o teste" ficam em Clientes. Pix que já foi pago aparece só como Pago.</p>`;
+    <p class="dica">O botão "Chamar no WhatsApp" abre a conversa com uma mensagem pronta para cada caso. Pix que já foi pago aparece só como Pago.</p>`;
   $$('[data-pag-per]', tela).forEach((b) => (b.onclick = () => { f.per = b.dataset.pagPer; desenhar(); }));
-  $$('[data-pag-st]', tela).forEach((b) => (b.onclick = () => { f.st = f.st === b.dataset.pagSt ? '' : b.dataset.pagSt; desenhar(); }));
+  $$('[data-pag-aba]', tela).forEach((b) => (b.onclick = () => { f.aba = b.dataset.pagAba; desenhar(); }));
   $$('[data-pag-c]', tela).forEach((b) => (b.onclick = () => { f[b.dataset.pagC] = b.dataset.pagV; desenhar(); }));
 }
 
@@ -1604,13 +1667,17 @@ const EMAILS_TIPOS = [
   ['parada_4', 'Parada: não divulgou (etapa 4)', '24 h parada'],
   ['parada_5', 'Parada: sem reserva (etapa 5)', '24 h parada'],
   ['primeira_reserva', '1ª reserva de cliente real', 'quando acontece'],
-  ['dia2_montagem', 'Dia 2 · Montamos sua loja (menos de 3 kits)', '2º dia'],
+  ['dia2_montagem', 'Dia 2 · Loja pronta com a IA (menos de 3 kits)', '2º dia'],
   ['dia2_promo', 'Dia 2 · 53% OFF (3+ kits)', '2º dia'],
   ['dia5_resumo', 'Dia 5 · resumo do que ela fez', '5º dia'],
   ['teste_amanha', 'Dia 6 · teste acaba amanhã', '6º dia'],
-  ['checkout', 'Foi ao checkout e não comprou', '~2 h depois'],
-  ['teste_acabou', 'Dia 7 · teste acabou', '7º dia'],
-  ['promo_ultimo_dia', 'Dia 9 · último dia do desconto', '9º dia'],
+  ['teste_acabou', 'Dia 7 · teste acabou (link fora do ar)', '7º dia'],
+  ['promo_ultimo_dia', 'Dia 9 · link continua fora do ar', '9º dia'],
+  ['carrinho', 'Recuperação · carrinho abandonado', '1 h depois (no app: 2 h)'],
+  ['pix_pendente', 'Recuperação · Pix gerado (com o código)', '10 min depois'],
+  ['pix_vencido', 'Recuperação · Pix não pago', '1 h depois'],
+  ['cartao_recusado', 'Recuperação · cartão recusado', '1 h depois'],
+  ['checkout', 'Antigo · foi ao checkout e não comprou', 'trocado pelo carrinho'],
 ];
 async function abaEmails(tela) {
   tela.innerHTML = '<div id="em-c" class="coluna" style="gap:16px"><div class="cartao">Carregando…</div></div>';
@@ -1626,7 +1693,7 @@ async function abaEmails(tela) {
   const per = [['7', '7 dias'], ['30', '30 dias'], ['90', '90 dias'], ['0', 'Desde o início']];
   alvo.innerHTML = `
     <section class="cartao linha-flex entre" style="gap:12px;flex-wrap:wrap">
-      <div><b>${r.pausados ? '⏸️ Envio pausado' : '🟢 Envio ligado'}</b><div class="pequeno">Saem sozinhos a cada 15 minutos (boas-vindas a qualquer hora; os outros das 8h às 20h) · no máximo 1 por dia por pessoa · param quando ela assina.</div></div>
+      <div><b>${r.pausados ? '⏸️ Envio pausado' : '🟢 Envio ligado'}</b><div class="pequeno">Saem sozinhos a cada 15 minutos (boas-vindas a qualquer hora; os do teste das 8h às 20h; os de recuperação das 8h às 22h, e o do Pix com o código até 23h) · no máximo 1 por dia por pessoa (o do Pix com o código não conta) · param quando ela assina.</div></div>
       <div class="linha-flex" style="gap:8px"><label class="pequeno">Período <select id="em-dias">${per.map(([v, t]) => `<option value="${v}" ${v === dias ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
       <button class="btn ${r.pausados ? 'principal' : 'contorno'} mini" id="em-pausar">${r.pausados ? 'Retomar envios' : 'Pausar todos'}</button></div>
     </section>

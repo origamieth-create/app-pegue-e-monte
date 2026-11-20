@@ -27,10 +27,58 @@ function origemAnuncio() {
   const u = new URLSearchParams(location.search), o = {};
   campos.forEach((c) => { const v = u.get(c); if (v) o[c] = v.slice(0, 200); });
   if (Object.keys(o).length) return o;
-  for (const k of ['apm-quiz2-origem', 'apm-origem']) {
+  for (const k of ['apm-origem', 'apm-quiz2-origem', 'apm-quiz-origem']) {
     try { const v = JSON.parse(localStorage.getItem(k) || 'null'); if (v && typeof v === 'object') return v; } catch (e) { /* segue */ }
   }
   return null;
+}
+
+// Link da Cakto levando junto de onde a pessoa veio (UTMs do anúncio; dentro do app, src=app e o popup em sck),
+// para a Utmify saber a campanha e o popup de cada venda.
+export function linkCakto(link, popup) {
+  try {
+    const u = new URL(link);
+    const o = origemAnuncio() || {};
+    ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'src', 'sck'].forEach((c) => { if (o[c] && !u.searchParams.get(c)) u.searchParams.set(c, String(o[c]).slice(0, 200)); });
+    if (popup && !u.searchParams.get('sck')) { u.searchParams.set('sck', ('popup-' + popup).slice(0, 60)); if (!u.searchParams.get('src')) u.searchParams.set('src', 'app'); }
+    return u.href;
+  } catch (e) { return link; }
+}
+// Página de assinatura com a Cakto: avisa o InitiateCheckout (uma vez) e vai para a Cakto na mesma aba
+async function irParaCakto(destino, op, cat) {
+  if (!window.__apmIniciou) {
+    window.__apmIniciou = true;
+    garantirPixel();
+    const pl = op.plano === 'mensal' ? 'mensal' : 'anual';
+    const valor = cat && cat.planos && cat.planos[pl] ? cat.planos[pl].valor / 100 : (pl === 'mensal' ? 29.9 : 167);
+    // espera o pixel carregar (no máximo 1,5 s) para o aviso não se perder na troca de página
+    for (let i = 0; i < 15 && !(window.fbq && window.fbq.callMethod) && !dados.MODO_DEMO; i++) await new Promise((r) => setTimeout(r, 100));
+    evento('InitiateCheckout', { content_name: pl, content_ids: [pl], value: valor, currency: 'BRL', num_items: 1 });
+    await new Promise((r) => setTimeout(r, 400));
+  }
+  location.href = destino;
+}
+
+// ---------------------------------------------------------------------
+// Pixel do Meta: o checkout carrega sozinho (se a página ainda não tiver) e avisa
+// InitiateCheckout (abriu), AddPaymentInfo (Pix gerado / cartão enviado) e Purchase (aprovado).
+// A compra também vai pelo servidor (API de Conversões) com o mesmo código, sem contar duas vezes.
+// ---------------------------------------------------------------------
+const PIXEL_META = '1489696249388385';
+function garantirPixel() {
+  if (dados.MODO_DEMO || window.fbq) return;
+  /* eslint-disable */
+  !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');
+  /* eslint-enable */
+  window.fbq('init', PIXEL_META);
+}
+function evento(nome, dadosEvento, id) {
+  try { garantirPixel(); if (window.fbq) window.fbq('track', nome, dadosEvento || {}, id ? { eventID: id } : undefined); } catch (e) { /* segue */ }
+}
+// Para páginas que não têm o pixel: carrega e marca a visita (PageView)
+export function iniciarPixel() { const tinha = !!window.fbq; garantirPixel(); try { if (!tinha && window.fbq) window.fbq('track', 'PageView'); } catch (e) { /* segue */ } }
+function cookie(nome) {
+  try { const m = document.cookie.match(new RegExp('(?:^|; )' + nome + '=([^;]*)')); return m ? decodeURIComponent(m[1]) : ''; } catch (e) { return ''; }
 }
 
 function css() {
@@ -87,7 +135,9 @@ function css() {
 .ck-ok{width:86px;height:86px;border-radius:50%;background:#EEF8F2;display:grid;place-items:center;margin:8px auto 0;font-size:44px;color:#1F7A52}
 .ck-centro{text-align:center}
 .ck-end{font-size:13px;color:#6B6175;margin-top:-6px}
-.ck-oculto{display:none!important}`;
+.ck-oculto{display:none!important}
+.ck-oferta{background:#EEF8F2;border:1.5px solid #BFE3CD;border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:8px;font-size:14.5px;color:#1B4D36}
+.ck-oferta .ck-btn{background:#1F7A52;box-shadow:none;padding:13px;font-size:15.5px}`;
   document.head.appendChild(s);
 }
 
@@ -96,7 +146,19 @@ export async function abrirCheckout(op = {}) {
   css();
   let cat;
   try { cat = await planos(); } catch (e) { cat = null; }
-  if (!cat || !cat.ativo) { if (op.linkReserva) window.open(op.linkReserva, '_blank', 'noopener'); return; }
+  if (!cat || !cat.ativo) {
+    // checkout próprio desligado: paga na Cakto
+    if (op.linkReserva) {
+      const destino = linkCakto(op.linkReserva, op.popup);
+      if (op.initiate) { await irParaCakto(destino, op, cat); return; }
+      const w = window.open(destino, '_blank', 'noopener'); if (!w) location.href = destino;
+    }
+    return;
+  }
+  garantirPixel();
+  const valorPlano = (pl) => (cat.planos[pl] ? cat.planos[pl].valor / 100 : 0);
+  // InitiateCheckout só quando a página de assinatura pede (initiate: true), uma vez por visita
+  if (op.initiate && !window.__apmIniciou) { window.__apmIniciou = true; evento('InitiateCheckout', { content_name: op.plano === 'mensal' ? 'mensal' : 'anual', content_ids: [op.plano === 'mensal' ? 'mensal' : 'anual'], value: valorPlano(op.plano === 'mensal' ? 'mensal' : 'anual'), currency: 'BRL', num_items: 1 }); }
 
   const sessao = await dados.sessaoAtual().catch(() => null);
   const st = {
@@ -253,6 +315,7 @@ export async function abrirCheckout(op = {}) {
       const b = e.currentTarget; b.disabled = true; b.textContent = 'Gerando o Pix…';
       try {
         const r = await pagar({ metodo: 'pix' });
+        evento('AddPaymentInfo', { payment_type: 'pix', content_name: st.plano, value: (r.valor || precoBase()) / 100, currency: 'BRL' });
         st.pagamento = r; st.passo = 'pix'; desenhar();
       } catch (err) { b.disabled = false; b.textContent = `Gerar Pix de ${reais(precoBase())}`; mostrarErro(err.message); }
     };
@@ -299,7 +362,7 @@ export async function abrirCheckout(op = {}) {
       voltas++;
       try {
         const r = await dados.chamarFuncao('pagarme', { acao: 'status', id });
-        if (r.status === 'pago') { clearInterval(consulta); st.venceEm = r.vence_em; concluir(); }
+        if (r.status === 'pago') { clearInterval(consulta); st.venceEm = r.vence_em; concluir(r); }
         else if (r.status === 'vencido') { clearInterval(consulta); st.erro = 'Este Pix venceu. Gere outro para continuar.'; st.passo = 'plano'; desenhar(); }
         else if (r.status === 'recusado' && st.passo === 'cartao') { clearInterval(consulta); }
       } catch (e) { /* tenta de novo */ }
@@ -358,11 +421,12 @@ export async function abrirCheckout(op = {}) {
       if (!f.num.value.trim()) return mostrarErro('Digite o número da casa.');
       const b = f.querySelector('button[type=submit]'); b.disabled = true; b.textContent = 'Processando…';
       try {
+        evento('AddPaymentInfo', { payment_type: 'cartao', content_name: st.plano, value: totalAtual() / 100, currency: 'BRL' });
         const token = await tokenizar({ number: numero, holder_name: f.titular.value.trim().toUpperCase(), exp_month: Number(mm), exp_year: Number('20' + so(aa)), cvv });
         const r = await pagar({ metodo: 'cartao', card_token: token, parcelas: st.plano === 'anual' ? st.parcelas : 1,
           endereco: { ...end, cep: so(f.cep.value), numero: f.num.value.trim() } });
         st.pagamento = r;
-        if (r.status === 'pago') { st.venceEm = r.vence_em; concluir(); return; }
+        if (r.status === 'pago') { st.venceEm = r.vence_em; concluir(r); return; }
         if (r.status === 'analise') {
           b.textContent = 'Em análise pelo banco…';
           st.erro = ''; esperarPagamento(r.id);
@@ -373,8 +437,29 @@ export async function abrirCheckout(op = {}) {
         }
         b.disabled = false; b.textContent = `Pagar ${reais(totalAtual())}`;
         mostrarErro(r.mensagem || 'Cartão recusado pelo banco. Confira os dados ou pague com Pix, que libera na hora.');
+        if (st.plano === 'anual') ofertaMensal(r.motivo);
       } catch (err) { b.disabled = false; b.textContent = `Pagar ${reais(totalAtual())}`; mostrarErro(err.message); }
     };
+  }
+  // Anual recusado no cartão: oferece o mensal (valor bem menor), no mesmo cartão ou no Pix
+  function ofertaMensal(motivo) {
+    const me = cat.planos.mensal.valor;
+    let caixaOferta = caixa.querySelector('.ck-oferta');
+    if (!caixaOferta) { caixaOferta = document.createElement('div'); caixaOferta.className = 'ck-oferta'; caixa.querySelector('.ck-erro').after(caixaOferta); }
+    caixaOferta.innerHTML = `<b>${motivo === 'limite' ? 'Parece que foi o limite do cartão.' : 'Quer tentar de outro jeito?'}</b>
+      <span>Comece pelo <b>plano mensal: ${reais(me)} por mês</b>. Seus kits e reservas ficam iguais, e dá para passar para o anual depois.</span>
+      <button type="button" class="ck-btn" data-mensal-cartao>Assinar o mensal neste cartão</button>
+      <button type="button" class="ck-link" data-mensal-pix>Pagar o mensal no Pix</button>`;
+    caixaOferta.querySelector('[data-mensal-cartao]').onclick = () => {
+      const f = caixa.querySelector('form');
+      const v = {}; ['numero', 'titular', 'validade', 'cvv', 'cep', 'num'].forEach((c) => { v[c] = f[c] ? f[c].value : ''; });
+      st.plano = 'mensal'; st.parcelas = 1; st.erro = ''; desenhar();
+      const g = caixa.querySelector('form');
+      Object.entries(v).forEach(([c, x]) => { if (g[c]) g[c].value = x; });
+      if (g.cep && v.cep) g.cep.dispatchEvent(new Event('input'));
+      g.cvv.focus();
+    };
+    caixaOferta.querySelector('[data-mensal-pix]').onclick = () => { st.plano = 'mensal'; st.metodo = 'pix'; st.parcelas = 1; st.erro = ''; st.passo = 'plano'; desenhar(); };
   }
   async function tokenizar(card) {
     if (dados.MODO_DEMO) return /^4000/.test(card.number) ? 'token_ruim' : 'token_ok';
@@ -388,14 +473,18 @@ export async function abrirCheckout(op = {}) {
   async function pagar(extra) {
     return dados.chamarFuncao('pagarme', {
       acao: 'pagar', plano: st.plano, cpf: so(st.cpf), nome: st.nome, telefone: so(st.telefone),
-      email: st.logado ? undefined : st.email, origem: origemAnuncio(), ...extra,
+      email: st.logado ? undefined : st.email, origem: origemAnuncio(), popup: op.popup || null,
+      fbp: cookie('_fbp'), fbc: cookie('_fbc'), pagina: location.origin + location.pathname, ...extra,
     });
   }
 
   // 4. Acesso liberado
-  function concluir() {
+  function concluir(r = {}) {
     st.passo = 'acesso'; st.erro = '';
-    try { if (window.fbq) window.fbq('track', 'Purchase', { value: totalAtual() / 100, currency: 'BRL', content_name: st.plano }); } catch (e) { /* segue */ }
+    const id = r.id || (st.pagamento && st.pagamento.id);
+    const tipo = r.tipo || (st.pagamento && st.pagamento.tipo);
+    // Compra nova = Purchase (renovação não conta como venda nova no Meta)
+    if (tipo !== 'renovacao') evento('Purchase', { value: (r.valor || (st.pagamento && st.pagamento.valor) || totalAtual()) / 100, currency: 'BRL', content_name: st.plano, content_ids: [st.plano], content_type: 'product' }, id ? 'compra-' + id : undefined);
     desenhar();
   }
   function desenharAcesso() {

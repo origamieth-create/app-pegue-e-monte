@@ -390,6 +390,21 @@
   .st-pago { color: var(--pos); border-color: #1F4A3A; background: #132A22; }
   .st-pix_pendente { color: var(--warn); border-color: #5A4320; background: #2A2214; }
   .st-pendente { color: #8FB0FF; border-color: #2C3A5A; }
+  .st-abandono { color: #B9A7FF; border-color: #3A2F66; background: #1E1838; }
+  .st-cancelado { color: var(--texto2); }
+  .pg-ab { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 14px; padding: 14px 0; border-bottom: 1px solid var(--linha); align-items: center; }
+  .pg-ab:last-child { border: 0; }
+  .pg-ab b.t { display: block; font-size: 15px; }
+  .pg-ab small { display: block; color: var(--texto2); font-size: 12.5px; font-weight: 600; margin-top: 3px; overflow-wrap: anywhere; }
+  .pg-ab .st { margin-right: 4px; }
+  .pg-ab .ld { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+  .pg-ab .v { font-weight: 800; white-space: nowrap; }
+  .em-rec { display: inline-flex; gap: 5px; align-items: center; font-size: 12px; font-weight: 700; color: var(--texto2); margin: 6px 10px 0 0; }
+  .em-rec i { font-style: normal; color: var(--pos); } .em-rec i.na { color: var(--texto2); }
+  .zapb { background: #1F9D63; color: #fff; border-radius: 10px; padding: 9px 12px; font-size: 13px; font-weight: 800; white-space: nowrap; text-decoration: none; }
+  .rec-faixa { display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: center; background: #132A22; border: 1px solid #1F4A3A; color: var(--pos); border-radius: 12px; padding: 10px 14px; font-weight: 800; font-size: 13.5px; margin-top: 12px; }
+  .rec-faixa span { color: var(--texto2); font-weight: 700; }
+  @media (max-width: 600px) { .pg-ab { grid-template-columns: 1fr; } .pg-ab .ld { flex-direction: row; justify-content: space-between; align-items: center; } }
   .st-recusado { color: var(--neg); border-color: #5A2A33; background: #2A1519; }
   .lista-cli { padding-top: 4px; padding-bottom: 4px; }
   .cli { display: block; border-bottom: 1px solid var(--linha); }
@@ -411,6 +426,6 @@
 <body>
 <div id="raiz"><div class="carregando">Carregando…</div></div>
 <div id="toast" class="toast oculto" role="status" aria-live="polite"></div>
-<script type="module" src="admin.js?v=20261121e"></script>
+<script type="module" src="admin.js?v=20261121g"></script>
 </body>
 </html>

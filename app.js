@@ -3,7 +3,7 @@
 // Abas: Hoje, Agenda, Kits, Mais
 // =====================================================================
 import * as dados from './dados.js?v=20261121e';
-import { abrirCheckout, planos as planosCheckout } from './checkout.js?v=20261121e';
+import { abrirCheckout, planos as planosCheckout, linkCakto } from './checkout.js?v=20261121g';
 import { PERMITIR_CADASTRO, EMAIL_SUPORTE, WHATSAPP_SUPORTE, LINK_MENSAL, LINK_ANUAL, LINK_ANUAL_PROMO, DEMO_SITE, LINK_PLANOS, SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=20261121e';
 
 const { hojeISO, somaDias, cruza } = dados;
@@ -202,19 +202,35 @@ document.addEventListener('click', (e) => {
   const nome = popupAtual || (a.closest('#bloqueio') ? 'fim_teste' : a.closest('#faixa') ? 'faixa' : 'outro');
   popupFoiCheckout = true;
   rastrear(nome, 'checkout', detalhe);
-  // Checkout próprio (Pagar.me) ligado: paga aqui dentro, sem sair do app
-  if (checkoutProprio() && !DEMO_SITE) {
-    e.preventDefault();
-    abrirPagamento(detalhe === 'mensal' ? 'mensal' : 'anual', h);
+  // Checkout próprio (Pagar.me) ligado: paga aqui dentro, sem sair do app (e anota de qual popup veio)
+  if (DEMO_SITE || estado.suporte) return;
+  const plano = detalhe === 'mensal' ? 'mensal' : 'anual';
+  if (checkoutProprio()) { e.preventDefault(); abrirPagamento(plano, h, nome); return; }
+  // Cakto: o anual é sempre o de R$ 167, e o link leva o popup e a campanha (para a Utmify)
+  const destino = linkCakto(detalhe === 'mensal' ? h : LINK_ANUAL_PROMO, nome);
+  e.preventDefault();
+  if (estado.checkout === undefined) {
+    // os preços ainda estão carregando: espera um instante em vez de mandar para a Cakto por engano
+    carregarCheckout().then(() => {
+      if (checkoutProprio()) abrirPagamento(plano, h, nome);
+      else { const w = window.open(destino, '_blank', 'noopener'); if (!w) location.href = destino; }
+    });
+    return;
   }
+  const w = window.open(destino, '_blank', 'noopener'); if (!w) location.href = destino;
 }, true);
 function checkoutProprio() { return !!(estado.checkout && estado.checkout.ativo) && !estado.suporte; }
-function abrirPagamento(plano, linkReserva) {
+let promessaCheckout = null;
+function carregarCheckout() {
+  if (!promessaCheckout) promessaCheckout = planosCheckout().then((c) => { estado.checkout = c; }).catch(() => { estado.checkout = null; });
+  return promessaCheckout;
+}
+function abrirPagamento(plano, linkReserva, popup) {
   const a = estado.assinatura || {};
   if (document.getElementById('bloqueio')) { document.getElementById('bloqueio').remove(); document.body.style.overflow = ''; }
   fecharPainel();
   abrirCheckout({
-    plano, contexto: 'app', linkReserva,
+    plano, contexto: 'app', linkReserva, popup: popup || null,
     email: a.email, telefone: (estado.negocio && estado.negocio.whatsapp) || '', temCliente: !!a.cliente_pagarme,
     aoConcluir: () => { recarregar().then(() => aviso('Pagamento confirmado! Obrigada 💛')).catch(() => location.reload()); },
   });
@@ -381,6 +397,7 @@ async function iniciar() {
 
 async function carregarTudo() {
   estado.suporte = await dados.suporteAtual().catch(() => null);
+  if (!estado.suporte && !DEMO_SITE) carregarCheckout(); // preços do checkout já começam a carregar
   [estado.negocio, estado.assinatura] = await Promise.all([dados.meuNegocio(), dados.minhaAssinatura()]);
   marcarRelogio();
   dados.registrarUso().catch(() => {}); // só marca a data de uso; nunca atrapalha o app
@@ -391,12 +408,12 @@ async function carregarTudo() {
   if (!estado.suporte && !a.cortesia && !a.encontrada) {
     // Conta nova sem compra: ganha 7 dias de teste grátis (uma vez por e-mail).
     try { await dados.iniciarTeste(); estado.assinatura = await dados.minhaAssinatura(); marcarRelogio(); } catch (e) { /* segue para a tela de assinatura */ }
-    if (!estado.assinatura.encontrada) return telaSemAssinatura();
+    if (!estado.assinatura.encontrada) { if (!estado.suporte && !DEMO_SITE) await carregarCheckout(); return telaSemAssinatura(); }
   }
   if (!estado.negocio) return telaConfiguracaoInicial();
   [estado.kits, estado.reservas, estado.gastos, estado.montagem, estado.ia, estado.estruturas, estado.fechados] = await Promise.all([dados.listarKits(), dados.listarReservas(), dados.listarGastos().catch(() => []), estado.suporte ? null : dados.minhaMontagem().catch(() => null), dados.iaSituacao().catch(() => null), dados.listarEstruturas().catch(() => []), dados.listarFechados().catch(() => [])]);
   estado.carregadoEm = Date.now();
-  if (!estado.suporte && !DEMO_SITE) planosCheckout().then((c) => { estado.checkout = c; }).catch(() => { estado.checkout = null; });
+  if (!estado.suporte && !DEMO_SITE) carregarCheckout();
   montarApp();
 }
 
@@ -453,7 +470,7 @@ function popupPagamento() {
   const temPix = !!(a.pix_codigo && a.pix_vence && new Date(a.pix_vence).getTime() > agoraServidor());
   if (!temPix && a.gateway === 'pagarme') {
     // pagou pela Pagar.me: paga aqui mesmo (Pix na hora ou outro cartão)
-    planosCheckout().then((c) => { estado.checkout = c; abrirPagamento(a.plano === 'anual' ? 'anual' : 'mensal', null); })
+    planosCheckout().then((c) => { estado.checkout = c; abrirPagamento(a.plano === 'anual' ? 'anual' : 'mensal', null, 'pagamento_pendente'); })
       .catch(() => aviso('Não consegui abrir o pagamento agora. Tente de novo em instantes.'));
     return;
   }
@@ -567,9 +584,10 @@ function planosHtml() {
         ${estado.ia && estado.ia.disponivel ? '<div class="ia-plano-item">✨ IA monta seu catálogo: ilimitado</div>' : ''}
         <a class="btn verde cheio" style="min-height:52px;font-size:17px" href="${esc(LINK_ANUAL)}" target="_blank" rel="noopener">Assinar o anual</a>
       </div>`
-    : `<div class="plano anual"><div class="nome">Plano anual</div>
-        <div class="por">R$ 269 <small>por 12 meses</small></div>
-        <div class="mes">ou 12x de R$ 27,79 no cartão</div>
+    : `<div class="plano anual"><span class="desc">53% OFF</span><div class="nome">Plano anual</div>
+        <div class="de">De R$ 358,80</div>
+        <div class="por">R$ 167 <small>por 12 meses</small></div>
+        <div class="mes">Sai por R$ 13,92 por mês · ou parcele no cartão</div>
         ${estado.ia && estado.ia.disponivel ? '<div class="ia-plano-item">✨ IA monta seu catálogo: ilimitado</div>' : ''}
         <a class="btn verde cheio" style="min-height:52px;font-size:17px" href="${esc(LINK_ANUAL)}" target="_blank" rel="noopener">Assinar o anual</a>
       </div>`;
@@ -845,7 +863,7 @@ function telaSemAssinatura() {
       <p class="centro">Não encontramos uma assinatura para <b>${esc(email)}</b>.</p>
       <p class="centro pequeno">Se você já comprou, confira se entrou com o <b>mesmo e-mail usado na compra</b>. A confirmação do pagamento pode levar alguns minutos.</p>
       <button class="btn verde cheio" id="verificar">Já paguei, verificar de novo</button>
-      <a class="btn principal cheio" href="${esc(LINK_ANUAL)}" target="_blank" rel="noopener">${precoAnualCheckout() ? `Assinar o anual: ${reaisC(precoAnualCheckout().valor)}` : 'Assinar o anual: R$ 269 ou 12x de R$ 27,79'}</a>
+      <a class="btn principal cheio" href="${esc(LINK_ANUAL)}" target="_blank" rel="noopener">${precoAnualCheckout() ? `Assinar o anual: ${reaisC(precoAnualCheckout().valor)}` : 'Assinar o anual: R$ 167'}</a>
       <a class="btn contorno cheio" href="${esc(LINK_MENSAL)}" target="_blank" rel="noopener">Assinar o mensal: R$ 29,90</a>
       <button type="button" class="link-btn" id="trocar">Entrar com outro e-mail</button>
     </div></div>`;
