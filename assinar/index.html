@@ -56,11 +56,12 @@
   <button class="plano" data-plano="mensal" id="pl-mensal">
     <b>Plano mensal</b><span class="v" id="v-mensal">R$ 29,90</span><small>por mês</small></button>
   <button class="btn" id="assinar">Assinar o plano anual</button>
-  <div class="seg">🔒 Pagamento seguro no Pix ou cartão · Pagar.me (Stone)</div>
+  <div class="seg">🔒 Pagamento seguro no Pix ou no cartão</div>
   <a class="zap" id="zap" target="_blank" rel="noopener" href="https://wa.me/5551982316117?text=Oi!%20Tenho%20uma%20d%C3%BAvida%20sobre%20os%20planos%20do%20App%20Pegue%20e%20Monte.">Ficou com dúvida? Fale com a gente no WhatsApp</a>
 </main>
 <script type="module">
-import { abrirCheckout, planos } from '../checkout.js?v=20261121e';
+import { abrirCheckout, planos, iniciarPixel } from '../checkout.js?v=20261121g';
+iniciarPixel();
 import { LINK_ANUAL_PROMO, LINK_MENSAL } from '../config.js?v=20261121e';
 
 const reais = (c) => (c / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -85,15 +86,16 @@ planos().then((p) => {
   if (!p || !p.planos) return;
   const a = p.planos.anual, m = p.planos.mensal;
   document.getElementById('v-anual').innerHTML = `${a.de ? `<s>${reais(a.de)}</s>` : ''}${reais(a.valor)}`;
-  document.getElementById('s-anual').textContent = `Sai por ${reais(Math.round(a.valor / 12))} por mês · Pix ou até 12x no cartão`;
+  document.getElementById('s-anual').textContent = `Sai por ${reais(Math.round(a.valor / 12))} por mês · Pix ou cartão`;
   if (a.de) document.getElementById('fita-anual').textContent = `${Math.round((1 - a.valor / a.de) * 100)}% OFF`;
   document.getElementById('v-mensal').textContent = reais(m.valor);
 }).catch(() => {});
 
-document.getElementById('assinar').onclick = () => {
-  try { if (window.fbq) window.fbq('track', 'InitiateCheckout', { content_name: escolhido, currency: 'BRL' }); } catch (e) { /* segue */ }
-  abrirCheckout({ plano: escolhido, contexto: 'venda', linkReserva: LINKS[escolhido], appUrl: new URL('../', location.href).href });
-};
+// Esta é a ÚNICA página que avisa o InitiateCheckout (uma vez por visita), para qualquer página de vendas que mande para cá
+const abrir = () => abrirCheckout({ plano: escolhido, contexto: 'venda', linkReserva: LINKS[escolhido], appUrl: new URL('../', location.href).href, initiate: true });
+document.getElementById('assinar').onclick = () => { const b = document.getElementById('assinar'); b.textContent = 'Abrindo o pagamento seguro…'; abrir().finally(() => setTimeout(marcar, 2500)); };
+// Vindo do botão de uma página de vendas (?abrir=1): o checkout já abre direto, sem clique a mais
+if (url.get('abrir') === '1') abrir();
 </script>
 </body>
 </html>
