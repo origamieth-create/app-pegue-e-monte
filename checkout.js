@@ -4,8 +4,8 @@
 //      abrirCheckout({ plano: 'anual', contexto: 'app' | 'venda', linkReserva: 'https://pay.cakto...' })
 // O cartão vira "token" direto na Pagar.me (chave pública); o número nunca passa pelo nosso servidor.
 // =====================================================================
-import * as dados from './dados.js?v=20261121c';
-import { PAGARME_PK } from './config.js?v=20261121c';
+import * as dados from './dados.js?v=20261121e';
+import { PAGARME_PK } from './config.js?v=20261121e';
 
 const PASSOS = ['Sua conta', 'Pagamento', 'Acesso'];
 const reais = (c) => (c / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -224,7 +224,6 @@ export async function abrirCheckout(op = {}) {
     const primeiro = (st.nome || '').split(' ')[0];
     caixa.innerHTML = `${cabeca(1)}
       <h2>${primeiro ? esc(primeiro) + ', escolha' : 'Escolha'} seu plano</h2>
-      ${st.email ? `<p class="ck-sub">Para ${esc(st.email)}</p>` : ''}
       <div class="ck-planos">
         <button class="ck-pl ${st.plano === 'anual' ? 'sel' : ''}" data-plano="anual"><span class="r"></span>
           <span><b>Anual</b>${an.de ? `<span class="ck-selo">${Math.round((1 - an.valor / an.de) * 100)}% OFF</span><br>` : ''}<small>${reais(Math.round(an.valor / 12))}/mês · 12 meses</small></span>

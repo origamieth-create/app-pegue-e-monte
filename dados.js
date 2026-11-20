@@ -4,7 +4,7 @@
 // - Sem configurar: MODO DEMONSTRAÇÃO, com dados de exemplo guardados
 //   só neste navegador. Serve para ver e testar o app antes de tudo.
 // =====================================================================
-import { SUPABASE_URL, SUPABASE_ANON_KEY, DEMO_SITE } from './config.js?v=20261121c';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, DEMO_SITE } from './config.js?v=20261121e';
 
 export const MODO_DEMO = !/^https:\/\/.+\.supabase\.co\/?$/.test(SUPABASE_URL);
 

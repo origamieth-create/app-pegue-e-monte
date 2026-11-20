@@ -2,9 +2,9 @@
 // App Pegue e Monte — app da dona
 // Abas: Hoje, Agenda, Kits, Mais
 // =====================================================================
-import * as dados from './dados.js?v=20261121c';
-import { abrirCheckout, planos as planosCheckout } from './checkout.js?v=20261121c';
-import { PERMITIR_CADASTRO, EMAIL_SUPORTE, WHATSAPP_SUPORTE, LINK_MENSAL, LINK_ANUAL, LINK_ANUAL_PROMO, DEMO_SITE, LINK_PLANOS, SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=20261121c';
+import * as dados from './dados.js?v=20261121e';
+import { abrirCheckout, planos as planosCheckout } from './checkout.js?v=20261121e';
+import { PERMITIR_CADASTRO, EMAIL_SUPORTE, WHATSAPP_SUPORTE, LINK_MENSAL, LINK_ANUAL, LINK_ANUAL_PROMO, DEMO_SITE, LINK_PLANOS, SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=20261121e';
 
 const { hojeISO, somaDias, cruza } = dados;
 
@@ -1634,6 +1634,8 @@ function popupParabens() {
 
 // Assinou o anual com a montagem: cartão fixo até ela pedir a montagem no WhatsApp.
 function cartaoMontagem() {
+  return ''; // 20/11: aviso retirado da tela inicial (a dona segue pelos passos de configuração)
+  // eslint-disable-next-line no-unreachable
   const m = estado.montagem;
   if (!m || m.pediu_em || m.concluida_em || estado.suporte || !WHATSAPP_SUPORTE) return '';
   return `<section class="cartao coluna cartao-montagem">
