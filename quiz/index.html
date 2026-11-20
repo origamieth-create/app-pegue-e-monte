@@ -254,9 +254,10 @@ body.escuro.mostrar-fixa .fixa{display:block}
   'use strict';
   // ======================= CONFIGURAÇÃO =======================
   var CHECKOUT = {
-    anual_promo: 'https://pay.cakto.com.br/mjrcoxc', // anual R$ 167 (Black Friday)
-    anual: 'https://pay.cakto.com.br/65irjr2',       // anual R$ 269 (depois do cronômetro)
-    mensal: 'https://pay.cakto.com.br/3bnawbt_1255298'
+    // Checkout próprio: a página de assinatura do app (é ela que avisa o InitiateCheckout)
+    anual_promo: 'https://app.pegueemonte.com/assinar/?plano=anual&abrir=1&src=quiz',
+    anual: 'https://app.pegueemonte.com/assinar/?plano=anual&abrir=1&src=quiz',
+    mensal: 'https://app.pegueemonte.com/assinar/?plano=mensal&abrir=1&src=quiz'
   };
   var MINUTOS_OFERTA = 60;          // cronômetro da oferta, contado a partir da 1ª vez que a pessoa vê a oferta
   var WHATSAPP = '5551982316117';
@@ -469,7 +470,7 @@ body.escuro.mostrar-fixa .fixa{display:block}
     var a = e.target.closest('.checkout'); if (!a) return;
     var encerrada = document.body.classList.contains('encerrada');
     var valor = a.dataset.plano === 'mensal' ? 29.9 : (encerrada ? 269 : 167);
-    pixel('track', 'InitiateCheckout', { content_name: a.dataset.plano + (a.dataset.plano === 'anual' && !encerrada ? '_promo' : ''), value: valor, currency: 'BRL' });
+    // (o InitiateCheckout agora sai só na página de assinatura, para não contar duas vezes)
   });
   $('#ver-desconto').addEventListener('click', function (e) {
     e.preventDefault(); $('#planos').scrollIntoView({ behavior: 'smooth' });
