@@ -42,7 +42,7 @@ document.addEventListener('click', function (e) {
   var a = e.target.closest && e.target.closest('a[href*="pay.cakto.com.br"]');
   if (!a || !window.fbq) return;
   var anual = a.href.indexOf('65irjr2') > -1;
-  fbq('track', 'InitiateCheckout', { content_name: anual ? 'Plano anual' : 'Plano mensal', currency: 'BRL', value: anual ? 269 : 29.90 });
+  // (o InitiateCheckout agora sai só na página de assinatura do app)
 });
 </script>
 <style>
@@ -500,6 +500,18 @@ document.addEventListener('click', function (e) {
     var ref = o ? [nome(o.campanha), nome(o.anuncio)].filter(Boolean).join(' / ') : '';
     if (window.fbq) fbq('track', 'Contact', { content_name: 'WhatsApp página de vendas', content_category: ref || 'sem origem' });
   }, true);
+})();
+</script>
+<script>
+// Checkout próprio: os botões de assinar levam para a página de assinatura do app, com a origem do anúncio
+(function () {
+  var q = new URLSearchParams(location.search), extra = '';
+  ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'fbclid', 'src', 'sck'].forEach(function (c) { var v = q.get(c); if (v) extra += '&' + c + '=' + encodeURIComponent(v); });
+  if (extra.indexOf('&src=') < 0) extra += '&src=comprar';
+  document.querySelectorAll('a[href*="pay.cakto.com.br"]').forEach(function (a) {
+    var mensal = a.href.indexOf('3bnawbt') > -1;
+    a.href = 'https://app.pegueemonte.com/assinar/?plano=' + (mensal ? 'mensal' : 'anual') + '&abrir=1' + extra;
+  });
 })();
 </script>
 </body>
