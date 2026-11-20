@@ -1875,7 +1875,6 @@ function abaKits(tela) {
       ${k.categoria ? `<span class="etiqueta et-categoria">${esc(k.categoria)}</span>` : ''}
       ${k.ativo ? '' : '<span class="etiqueta et-cancelada">Oculto</span>'}
     </button>
-    ${podeEditar() ? `<button class="kit-olho ${k.ativo ? '' : 'off'}" data-olho="${esc(k.id)}" aria-label="${k.ativo ? 'Ocultar do link' : 'Mostrar no link'}" title="${k.ativo ? 'Ocultar do link' : 'Mostrar no link'}">${k.ativo ? '👁' : '🙈'}</button>` : ''}
     ${k.ativo && !DEMO_SITE ? `<button class="kit-compartilhar" data-compartilhar="${esc(k.id)}" aria-label="Compartilhar o kit ${esc(k.nome)}" title="Compartilhar este kit">↗</button>` : ''}
     </div>`;
   }).join('');
@@ -1900,12 +1899,6 @@ function abaKits(tela) {
   $('#vitrine-copiar', tela).onclick = () => copiarMeuLink();
   $$('[data-kit]', tela).forEach((b) => (b.onclick = () => formKit(estado.kits.find((k) => k.id === b.dataset.kit))));
   $$('[data-compartilhar]', tela).forEach((b) => (b.onclick = (e) => { e.stopPropagation(); compartilharKit(estado.kits.find((k) => k.id === b.dataset.compartilhar)); }));
-  $$('[data-olho]', tela).forEach((b) => (b.onclick = (e) => { e.stopPropagation(); acao(b, async () => {
-    const k = kitDe(b.dataset.olho);
-    await dados.salvarKit({ id: k.id, ativo: !k.ativo });
-    aviso(k.ativo ? 'Kit oculto: não aparece mais no link.' : 'Kit aparecendo no link de novo.');
-    await recarregar();
-  }); }));
   const ord = $('#ordem-kits', tela);
   if (ord) ord.onchange = () => acao(null, async () => { estado.negocio = await dados.salvarNegocio({ ordem_kits: ord.value }); abaKits(tela); });
   ligarCartaoIA(tela);
