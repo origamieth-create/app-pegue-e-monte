@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Assine o App Pegue e Monte</title>
+<meta name="description" content="Agenda sem reserva dupla, link de reservas e contratos para o seu pegue e monte. Escolha o plano e pague aqui mesmo, no Pix ou no cartão.">
+<meta property="og:title" content="Assine o App Pegue e Monte">
+<meta property="og:description" content="Escolha o plano e pague aqui mesmo, no Pix ou no cartão. Acesso liberado na hora.">
+<meta property="og:image" content="https://app.pegueemonte.com/icone-512.png">
+<meta property="og:url" content="https://app.pegueemonte.com/assinar/">
+<meta name="theme-color" content="#FFFBF7">
+<link rel="icon" href="../icone.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito+Sans:wght@400;600;700;800&display=swap">
+<style>
+  :root { --fundo: #FFFBF7; --tinta: #2A1B3D; --texto2: #6B6175; --linha: #EDE3D8; --destaque: #C73B48; --verde: #1F7A52; --verde-claro: #EEF8F2; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--fundo); color: var(--tinta); font-family: 'Nunito Sans', system-ui, -apple-system, sans-serif; }
+  main { max-width: 460px; margin: 0 auto; padding: 28px 18px 40px; display: flex; flex-direction: column; gap: 16px; }
+  .marca { display: flex; align-items: center; gap: 10px; font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 19px; }
+  .marca img { width: 40px; height: 40px; border-radius: 12px; }
+  h1 { font-family: 'Fredoka', sans-serif; font-size: 29px; line-height: 1.15; margin: 4px 0 0; }
+  h1 span { color: var(--destaque); }
+  .sub { color: var(--texto2); margin: -6px 0 0; font-size: 15.5px; }
+  ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  li { display: flex; gap: 10px; align-items: flex-start; font-size: 15px; font-weight: 600; }
+  li:before { content: '✓'; color: var(--verde); font-weight: 900; }
+  .plano { width: 100%; text-align: left; font: inherit; color: inherit; cursor: pointer; background: #fff; border: 1.5px solid var(--linha); border-radius: 20px; padding: 16px; display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; position: relative; box-shadow: 0 2px 10px rgba(0,0,0,.04); }
+  .plano.destaque { border-color: var(--destaque); box-shadow: inset 0 0 0 1px var(--destaque), 0 6px 18px rgba(199,59,72,.12); }
+  .plano b { font-size: 18px; }
+  .plano small { color: var(--texto2); font-size: 13px; grid-column: 1; }
+  .plano .v { font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 23px; text-align: right; grid-row: 1 / span 2; grid-column: 2; }
+  .plano .v s { display: block; font-size: 12.5px; color: #9A90A3; font-family: 'Nunito Sans', sans-serif; font-weight: 600; }
+  .fita { position: absolute; top: -11px; left: 14px; background: var(--verde); color: #fff; font-size: 11.5px; font-weight: 800; border-radius: 99px; padding: 3px 10px; }
+  .btn { background: var(--destaque); color: #fff; border: 0; border-radius: 16px; padding: 17px; font: inherit; font-weight: 800; font-size: 17px; cursor: pointer; box-shadow: 0 6px 16px rgba(199,59,72,.28); }
+  .seg { text-align: center; color: #8A8093; font-size: 13px; font-weight: 600; }
+  .zap { text-align: center; color: var(--verde); font-weight: 800; font-size: 14.5px; text-decoration: none; }
+  .teste { text-align: center; color: var(--texto2); font-size: 14px; }
+  .teste a { color: var(--destaque); font-weight: 800; }
+</style>
+</head>
+<body>
+<main>
+  <div class="marca"><img src="../icone-192.png" alt="">App Pegue e Monte</div>
+  <h1>Seu pegue e monte <span>organizado de verdade</span></h1>
+  <p class="sub">Escolha o plano e pague aqui mesmo. O acesso libera na hora.</p>
+  <ul>
+    <li>Agenda que nunca deixa reservar o mesmo kit duas vezes</li>
+    <li>Link de reservas: a cliente escolhe o kit, o tema e a data sozinha</li>
+    <li>Contrato pelo celular, checklist de peças e controle do que entra</li>
+    <li>IA que monta seu catálogo com as suas fotos</li>
+  </ul>
+  <button class="plano destaque" data-plano="anual" id="pl-anual"><span class="fita" id="fita-anual">MAIS ESCOLHIDO</span>
+    <b>Plano anual</b><span class="v" id="v-anual">R$ 167</span><small id="s-anual">12 meses de acesso</small></button>
+  <button class="plano" data-plano="mensal" id="pl-mensal">
+    <b>Plano mensal</b><span class="v" id="v-mensal">R$ 29,90</span><small>por mês</small></button>
+  <button class="btn" id="assinar">Assinar o plano anual</button>
+  <div class="seg">🔒 Pagamento seguro no Pix ou cartão · Pagar.me (Stone)</div>
+  <a class="zap" id="zap" target="_blank" rel="noopener" href="https://wa.me/5551982316117?text=Oi!%20Tenho%20uma%20d%C3%BAvida%20sobre%20os%20planos%20do%20App%20Pegue%20e%20Monte.">Ficou com dúvida? Fale com a gente no WhatsApp</a>
+</main>
+<script type="module">
+import { abrirCheckout, planos } from '../checkout.js?v=20261121e';
+import { LINK_ANUAL_PROMO, LINK_MENSAL } from '../config.js?v=20261121e';
+
+const reais = (c) => (c / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const LINKS = { anual: LINK_ANUAL_PROMO, mensal: LINK_MENSAL };
+const url = new URLSearchParams(location.search);
+// Guarda a origem (UTMs) para o pagamento saber de onde a pessoa veio
+const campos = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'fbclid', 'src', 'sck'];
+const origem = {};
+campos.forEach((c) => { const v = url.get(c); if (v) origem[c] = v.slice(0, 200); });
+if (Object.keys(origem).length) { try { localStorage.setItem('apm-origem', JSON.stringify(origem)); } catch (e) { /* segue */ } }
+
+let escolhido = url.get('plano') === 'mensal' ? 'mensal' : 'anual';
+const marcar = () => {
+  document.querySelectorAll('[data-plano]').forEach((b) => b.classList.toggle('destaque', b.dataset.plano === escolhido));
+  document.getElementById('assinar').textContent = `Assinar o plano ${escolhido}`;
+};
+document.querySelectorAll('[data-plano]').forEach((b) => (b.onclick = () => { escolhido = b.dataset.plano; marcar(); }));
+marcar();
+
+// Preços de verdade (os mesmos do checkout)
+planos().then((p) => {
+  if (!p || !p.planos) return;
+  const a = p.planos.anual, m = p.planos.mensal;
+  document.getElementById('v-anual').innerHTML = `${a.de ? `<s>${reais(a.de)}</s>` : ''}${reais(a.valor)}`;
+  document.getElementById('s-anual').textContent = `Sai por ${reais(Math.round(a.valor / 12))} por mês · Pix ou até 12x no cartão`;
+  if (a.de) document.getElementById('fita-anual').textContent = `${Math.round((1 - a.valor / a.de) * 100)}% OFF`;
+  document.getElementById('v-mensal').textContent = reais(m.valor);
+}).catch(() => {});
+
+document.getElementById('assinar').onclick = () => {
+  try { if (window.fbq) window.fbq('track', 'InitiateCheckout', { content_name: escolhido, currency: 'BRL' }); } catch (e) { /* segue */ }
+  abrirCheckout({ plano: escolhido, contexto: 'venda', linkReserva: LINKS[escolhido], appUrl: new URL('../', location.href).href });
+};
+</script>
+</body>
+</html>
