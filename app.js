@@ -2,8 +2,9 @@
 // App Pegue e Monte — app da dona
 // Abas: Hoje, Agenda, Kits, Mais
 // =====================================================================
-import * as dados from './dados.js?v=20261121a';
-import { PERMITIR_CADASTRO, EMAIL_SUPORTE, WHATSAPP_SUPORTE, LINK_MENSAL, LINK_ANUAL, LINK_ANUAL_PROMO, DEMO_SITE, LINK_PLANOS, SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=20261117c';
+import * as dados from './dados.js?v=20261121c';
+import { abrirCheckout, planos as planosCheckout } from './checkout.js?v=20261121c';
+import { PERMITIR_CADASTRO, EMAIL_SUPORTE, WHATSAPP_SUPORTE, LINK_MENSAL, LINK_ANUAL, LINK_ANUAL_PROMO, DEMO_SITE, LINK_PLANOS, SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=20261121c';
 
 const { hojeISO, somaDias, cruza } = dados;
 
@@ -201,7 +202,31 @@ document.addEventListener('click', (e) => {
   const nome = popupAtual || (a.closest('#bloqueio') ? 'fim_teste' : a.closest('#faixa') ? 'faixa' : 'outro');
   popupFoiCheckout = true;
   rastrear(nome, 'checkout', detalhe);
+  // Checkout próprio (Pagar.me) ligado: paga aqui dentro, sem sair do app
+  if (checkoutProprio() && !DEMO_SITE) {
+    e.preventDefault();
+    abrirPagamento(detalhe === 'mensal' ? 'mensal' : 'anual', h);
+  }
 }, true);
+function checkoutProprio() { return !!(estado.checkout && estado.checkout.ativo) && !estado.suporte; }
+function abrirPagamento(plano, linkReserva) {
+  const a = estado.assinatura || {};
+  if (document.getElementById('bloqueio')) { document.getElementById('bloqueio').remove(); document.body.style.overflow = ''; }
+  fecharPainel();
+  abrirCheckout({
+    plano, contexto: 'app', linkReserva,
+    email: a.email, telefone: (estado.negocio && estado.negocio.whatsapp) || '', temCliente: !!a.cliente_pagarme,
+    aoConcluir: () => { recarregar().then(() => aviso('Pagamento confirmado! Obrigada 💛')).catch(() => location.reload()); },
+  });
+}
+// Textos dos planos seguem os preços do checkout próprio quando ele está ligado
+function precoAnualCheckout() {
+  const c = estado.checkout;
+  if (!checkoutProprio() || !c.planos) return null;
+  const v = c.planos.anual.valor, p12 = (c.parcelas || [])[11];
+  return { valor: v, de: c.planos.anual.de, mes: Math.round(v / 12), p12: p12 ? p12.parcela : null };
+}
+const reaisC = (c) => (c / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 function abrirPopup(corpo, aoMontar) {
   const p = $('#painel');
@@ -371,6 +396,7 @@ async function carregarTudo() {
   if (!estado.negocio) return telaConfiguracaoInicial();
   [estado.kits, estado.reservas, estado.gastos, estado.montagem, estado.ia, estado.estruturas, estado.fechados] = await Promise.all([dados.listarKits(), dados.listarReservas(), dados.listarGastos().catch(() => []), estado.suporte ? null : dados.minhaMontagem().catch(() => null), dados.iaSituacao().catch(() => null), dados.listarEstruturas().catch(() => []), dados.listarFechados().catch(() => [])]);
   estado.carregadoEm = Date.now();
+  if (!estado.suporte && !DEMO_SITE) planosCheckout().then((c) => { estado.checkout = c; }).catch(() => { estado.checkout = null; });
   montarApp();
 }
 
@@ -425,6 +451,12 @@ const ZAP_PAGAMENTO = 'Oi! Sou cliente do App Pegue e Monte e preciso de ajuda c
 function popupPagamento() {
   const a = estado.assinatura || {};
   const temPix = !!(a.pix_codigo && a.pix_vence && new Date(a.pix_vence).getTime() > agoraServidor());
+  if (!temPix && a.gateway === 'pagarme') {
+    // pagou pela Pagar.me: paga aqui mesmo (Pix na hora ou outro cartão)
+    planosCheckout().then((c) => { estado.checkout = c; abrirPagamento(a.plano === 'anual' ? 'anual' : 'mensal', null); })
+      .catch(() => aviso('Não consegui abrir o pagamento agora. Tente de novo em instantes.'));
+    return;
+  }
   const corpo = temPix ? `
     <h2 class="centro" style="font-size:24px">Renove com Pix</h2>
     <p class="centro pequeno">A cobrança da sua assinatura já está pronta. Pague aqui mesmo, sem sair do app:</p>
@@ -527,6 +559,13 @@ function planosHtml() {
         ${montagem ? '<div class="montagem-extra">✓ Nossa equipe cadastra seus kits para você</div>' : ''}
         ${fim - agoraServidor() <= HORAS_OFERTA_FIM * 3600e3 ? `<div class="contagem-oferta">Oferta termina em <b id="oferta-relogio">${tempoRestante(fim - agoraServidor())}</b></div>` : ''}
         <a class="btn verde cheio" style="min-height:52px;font-size:17px" href="${esc(LINK_ANUAL_PROMO)}" target="_blank" rel="noopener">${montagem ? 'Quero o anual com a loja montada' : 'Quero o anual com desconto'}</a>
+      </div>`
+    : precoAnualCheckout() ? `<div class="plano anual"><span class="desc">${Math.round((1 - precoAnualCheckout().valor / precoAnualCheckout().de) * 100)}% OFF</span><div class="nome">Plano anual</div>
+        <div class="de">De ${reaisC(precoAnualCheckout().de)}</div>
+        <div class="por">${reaisC(precoAnualCheckout().valor).replace(',00', '')} <small>por 12 meses</small></div>
+        <div class="mes">Sai por ${reaisC(precoAnualCheckout().mes)} por mês · ou parcele no cartão</div>
+        ${estado.ia && estado.ia.disponivel ? '<div class="ia-plano-item">✨ IA monta seu catálogo: ilimitado</div>' : ''}
+        <a class="btn verde cheio" style="min-height:52px;font-size:17px" href="${esc(LINK_ANUAL)}" target="_blank" rel="noopener">Assinar o anual</a>
       </div>`
     : `<div class="plano anual"><div class="nome">Plano anual</div>
         <div class="por">R$ 269 <small>por 12 meses</small></div>
@@ -711,6 +750,16 @@ function desenharFaixaAssinatura() {
   if (estado.suporte) { desenharFaixaSuporte(faixa, base); return; }
   const sit = situacaoAssinatura();
   if (sit !== 'teste_fim' && $('#bloqueio')) { $('#bloqueio').remove(); document.body.style.overflow = ''; }
+  const ass = estado.assinatura || {};
+  if (!sit && ass.status === 'ativa' && ass.gateway === 'pagarme' && ass.pix_codigo && ass.vence_em) {
+    faixa.innerHTML = base + `
+      <div class="faixa-pagamento teste" role="status">
+        <div>🔔 <b>Sua assinatura renova dia ${esc(new Date(ass.vence_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }))}.</b> O Pix já está pronto: pague e continue usando sem parar.</div>
+        <button class="btn mini" id="faixa-renovar">Pagar com Pix</button>
+      </div>`;
+    $('#faixa-renovar', faixa).onclick = popupPagamento;
+    return;
+  }
   if (!sit) { faixa.innerHTML = base; return; }
   const a = estado.assinatura;
 
@@ -796,7 +845,7 @@ function telaSemAssinatura() {
       <p class="centro">Não encontramos uma assinatura para <b>${esc(email)}</b>.</p>
       <p class="centro pequeno">Se você já comprou, confira se entrou com o <b>mesmo e-mail usado na compra</b>. A confirmação do pagamento pode levar alguns minutos.</p>
       <button class="btn verde cheio" id="verificar">Já paguei, verificar de novo</button>
-      <a class="btn principal cheio" href="${esc(LINK_ANUAL)}" target="_blank" rel="noopener">Assinar o anual: R$ 269 ou 12x de R$ 27,79</a>
+      <a class="btn principal cheio" href="${esc(LINK_ANUAL)}" target="_blank" rel="noopener">${precoAnualCheckout() ? `Assinar o anual: ${reaisC(precoAnualCheckout().valor)}` : 'Assinar o anual: R$ 269 ou 12x de R$ 27,79'}</a>
       <a class="btn contorno cheio" href="${esc(LINK_MENSAL)}" target="_blank" rel="noopener">Assinar o mensal: R$ 29,90</a>
       <button type="button" class="link-btn" id="trocar">Entrar com outro e-mail</button>
     </div></div>`;

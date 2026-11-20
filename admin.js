@@ -3,8 +3,8 @@
 // Só abre para e-mails cadastrados na tabela "administradores".
 // Quem confere é o banco de dados: esta página só mostra o resultado.
 // =====================================================================
-import * as dados from './dados.js?v=20261121a';
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=20261117c';
+import * as dados from './dados.js?v=20261121c';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=20261121c';
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -146,8 +146,9 @@ function telaAviso(titulo, texto, botao) {
 
 async function carregar() {
   estado.carregadoEm = new Date();
-  [estado.resumo, estado.clientes, estado.origem, estado.painel] = await Promise.all([
+  [estado.resumo, estado.clientes, estado.origem, estado.painel, estado.cancelarCakto] = await Promise.all([
     dados.adminResumo(), dados.adminClientes(), dados.adminTestesOrigem().catch(() => null), dados.adminPainel().catch(() => null),
+    dados.adminCancelarCakto().catch(() => []),
   ]);
   [estado.crm, estado.crmMsgs, estado.logos, estado.saude] = await Promise.all([dados.adminCrm().catch(() => null), dados.adminCrmMensagens().catch(() => ({})),
     dados.adminLogos().catch(() => ({})), dados.adminSaude().catch(() => null)]);
@@ -857,8 +858,13 @@ function abaResumo(tela) {
   const qtdForma = (l) => `Pix ${l.filter((x) => x.fo === 'pix').length} · Cartão ${l.filter((x) => x.fo === 'cartao').length}`;
   const pend = (r.carencia || 0), canc = (r.canceladas || 0), bloq = (r.suspensas || 0);
 
+  const cc = estado.cancelarCakto || [];
   tela.innerHTML = `
     ${cartaoNotificacoes()}
+    ${cc.length ? `<section class="cartao coluna nota-amarela" style="gap:8px"><b>Cancele o mensal na Cakto (${cc.length})</b>
+      <span class="pequeno">Estas clientes assinaram pelo checkout novo e ainda têm o mensal da Cakto. Cancele lá para não cobrar duas vezes e toque em "Já cancelei".</span>
+      ${cc.map((x) => `<div class="linha-flex entre pequeno" style="gap:10px"><span><b>${esc(x.nome || x.email)}</b> · ${esc(x.email)} · ${esc(dataHora(x.quando))}</span><button class="btn mini contorno" data-cakto-ok="${esc(x.email)}">Já cancelei</button></div>`).join('')}
+    </section>` : ''}
     ${abasPeriodo([['hoje', 'Hoje'], ['ontem', 'Ontem'], ['7', '7 dias'], ['mes', 'Mês']], per, 'data-res-per')}
     <div class="kpis-crm k4">
       <div class="kpi"><small>Faturamento líquido</small><b>${esc(reais(soma(pagos, 'l')))}</b><i>bruto ${esc(reais(soma(pagos, 'b')))}</i></div>
@@ -895,6 +901,11 @@ function abaResumo(tela) {
         ${(estado.origem.por_campanha || []).map((x) => `<div><span>${esc(x.campanha)}</span><b>${x.total} testes · ${x.convertidos} assinantes</b></div>`).join('')}
       </div></section>` : ''}`;
   $$('[data-res-per]', tela).forEach((b) => (b.onclick = () => { estado.resPer = b.dataset.resPer; desenhar(); }));
+  $$('[data-cakto-ok]', tela).forEach((b) => (b.onclick = async () => {
+    b.disabled = true;
+    try { await dados.adminCaktoCancelado(b.dataset.caktoOk); estado.cancelarCakto = (estado.cancelarCakto || []).filter((x) => x.email !== b.dataset.caktoOk); desenhar(); }
+    catch (e) { aviso(e.message); b.disabled = false; }
+  }));
 }
 
 // ---------------------------------------------------------------------
@@ -1351,7 +1362,7 @@ function abaPagamentos(tela) {
       ${lista.length ? `<div class="pg-lista">${lista.slice(0, 300).map((x) => `<div class="pg">
         <span class="st st-${esc(x.st)}">${esc(x.st === 'cancelado' ? (EV_CANCEL[x.ev] || 'Cancelado').replace(/^./, (c) => c.toUpperCase()) : ST_PAG[x.st] || x.st)}</span>
         <div style="min-width:0"><b class="t">${esc([x.pl === 'anual' ? 'Anual' : x.pl === 'mensal' ? 'Mensal' : '', FORMA_NOME[x.fo] || '', x.tp === 'nova' ? 'venda nova' : x.tp === 'renovacao' ? 'renovação' : ''].filter(Boolean).join(' · '))}</b>
-          <small>${esc([x.no, x.em, dataHora(x.q)].filter(Boolean).join(' · '))}</small></div>
+          <small>${esc([x.no, x.em, dataHora(x.q), x.gw === 'pagarme' ? 'Pagar.me' : 'Cakto'].filter(Boolean).join(' · '))}</small></div>
         <span class="v">${x.b ? esc(reais(x.b)) : ''}</span></div>`).join('')}</div>`
         : '<p class="pequeno centro" style="padding:16px 0">Nenhum pagamento neste período com esses filtros.</p>'}
     </section>

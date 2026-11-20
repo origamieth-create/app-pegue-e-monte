@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Teste do pagamento</title>
+<style>
+  body { margin: 0; font-family: 'Nunito Sans', system-ui, -apple-system, sans-serif; background: #FFFBF7; color: #2A1B3D; }
+  main { max-width: 440px; margin: 0 auto; padding: 32px 20px; display: flex; flex-direction: column; gap: 14px; }
+  h1 { font-size: 24px; margin: 0; }
+  p { margin: 0; color: #4E4459; }
+  button { background: #C73B48; color: #fff; border: 0; border-radius: 16px; padding: 16px; font: inherit; font-weight: 800; font-size: 16px; cursor: pointer; }
+  button.claro { background: #fff; color: #C73B48; box-shadow: inset 0 0 0 1.5px #C73B48; }
+  #situacao { font-size: 14px; background: #F3ECFC; color: #4A2F73; border-radius: 12px; padding: 12px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Teste do pagamento</h1>
+  <p>Página só para o administrador conferir o checkout novo. Entre no app com a sua conta antes.</p>
+  <div id="situacao">Carregando…</div>
+  <button data-plano="anual" data-contexto="app">Pagar o anual (como no app)</button>
+  <button data-plano="mensal" data-contexto="app" class="claro">Pagar o mensal (como no app)</button>
+  <button data-plano="anual" data-contexto="venda" class="claro">Como na página de vendas</button>
+</main>
+<script type="module">
+import { abrirCheckout, planos } from './checkout.js?v=20261121c';
+import * as dados from './dados.js?v=20261121c';
+const s = document.getElementById('situacao');
+const sessao = await dados.sessaoAtual().catch(() => null);
+const p = await planos().catch((e) => ({ erro: e.message }));
+s.textContent = p.erro ? 'Erro: ' + p.erro
+  : p.ativo ? `Checkout novo LIGADO para ${sessao ? sessao.user.email : 'quem não entrou'}.`
+  : `Checkout novo DESLIGADO para ${sessao ? sessao.user.email : 'quem não entrou'} (os botões vão para a Cakto).`;
+document.querySelectorAll('[data-plano]').forEach((b) => (b.onclick = () => abrirCheckout({
+  plano: b.dataset.plano, contexto: b.dataset.contexto, email: sessao && sessao.user.email,
+  aoConcluir: () => { s.textContent = 'Pagamento aprovado e acesso liberado.'; },
+})));
+</script>
+</body>
+</html>

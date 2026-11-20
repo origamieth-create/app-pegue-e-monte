@@ -4,7 +4,7 @@
 // - Sem configurar: MODO DEMONSTRAÇÃO, com dados de exemplo guardados
 //   só neste navegador. Serve para ver e testar o app antes de tudo.
 // =====================================================================
-import { SUPABASE_URL, SUPABASE_ANON_KEY, DEMO_SITE } from './config.js?v=20261117c';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, DEMO_SITE } from './config.js?v=20261121c';
 
 export const MODO_DEMO = !/^https:\/\/.+\.supabase\.co\/?$/.test(SUPABASE_URL);
 
@@ -636,6 +636,34 @@ function demoIaLiberar() {
   if (demoIaPlano() !== 'pago') return;
   for (const l of demoIa().lotes) { l.escolher = 0; for (const k of l.kits || []) if (k.situacao === 'guardado') { k.situacao = 'conferir'; k.liberado = true; if (l.status === 'fechado') l.status = 'pronto'; } }
 }
+// Chama uma função do servidor (manda o login, se houver). Usada pelo checkout.
+export async function chamarFuncao(nome, corpo) {
+  if (MODO_DEMO) return demoPagamento(corpo);
+  const s = await cliente();
+  const { data } = await s.auth.getSession();
+  const tk = data.session && data.session.access_token;
+  let r;
+  try {
+    r = await fetch(`${SUPABASE_URL}/functions/v1/${nome}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${tk || SUPABASE_ANON_KEY}` },
+      body: JSON.stringify(corpo),
+    });
+  } catch (e) { throw new Error('Sem conexão. Confira a internet e tente de novo.'); }
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || d.erro) throw new Error(d.erro || 'Não deu certo agora. Tente de novo em instantes.');
+  return d;
+}
+// Checkout na demonstração: Pix "pago" depois de 2 consultas; cartão 4000... recusado
+function demoPagamento(c) {
+  const parc = (v) => { const l = [{ n: 1, parcela: v, total: v }]; for (let n = 2; n <= 12; n++) { const p = Math.ceil((v * 0.0347) / (1 - Math.pow(1.0347, -n))); l.push({ n, parcela: p, total: p * n }); } return l; };
+  if (c.acao === 'planos') return { ativo: true, planos: { mensal: { valor: 2990 }, anual: { valor: 16700, de: 35880 } }, parcelas: parc(16700) };
+  const vence = new Date(Date.now() + (c.plano === 'mensal' ? 30 : 365) * 864e5).toISOString();
+  if (c.acao === 'pagar' && c.metodo === 'pix') { demoPagamento.voltas = 0; return { id: 'demo-pix', status: 'pendente', valor: c.plano === 'mensal' ? 2990 : 16700, pix: { codigo: '00020126580014br.gov.bcb.pix0136demo-pegue-e-monte-5204000053039865802BR', url: null, vence } }; }
+  if (c.acao === 'pagar') return c.card_token === 'token_ok' ? { id: 'demo-cartao', status: 'pago', vence_em: vence } : { id: 'demo-cartao', status: 'recusado', mensagem: 'Cartão recusado pelo banco. Confira os dados, tente outro cartão ou pague com Pix, que libera na hora.' };
+  if (c.acao === 'status') { demoPagamento.voltas = (demoPagamento.voltas || 0) + 1; return demoPagamento.voltas >= 2 ? { status: 'pago', vence_em: vence } : { status: 'pendente' }; }
+  return {};
+}
 async function chamarFuncaoIA(corpo, bruto = false) {
   const s = await cliente();
   const { data } = await s.auth.getSession();
@@ -932,6 +960,16 @@ function demoPainel() {
   for (let i = 0; i < 60; i++) testes.push({ t: new Date(agora - i * 0.5 * dia).toISOString(), a: i % 3 === 0 });
   return { agora: new Date().toISOString(), pagamentos: pg, ativas: { total: 142, anual: 96, mensal: 46, pix: 58, cartao: 84, manual: 2 },
     teste_ate_assinar: { total: 40, media: 2.4, mesmo_dia: 14, d1_3: 16, d4_7: 8, depois: 2 }, testes, meses };
+}
+export async function adminCancelarCakto() {
+  if (MODO_DEMO) return [{ email: 'bia@exemplo.com', nome: 'Bia Melo', quando: new Date().toISOString(), plano: 'anual' }];
+  const s = await cliente();
+  return ok(s.rpc('admin_cancelar_cakto'));
+}
+export async function adminCaktoCancelado(email) {
+  if (MODO_DEMO) return { ok: true };
+  const s = await cliente();
+  return ok(s.rpc('admin_cakto_cancelado', { p_email: email }));
 }
 export async function adminResumo() {
   if (MODO_DEMO) return demoAdmin().resumo;

@@ -26,6 +26,10 @@ export const LINK_ANUAL = 'https://pay.cakto.com.br/65irjr2';
 // Anual com desconto (R$ 167/ano): fim do teste grátis e Black Friday das assinantes do mensal no Pix
 export const LINK_ANUAL_PROMO = 'https://pay.cakto.com.br/mjrcoxc';
 
+// Pagar.me: chave PÚBLICA (começa com pk_test_ no teste e pk_ de verdade). Pode ficar aqui.
+// Vazia = o checkout próprio só oferece Pix. A chave SECRETA nunca entra aqui (fica nos Secrets do Supabase).
+export const PAGARME_PK = 'pk_test_BMnVWKUPJTzdVlpe';
+
 // Demonstração pública no site (pegueemonte.com/demo). Deixe false no app de verdade.
 export const DEMO_SITE = false;
 // Para onde vai o botão "Quero assinar" da demonstração.
