@@ -367,5 +367,16 @@ h2.t{font-family:'Fredoka',sans-serif;font-weight:600;font-size:24px;text-align:
   else if (ler('apm-quiz2-feito') === '1') abrirVsl();
 })();
 </script>
+<script type="module">
+// Checkout próprio (Pagar.me): quando estiver ligado, o pagamento acontece aqui mesmo, sem ir para a Cakto
+import { abrirCheckout, checkoutAtivo } from '../checkout.js?v=20261121c';
+let ativo = false;
+checkoutAtivo().then((v) => { ativo = v; });
+document.querySelectorAll('[data-plano]').forEach((a) => a.addEventListener('click', (e) => {
+  if (!ativo) return;
+  e.preventDefault();
+  abrirCheckout({ plano: a.dataset.plano, contexto: 'venda', linkReserva: a.href, appUrl: new URL('../', location.href).href });
+}));
+</script>
 </body>
 </html>
