@@ -9,11 +9,18 @@
 <link rel="apple-touch-icon" href="icone-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito+Sans:wght@400;600;700;800&display=swap">
-<link rel="stylesheet" href="estilo.css?v=20261121h">
+<link rel="stylesheet" href="estilo.css?v=20261122a">
 <style>
   main { max-width: 720px; margin: 0 auto; padding: 24px 18px 48px; display: flex; flex-direction: column; gap: 20px; }
   .cabeca { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; padding-top: 8px; }
   .cabeca img { width: 96px; height: 96px; border-radius: 999px; object-fit: contain; background: #fff; padding: 6px; border: 3px solid #fff; box-shadow: 0 6px 18px rgba(42,27,61,.12); }
+  .cabeca img.logo-quadrada { width: 120px; height: 120px; object-fit: cover; padding: 0; }
+  .barra-previa { position: fixed; left: 0; right: 0; bottom: 0; z-index: 45; background: #fff; border-top: 1px solid var(--linha); padding: 10px 14px calc(14px + env(safe-area-inset-bottom)); box-shadow: 0 -10px 24px rgba(42,27,61,.08); }
+  .barra-previa p { margin: 0 auto 8px; max-width: 520px; text-align: center; font-size: 13px; color: var(--texto2); }
+  .barra-previa div { display: flex; gap: 8px; max-width: 520px; margin: 0 auto; }
+  .barra-previa .btn { flex: 1; text-align: center; text-decoration: none; }
+  .barra-previa .btn.principal { flex: 1.4; }
+  body.com-barra-previa main { padding-bottom: 150px; }
   .grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); gap: 14px; }
   .cartao.kit { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
   .kit .nome { font-weight: 800; font-size: 17px; line-height: 1.2; }
@@ -28,6 +35,6 @@
 <main id="raiz"><div class="carregando">Carregando…</div></main>
 <div id="painel"></div>
 <div id="toast" class="toast oculto" role="status" aria-live="polite"></div>
-<script type="module" src="reservar.js?v=20261121h"></script>
+<script type="module" src="reservar.js?v=20261122a"></script>
 </body>
 </html>

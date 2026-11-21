@@ -3,7 +3,7 @@
 // Só abre para e-mails cadastrados na tabela "administradores".
 // Quem confere é o banco de dados: esta página só mostra o resultado.
 // =====================================================================
-import * as dados from './dados.js?v=20261121e';
+import * as dados from './dados.js?v=20261122a';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=20261121e';
 
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -649,6 +649,33 @@ function abaEstudo(tela) {
 // Popups e ofertas
 // ---------------------------------------------------------------------
 // Oferta conforme o uso: quem viu o anual ou o mensal em destaque e se comprou
+// Loja pronta pelo Instagram (página /loja-pronta): prévias, e-mails deixados, quem foi pagar e quem pagou
+async function desenharLojaPronta(caixa, dias) {
+  if (!caixa) return;
+  let d = null;
+  try {
+    if (dados.MODO_DEMO) {
+      const h = (m) => new Date(Date.now() - m * 6e4).toISOString();
+      d = { total: 42, prontas: 37, com_email: 19, publicar: 8, pagaram: 3, convertidas: 2, ultimas: [
+        { criado_em: h(30), instagram: 'festasdamaria', status: 'pronta', modo: 'instagram', email: 'maria@exemplo.com', publicar_em: h(25), convertida_em: null, kits: 8, campanha: 'cadastro-lp' },
+        { criado_em: h(120), instagram: 'ludecora', status: 'pronta', modo: 'galeria', email: null, publicar_em: null, convertida_em: null, kits: 3, campanha: null }] };
+    } else d = await rpcAdmin('admin_previas', { p_dias: dias || 3650 });
+  } catch (e) { d = null; }
+  if (!caixa.isConnected || !d) { if (caixa.isConnected) caixa.innerHTML = ''; return; }
+  const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
+  const dh = (q) => { const x = new Date(q); return `${x.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} ${x.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`; };
+  const situ = (x) => x.convertida_em ? ['Loja criada', 'st-pago'] : x.publicar_em ? ['Foi pagar', 'st-pix_pendente'] : x.email ? ['Deixou o e-mail', 'st-pix_pendente'] : x.status === 'pronta' ? ['Viu a prévia', ''] : ['Não terminou', ''];
+  caixa.innerHTML = `<section class="cartao"><div class="cab-crm"><h2>Loja pronta pelo Instagram</h2><span>página app.pegueemonte.com/loja-pronta</span></div>
+    <div class="kpis-crm k4" style="margin:10px 0">
+      <div class="kpi"><small>Digitaram o @</small><b>${d.total}</b><i>${d.prontas} viram a loja pronta</i></div>
+      <div class="kpi"><small>Deixaram o e-mail</small><b>${d.com_email}</b><i class="p">${pct(d.com_email, d.prontas)}% de quem viu</i></div>
+      <div class="kpi"><small>Foram pagar</small><b>${d.publicar}</b><i class="p">${pct(d.publicar, d.prontas)}% de quem viu</i></div>
+      <div class="kpi"><small>Pagaram</small><b>${d.pagaram}</b><i class="p">${pct(d.pagaram, d.prontas)}% · ${d.convertidas} lojas criadas</i></div>
+    </div>
+    ${(d.ultimas || []).length ? `<div class="pg-lista">${d.ultimas.slice(0, 100).map((x) => { const [t, c] = situ(x); return `<div class="pg-ab"><div style="min-width:0"><b class="t">${x.instagram && x.instagram !== '-' ? '@' + esc(x.instagram) : 'Sem Instagram'}</b>
+      <small>${esc(dh(x.criado_em))} · ${x.kits} ${Number(x.kits) === 1 ? 'kit' : 'kits'} · ${{ instagram: 'pelo Instagram', galeria: 'fotos do celular', desenhos: 'desenhos de exemplo' }[x.modo] || ''}${x.email ? ' · ' + esc(x.email) : ''}${x.campanha ? ' · ' + esc(x.campanha) : ''}</small></div>
+      <div class="ld"><span class="st ${c}">${t}</span></div></div>`; }).join('')}</div>` : '<p class="pequeno">Ainda ninguém usou a página.</p>'}</section>`;
+}
 async function desenharOfertasUso(caixa, dias) {
   if (!caixa) return;
   let lista = null;
@@ -694,6 +721,7 @@ async function abaPopups(tela) {
   const escolhido = String(estado.funilDias ?? 30);
   alvo.innerHTML = `
     <div class="nota-crm" style="margin:0">Os popups que você mesma envia (com a lista de quem recebeu) ficam em <button class="link-btn" id="ir-msgs">Mensagens › Mensagens enviadas</button>. Ninguém recebe a mesma mensagem duas vezes.</div>
+    <div id="loja-pronta-adm"></div>
     <div id="ofertas-uso"></div>
     ${blocoNiveis()}
     <div class="filtros-crm"><label>Período<select id="f-dias">${per.map(([v, t]) => `<option value="${v}" ${v === escolhido ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label></div>
@@ -720,6 +748,7 @@ async function abaPopups(tela) {
     </section>`;
   const d = $('#f-dias', alvo);
   if (d) d.onchange = () => { estado.funilDias = d.value; desenhar(); };
+  desenharLojaPronta($('#loja-pronta-adm', alvo), Number(dias));
   desenharOfertasUso($('#ofertas-uso', alvo), Number(dias));
   const im = $('#ir-msgs', alvo);
   if (im) im.onclick = () => { estado.aba = 'mensagens'; desenhar(); window.scrollTo(0, 0); };

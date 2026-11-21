@@ -2,8 +2,8 @@
 // App Pegue e Monte — app da dona
 // Abas: Hoje, Agenda, Kits, Mais
 // =====================================================================
-import * as dados from './dados.js?v=20261121e';
-import { abrirCheckout, planos as planosCheckout, linkCakto } from './checkout.js?v=20261121h';
+import * as dados from './dados.js?v=20261122a';
+import { abrirCheckout, planos as planosCheckout, linkCakto } from './checkout.js?v=20261122a';
 import { PERMITIR_CADASTRO, EMAIL_SUPORTE, WHATSAPP_SUPORTE, LINK_MENSAL, LINK_ANUAL, LINK_ANUAL_PROMO, DEMO_SITE, LINK_PLANOS, SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=20261121e';
 
 const { hojeISO, somaDias, cruza } = dados;
@@ -410,7 +410,14 @@ async function carregarTudo() {
     try { await dados.iniciarTeste(); estado.assinatura = await dados.minhaAssinatura(); marcarRelogio(); } catch (e) { /* segue para a tela de assinatura */ }
     if (!estado.assinatura.encontrada) { if (!estado.suporte && !DEMO_SITE) await carregarCheckout(); return telaSemAssinatura(); }
   }
-  if (!estado.negocio) return telaConfiguracaoInicial();
+  if (!estado.negocio) {
+    if (!estado.suporte && !DEMO_SITE) {
+      let g = null; try { g = JSON.parse(localStorage.getItem('apm-previa') || 'null'); } catch (e) { /* segue */ }
+      estado.previa = await dados.previaMinha(g && g.id, g && g.t).catch(() => null);
+      if (estado.previa) estado.previa.token = g && g.id === estado.previa.id ? g.t : null;
+    }
+    return telaConfiguracaoInicial();
+  }
   [estado.kits, estado.reservas, estado.gastos, estado.montagem, estado.ia, estado.estruturas, estado.fechados] = await Promise.all([dados.listarKits(), dados.listarReservas(), dados.listarGastos().catch(() => []), estado.suporte ? null : dados.minhaMontagem().catch(() => null), dados.iaSituacao().catch(() => null), dados.listarEstruturas().catch(() => []), dados.listarFechados().catch(() => [])]);
   estado.carregadoEm = Date.now();
   if (!estado.suporte && !DEMO_SITE) carregarCheckout();
@@ -1164,13 +1171,27 @@ function ligarPreviaLink(form) {
   });
 }
 
-function telaConfiguracaoInicial() {
+async function slugLivre(base) {
+  const b = slugDe(base).slice(0, 34) || 'minha-loja';
+  for (const c of [b, `${b}-festas`, `${b}-2`, `${b}-3`, `${b}-${Math.floor(Math.random() * 900 + 100)}`]) {
+    if (/^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/.test(c) && !LINKS_RESERVADOS.includes(c) && await dados.linkDisponivel(c).catch(() => false)) return c;
+  }
+  return b;
+}
+async function telaConfiguracaoInicial() {
+  const pv = estado.previa;
+  let inicial = { whatsapp: soDigitos(guardado('apm-teste-whatsapp') || '') || null };
+  if (pv) {
+    const ig = pv.instagram && pv.instagram !== '-' ? pv.instagram : null;
+    inicial = { nome: (pv.perfil && pv.perfil.nome) || '', slug: await slugLivre(ig || (pv.perfil && pv.perfil.nome) || ''),
+      whatsapp: soDigitos((pv.perfil && pv.perfil.whatsapp) || pv.whatsapp || inicial.whatsapp || '') || null, instagram: ig };
+  }
   $('#raiz').innerHTML = `
     <div class="entrada"><form class="caixa" novalidate>
       ${BANDEIRINHAS}<div class="logo-app">${ICONE.logo}</div>
-      <h1 class="centro">Vamos começar</h1>
-      <p class="centro pequeno">Quatro informações e seu app está pronto.</p>
-      ${camposNegocio({ whatsapp: soDigitos(guardado('apm-teste-whatsapp') || '') || null }, true)}
+      <h1 class="centro">${pv ? 'Sua loja está quase no ar' : 'Vamos começar'}</h1>
+      <p class="centro pequeno">${pv ? `Confira os dados. Seus ${(pv.kits || []).length} kits já estão prontos para entrar. O WhatsApp é onde suas clientes vão falar com você.` : 'Quatro informações e seu app está pronto.'}</p>
+      ${camposNegocio(inicial, true)}
       <div class="erro oculto" id="erro-cfg"></div>
       <button class="btn principal cheio" type="submit">Pronto, abrir meu app</button>
       <button type="button" class="link-btn" id="sair">Sair</button>
@@ -1186,7 +1207,21 @@ function telaConfiguracaoInicial() {
       try {
         const c = lerCamposNegocio(form, true);
         if (!(await dados.linkDisponivel(c.slug))) throw new Error('Esse link já está em uso. Escolha outro.');
+        if (pv) { if (pv.perfil && pv.perfil.foto) c.logo_url = pv.perfil.foto; if (pv.perfil && pv.perfil.bio) c.recado_link = String(pv.perfil.bio).slice(0, 300); }
         await dados.salvarNegocio(c);
+        if (pv) {
+          // kits da prévia entram com "preço a consultar"; a pergunta das peças usa o grupo que a IA viu
+          try {
+            const r = await dados.previaImportar(pv.id, pv.token);
+            const mapa = Object.fromEntries(((r && r.ids) || []).map((x) => [x.previa, x.kit]));
+            const kitsDoGrupo = pv.grupo ? (pv.grupo.kits || []).map((id) => mapa[id]).filter(Boolean) : [];
+            estado.grupoPrevia = kitsDoGrupo.length >= 2 ? { ...pv.grupo, kits: kitsDoGrupo } : null;
+            estado.precosDepois = !!(r && r.kits);
+            estado.previaLimitada = !!(r && r.limitado);
+          } catch (e) { /* a loja abre mesmo assim; os kits podem ser montados com a IA */ }
+          try { localStorage.removeItem('apm-previa'); } catch (e) { /* segue */ }
+          estado.previa = null;
+        }
         estado.mostrarAssistente = true; // conta nova: perguntas da agenda logo de cara
         await carregarTudo();
       } catch (err) { caixa.textContent = err.message; caixa.classList.remove('oculto'); }
@@ -1295,7 +1330,7 @@ function montarApp() {
   irPara(['hoje', 'agenda', 'kits', 'mais'].includes(deHash) ? deHash : 'hoje');
   if (abrirPeloAviso()) return;
   if (estado.suporte) return; // no modo suporte não aparece nenhum aviso da dona
-  if (estado.mostrarAssistente) { estado.mostrarAssistente = false; setTimeout(() => assistenteAgenda(() => { if (!estado.kits.length) montarLojaGuiado(); }), 400); return; }
+  if (estado.mostrarAssistente) { estado.mostrarAssistente = false; setTimeout(() => assistenteAgenda(() => { if (estado.precosDepois) { estado.precosDepois = false; setTimeout(painelPrecosRapidos, 450); } else if (!estado.kits.length) montarLojaGuiado(); }), 400); return; }
   if (!estado.kits.length && podeEditar() && !DEMO_SITE && !(() => { try { return sessionStorage.getItem('apm-guia-sessao'); } catch (e) { return '1'; } })()) { setTimeout(montarLojaGuiado, 500); return; }
   setTimeout(mostrarNovidades, 600);
   setTimeout(mostrarBlackFriday, 1200);
@@ -3874,11 +3909,49 @@ function simulacaoTexto(limite) {
   const ok = limite === 1 ? '1º pedido' : `1º ao ${limite}º pedido`;
   return `<div class="ag-sim"><div><span>Sábado: ${ok}</span><b class="ag-ok">✓ aceita</b></div><div><span>${limite + 1}º pedido no mesmo sábado</span><b class="ag-no">✗ dia lotado</b></div></div>`;
 }
+// Simulação quando a dona disse quantos conjuntos de peças tem (loja que veio da prévia)
+function simulacaoGrupo(g) {
+  const linhas = [];
+  for (let i = 0; i <= g.qtd && i < 4; i++) {
+    const kit = g.kits[i % g.kits.length] || 'Kit';
+    const lotado = i === g.qtd;
+    linhas.push(`<div><span>${i + 1}º pedido · ${esc(kit)}</span><b class="${lotado ? 'ag-no' : 'ag-ok'}">${lotado ? '✗ lotado' : '✓ aceita'}</b></div>`);
+  }
+  return `<p class="pequeno" style="margin:0">Num sábado cheio, pedidos de kits com ${esc(g.nome)}:</p><div class="ag-sim">${linhas.join('')}</div>
+    <p class="pequeno" style="margin:6px 0 0">E o mesmo kit nunca sai 2 vezes na mesma data.</p>`;
+}
+// Último passo da loja que veio da prévia: preços (pode deixar "a consultar")
+function painelPrecosRapidos() {
+  const ks = (estado.kits || []).filter((k) => k.preco_consultar);
+  if (!ks.length) return;
+  abrirPainel('Seus preços', `<div class="coluna">
+      <p class="ia-perg" style="margin:0">Quer colocar os preços agora?</p>
+      <p class="pequeno" style="margin:-4px 0 6px">Pode deixar "a consultar": a cliente pede a data e você passa o valor no WhatsApp.</p>
+      ${estado.previaLimitada ? '<p class="nota-amarela pequeno" style="margin:0">No teste grátis entram 5 kits. Assinando, você coloca todos.</p>' : ''}
+      ${ks.map((k) => `<div class="preco-rapido">${k.foto_url ? `<img src="${esc(k.foto_url)}" alt="">` : '<span class="pr-sem"></span>'}<b>${esc(k.nome)}</b>
+        <input data-preco="${esc(k.id)}" inputmode="decimal" placeholder="R$ 0,00" aria-label="Preço do ${esc(k.nome)}"></div>`).join('')}
+      <button class="btn principal cheio" id="pr-salvar">Salvar e copiar meu link</button>
+      <button class="link-btn" id="pr-depois" style="align-self:center">Deixar a consultar por enquanto</button></div>`, (p) => {
+    const copiar = async () => { try { await navigator.clipboard.writeText(linkPublico(estado.negocio.slug)); aviso('Link copiado! Cole na bio do Instagram.'); } catch (e) { aviso('Sua loja está no ar!'); } };
+    $('#pr-depois', p).onclick = () => { fecharPainel(); copiar(); };
+    $('#pr-salvar', p).onclick = () => acao($('#pr-salvar', p), async () => {
+      for (const i of $$('[data-preco]', p)) {
+        const v = Number(String(i.value).replace(/[^\d,.]/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.'));
+        if (v > 0) { await dados.salvarKit({ id: i.dataset.preco, preco: Math.round(v * 100) / 100, preco_consultar: false }); }
+      }
+      estado.kits = await dados.listarKits();
+      fecharPainel(); desenharAba(); copiar();
+    });
+  });
+}
 // Perguntas da agenda (contas novas logo depois de criar a loja; e "Refazer as perguntas" em Mais)
 function assistenteAgenda(depois) {
   const n = estado.negocio;
   let passo = 0, limite = n.limite_dia || 3, semLimite = n.limite_dia == null && !!n.agenda_config_em, confirmar = n.confirmar_whatsapp !== false;
-  const fim = () => { fecharPainel(); if (depois) depois(); };
+  // Loja que veio da prévia: a IA viu kits que dividem as mesmas peças (pergunta 3)
+  const grupo = estado.grupoPrevia || null;
+  let conj = 1, conjFeito = null;
+  const fim = () => { estado.grupoPrevia = null; fecharPainel(); if (depois) depois(); };
   const telas = [
     () => `<div class="coluna ag-tela ag-centro">
         <div class="pic-g" aria-hidden="true"><i class="pic pic-balao"></i></div>
@@ -3905,11 +3978,25 @@ function assistenteAgenda(depois) {
     () => `<div class="coluna ag-tela ag-centro">
         <div class="pic-g" aria-hidden="true"><i class="pic pic-festa"></i></div>
         <h2 class="ag-titulo">Pronto!</h2>
-        ${simulacaoTexto(semLimite ? null : limite)}
+        ${conjFeito ? simulacaoGrupo(conjFeito) : simulacaoTexto(semLimite ? null : limite)}
         ${estado.kits.length ? '' : '<p class="pequeno" style="margin:6px 0 0">Agora vamos colocar seus kits na loja. A IA faz quase tudo.</p>'}
         <div class="ia-espaco"></div>
         ${estado.kits.length ? '<button class="btn principal cheio" data-fim>Fechar</button>' : '<button class="btn principal cheio" data-kits="guia">Montar minha loja</button>'}
         <button class="link-btn" data-ir="1" style="align-self:center">Mudar as respostas</button></div>`,
+    () => {
+      const ks = (estado.kits || []).filter((k) => grupo.kits.includes(k.id));
+      return `<div class="coluna ag-tela">
+        <div class="ia-passos"><i class="f"></i><i class="f"></i><i class="f"></i></div>
+        <p class="ia-perg" style="margin:0">Olhei seus ${(estado.kits || []).length} kits e vi uma coisa</p>
+        <div class="ag-grupo"><b>${ks.length} kits usam ${esc(grupo.frase)}</b>
+          <div class="ag-grupo-fotos">${ks.slice(0, 5).map((k) => k.foto_url ? `<img src="${esc(k.foto_url)}" alt="">` : '').join('')}</div></div>
+        <p class="ia-perg" style="margin:6px 0 0;font-size:17px">Quantos conjuntos de ${esc(grupo.curto)} você tem?</p>
+        <p class="pequeno" style="margin:-4px 0 4px">Assim o app não aceita mais festas com ${esc(grupo.curto)} no mesmo dia do que você consegue montar.</p>
+        ${contador('conj', conj, 1, 50)}
+        <div class="ia-espaco"></div>
+        <button class="btn principal cheio" data-grupo>Continuar</button>
+        <button class="link-btn" data-semgrupo style="align-self:center">Cada kit é completo e diferente</button></div>`;
+    },
   ];
   const desenhar = () => abrirPainel(passo ? 'Sua agenda' : '', telas[passo](), (p) => {
     $$('[data-ir]', p).forEach((b) => (b.onclick = () => { passo = Number(b.dataset.ir); desenhar(); }));
@@ -3921,9 +4008,24 @@ function assistenteAgenda(depois) {
     const salvar = $('[data-salvar]', p);
     if (salvar) salvar.onclick = () => acao(salvar, async () => {
       estado.negocio = await dados.salvarNegocio({ limite_dia: semLimite ? null : limite, confirmar_whatsapp: confirmar, agenda_config_em: new Date().toISOString() });
-      passo = 3; desenhar();
+      passo = grupo && !conjFeito ? 4 : 3; desenhar();
     });
     $$('[data-kits]', p).forEach((b) => (b.onclick = () => montarLojaGuiado()));
+    ligarContador(p, 'conj', (v) => { conj = v; });
+    const bg = $('[data-grupo]', p);
+    if (bg) bg.onclick = () => acao(bg, async () => {
+      // cria a peça compartilhada (ex.: "Mesa e arco": 2) e liga os kits do grupo a ela
+      const est = await dados.salvarEstrutura({ nome: grupo.nome || 'Peças compartilhadas', quantidade: conj });
+      for (const k of (estado.kits || []).filter((x) => grupo.kits.includes(x.id))) {
+        const lista = [...(k.estruturas || []).filter((x) => x.id !== est.id), { id: est.id, qtd: 1 }];
+        await dados.salvarKit({ id: k.id, estruturas: lista }); k.estruturas = lista;
+      }
+      estado.estruturas = await dados.listarEstruturas().catch(() => estado.estruturas);
+      conjFeito = { qtd: conj, nome: grupo.curto, kits: (estado.kits || []).filter((x) => grupo.kits.includes(x.id)).map((x) => x.nome) };
+      passo = 3; desenhar();
+    });
+    const sg = $('[data-semgrupo]', p);
+    if (sg) sg.onclick = () => { conjFeito = null; passo = 3; desenhar(); };
   }, passo > 0 ? () => { passo = Math.max(0, passo - 1); desenhar(); } : null);
   desenhar();
 }

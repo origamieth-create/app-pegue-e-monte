@@ -4,7 +4,7 @@
 //      abrirCheckout({ plano: 'anual', contexto: 'app' | 'venda', linkReserva: 'https://pay.cakto...' })
 // O cartão vira "token" direto na Pagar.me (chave pública); o número nunca passa pelo nosso servidor.
 // =====================================================================
-import * as dados from './dados.js?v=20261121e';
+import * as dados from './dados.js?v=20261122a';
 import { PAGARME_PK } from './config.js?v=20261121e';
 
 const PASSOS = ['Sua conta', 'Pagamento', 'Acesso'];

@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Veja sua loja pronta · App Pegue e Monte</title>
+<meta name="description" content="Digite o @ do seu Instagram e veja sua loja de pegue e monte pronta em 1 minuto, com link de reservas.">
+<meta property="og:title" content="Veja sua loja pronta em 1 minuto">
+<meta property="og:description" content="Digite o @ do seu Instagram. A gente monta sua loja com os seus kits.">
+<meta name="theme-color" content="#FFFFFF">
+<link rel="icon" href="../icone.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icone-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700;800;900&display=swap">
+<style>
+  :root { --t: #1E1A22; --m: #6F6878; --l: #ECE7E2; --b: #FAF8F6; --r: #C73B48; --v: #2E7D57; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #fff; color: var(--t); font-family: 'Nunito Sans', system-ui, -apple-system, sans-serif; -webkit-font-smoothing: antialiased; }
+  main { max-width: 440px; margin: 0 auto; padding: 22px 22px calc(28px + env(safe-area-inset-bottom)); min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
+  .marca { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 14px; }
+  .marca img { width: 26px; height: 26px; border-radius: 7px; }
+  .eye { font-size: 11px; font-weight: 800; letter-spacing: 1.3px; color: var(--r); margin: 40px 0 10px; }
+  h1 { font-size: 32px; line-height: 1.08; margin: 0 0 12px; letter-spacing: -.6px; font-weight: 900; }
+  h1.m { font-size: 26px; margin-top: 36px; }
+  .sub { font-size: 15.5px; line-height: 1.5; color: var(--m); margin: 0 0 22px; }
+  .campo { display: flex; align-items: center; border: 1.5px solid var(--t); border-radius: 14px; height: 58px; padding: 0 16px; font-size: 18px; font-weight: 700; background: #fff; }
+  .campo span { color: var(--m); margin-right: 2px; }
+  .campo input { border: 0; outline: 0; font: inherit; flex: 1; min-width: 0; background: transparent; color: var(--t); }
+  .rot { display: block; font-size: 12px; font-weight: 700; color: var(--m); margin: 0 0 6px 2px; }
+  .ent { width: 100%; border: 1.5px solid var(--l); border-radius: 14px; height: 52px; padding: 0 14px; font: inherit; font-size: 16px; color: var(--t); margin-bottom: 10px; background: #fff; }
+  .ent:focus { border-color: var(--t); outline: 0; }
+  .btn { margin-top: 12px; min-height: 56px; border-radius: 14px; background: var(--t); color: #fff; font: inherit; font-weight: 800; font-size: 16.5px; display: flex; align-items: center; justify-content: center; gap: 8px; border: 0; width: 100%; cursor: pointer; text-decoration: none; padding: 0 16px; }
+  .btn.r { background: var(--r); }
+  .btn.c { background: #fff; color: var(--t); border: 1.5px solid var(--l); }
+  .btn:disabled { opacity: .55; }
+  .link { background: none; border: 0; font: inherit; font-weight: 700; font-size: 14px; color: var(--t); margin: 14px auto 0; display: block; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+  .mini { text-align: center; font-size: 13px; color: var(--m); margin-top: 12px; line-height: 1.45; }
+  .erro { background: #FFF1F2; color: #A32D3A; border-radius: 12px; padding: 11px 13px; font-size: 14px; font-weight: 700; margin-top: 12px; line-height: 1.4; }
+  .passos { margin-top: 38px; border-top: 1px solid var(--l); padding-top: 22px; display: flex; flex-direction: column; gap: 16px; }
+  .p { display: flex; gap: 13px; align-items: center; font-size: 15px; font-weight: 600; }
+  .p i { width: 40px; height: 40px; border-radius: 12px; border: 1.5px solid var(--l); display: flex; align-items: center; justify-content: center; flex: none; }
+  .p i img { width: 20px; }
+  .perfil { border: 1.5px solid var(--l); border-radius: 20px; padding: 18px; margin-top: 18px; }
+  .ph { display: flex; gap: 13px; align-items: center; }
+  .av { width: 66px; height: 66px; border-radius: 50%; border: 1.5px solid var(--l); overflow: hidden; flex: none; background: var(--b); }
+  .av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .nm { font-weight: 800; font-size: 17px; }
+  .us, .num { color: var(--m); font-size: 13.5px; }
+  .bio { font-size: 13.5px; line-height: 1.45; margin: 12px 0; white-space: pre-line; max-height: 4.4em; overflow: hidden; }
+  .grade { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; border-radius: 10px; overflow: hidden; }
+  .grade img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; background: var(--b); }
+  .anel { width: 82px; height: 82px; border-radius: 50%; border: 5px solid var(--l); border-top-color: var(--t); margin: 64px auto 24px; animation: gira 1s linear infinite; }
+  @keyframes gira { to { transform: rotate(360deg); } }
+  .centro { text-align: center; }
+  .lst { margin: 24px 4px 0; display: flex; flex-direction: column; gap: 15px; }
+  .it { display: flex; align-items: center; gap: 12px; font-size: 15px; font-weight: 600; }
+  .it .ok { width: 24px; height: 24px; border-radius: 50%; background: var(--t); display: flex; align-items: center; justify-content: center; flex: none; }
+  .it .esp { width: 24px; height: 24px; border-radius: 50%; border: 2.5px solid var(--l); border-top-color: var(--t); flex: none; animation: gira 1s linear infinite; }
+  .it.off { color: #B8B2BC; } .it.off .esp { animation: none; border-top-color: var(--l); }
+  .sel3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 18px 0 6px; }
+  .sel3 > * { aspect-ratio: 1; border-radius: 12px; overflow: hidden; position: relative; }
+  .sel3 img { width: 100%; height: 100%; object-fit: cover; }
+  .sel3 em { position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; border-radius: 50%; background: var(--t); color: #fff; font-size: 12px; font-style: normal; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+  .mais { border: 1.5px dashed var(--l); display: flex; align-items: center; justify-content: center; color: var(--m); font-size: 30px; background: #fff; cursor: pointer; }
+  .info { display: flex; gap: 10px; align-items: flex-start; background: var(--b); border-radius: 14px; padding: 14px; font-size: 13.5px; line-height: 1.45; margin-top: 24px; }
+  .info img { width: 20px; margin-top: 1px; }
+  .ck { display: flex; flex-direction: column; gap: 10px; margin: 6px 0 18px; }
+  .ck div { display: flex; gap: 10px; align-items: center; font-size: 15px; }
+  .ck svg { width: 18px; flex: none; }
+  .preco { display: flex; justify-content: space-between; align-items: center; border: 1.5px solid var(--t); border-radius: 16px; padding: 14px 16px; margin-bottom: 14px; gap: 10px; }
+  .preco b { font-size: 28px; font-weight: 900; white-space: nowrap; } .preco small { display: block; font-size: 12.5px; color: var(--m); }
+  .gar { display: flex; gap: 7px; align-items: center; justify-content: center; font-size: 13px; color: var(--m); margin-top: 12px; }
+  .gar img { width: 16px; }
+  .copiar { display: flex; gap: 8px; align-items: center; border: 1.5px solid var(--l); border-radius: 14px; padding: 6px 6px 6px 14px; font-size: 13px; color: var(--m); margin-top: 14px; }
+  .copiar span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .copiar button { border: 0; background: var(--t); color: #fff; border-radius: 10px; padding: 10px 14px; font: inherit; font-weight: 800; font-size: 13px; cursor: pointer; }
+  .voltar { background: none; border: 0; font: inherit; font-weight: 700; font-size: 14px; color: var(--m); padding: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
+  .espaco { flex: 1; min-height: 20px; }
+  .oculto { display: none !important; }
+</style>
+</head>
+<body>
+<main id="m"><div class="anel"></div></main>
+<script type="module" src="loja-pronta.js?v=20261122a"></script>
+</body>
+</html>

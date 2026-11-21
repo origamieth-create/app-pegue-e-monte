@@ -2,7 +2,8 @@
 // App Pegue e Monte — link público de reservas (a cliente final usa)
 // Endereço: reservar.html?l=<link-do-negocio>
 // =====================================================================
-import * as dados from './dados.js?v=20261121e';
+import * as dados from './dados.js?v=20261122a';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=20261121e';
 
 // Demonstração do site: botões de WhatsApp mostram um aviso em vez de abrir conversa.
 if (dados.DEMONSTRACAO_SITE) {
@@ -60,6 +61,31 @@ const slug = (new URLSearchParams(location.search).get('l')
   || decodeURIComponent(location.pathname.replace(/^\/+|\/+$/g, '').split('/').pop() || '').replace(/\.html$/, '').replace(/^reservar$|^404$|^index$/, '')
   || '').toLowerCase();
 let loja = null;
+// Prévia da "loja pronta" (montada pelo @ do Instagram e ainda não publicada): reservar.html?previa=ID&t=TOKEN
+// Só liga com esses dois parâmetros; o link de reservas das lojas continua igual.
+const PREVIA = (() => { const u = new URLSearchParams(location.search); const id = u.get('previa'), t = u.get('t'); return id && t ? { id, t } : null; })();
+async function carregarPrevia() {
+  const r = await fetch(`${SUPABASE_URL}/functions/v1/loja-pronta`, { method: 'POST',
+    headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+    body: JSON.stringify({ acao: 'ver', id: PREVIA.id, token: PREVIA.t }) }).catch(() => null);
+  if (!r) throw new Error('Sem conexão. Confira a internet e tente de novo.');
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || !d.previa) return null;
+  return d;
+}
+function moldurasPrevia() {
+  const t = document.createElement('div');
+  t.className = 'faixa-dona';
+  t.innerHTML = '<span style="flex:1;text-align:center"><i class="pic pic-olho"></i> Prévia da sua loja · só você está vendo</span>';
+  document.body.prepend(t);
+  const b = document.createElement('div');
+  b.className = 'barra-previa';
+  const lp = `loja-pronta/?p=${encodeURIComponent(PREVIA.id)}&t=${encodeURIComponent(PREVIA.t)}`;
+  b.innerHTML = `<p>${loja.modo === 'desenhos' ? 'Troque os desenhos pelas fotos dos seus kits depois de publicar.' : 'Gostou? Publique e comece a receber reservas hoje.'}</p>
+    <div><a class="btn contorno" href="${lp}&email=1">Receber por e-mail</a><a class="btn principal" href="${lp}&publicar=1">Publicar minha loja</a></div>`;
+  document.body.appendChild(b);
+  document.body.classList.add('com-barra-previa');
+}
 
 function aviso(msg) {
   const t = $('#toast'); t.textContent = msg; t.classList.remove('oculto');
@@ -113,21 +139,23 @@ function contarVisita(slug) {
 }
 async function iniciar() {
   const raiz = $('#raiz');
-  if (!slug) { raiz.innerHTML = '<div class="erro">Link incompleto. Peça o link de reservas para a loja.</div>'; return; }
+  if (!slug && !PREVIA) { raiz.innerHTML = '<div class="erro">Link incompleto. Peça o link de reservas para a loja.</div>'; return; }
   try {
-    loja = await dados.catalogoPublico(slug);
-    if (loja) contarVisita(slug);
+    if (PREVIA) loja = await carregarPrevia();
+    else { loja = await dados.catalogoPublico(slug); if (loja) contarVisita(slug); }
   } catch (e) {
     raiz.innerHTML = `<div class="erro">${esc(e.message)}</div>`; return;
   }
+  if (!loja && PREVIA) { raiz.innerHTML = '<div class="erro">Esta prévia não está mais disponível. <a href="loja-pronta/">Montar de novo</a></div>'; return; }
   if (!loja) { raiz.innerHTML = '<div class="erro">Este link de reservas não está disponível.</div>'; return; }
+  if (PREVIA) moldurasPrevia();
   document.title = `Reservas · ${loja.nome}`;
   loja.kits = dados.ordenarKits(loja.kits, loja.ordem_kits || 'az');
   const fechadoAgora = (loja.fechado || []).find((f) => f.ate >= hojeISO() && f.de <= dados.somaDias(hojeISO(), 30));
   const categorias = [...new Set(loja.kits.map((k) => (k.categoria || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
   raiz.innerHTML = `
     <header class="cabeca">
-      ${loja.logo_url ? `<img src="${esc(loja.logo_url)}" alt="Logo de ${esc(loja.nome)}">` : ''}
+      ${loja.logo_url ? `<img src="${esc(loja.logo_url)}" alt="Logo de ${esc(loja.nome)}" onload="var r=this.naturalWidth/this.naturalHeight;if(r>0.9&&r<1.1)this.classList.add('logo-quadrada')">` : ''}
       <h1>${esc(loja.nome)}</h1>
       <p class="recado-loja">${esc(loja.recado || recadoPadrao(loja.nome))}</p>
       <p class="pequeno">Escolha o kit e veja as datas livres. ${loja.confirmar ? 'A loja confere a data e confirma pelo WhatsApp.' : 'A reserva é confirmada depois do sinal.'}</p>
@@ -215,7 +243,7 @@ async function escolherData(kit) {
     const area = $('#cal', p);
     if (!cache[mes]) {
       area.innerHTML = '<div class="carregando">Buscando datas livres…</div>';
-      try { cache[mes] = new Set(await dados.datasOcupadas(slug, kit.id, ini, fim)); }
+      try { cache[mes] = new Set(PREVIA ? [] : await dados.datasOcupadas(slug, kit.id, ini, fim)); }
       catch (e) { area.innerHTML = `<div class="erro">${esc(e.message)}</div>`; return; }
     }
     const ocupadas = cache[mes];
@@ -252,7 +280,7 @@ async function escolherData(kit) {
     const ta = $('#temas-area', p);
     if (ta) {
       ta.innerHTML = '<div class="carregando">Vendo os temas livres…</div>';
-      try { ocupadosTema = await dados.temasOcupados(slug, kit.id, escolhida); } catch (e) { ocupadosTema = []; }
+      try { ocupadosTema = PREVIA ? [] : await dados.temasOcupados(slug, kit.id, escolhida); } catch (e) { ocupadosTema = []; }
       if (tema && ocupadosTema.includes(tema)) tema = null;
       const pintar = () => { ta.innerHTML = temasHtml(); $$('[data-tema]', ta).forEach((b) => (b.onclick = () => { tema = b.dataset.tema; pintar(); })); };
       pintar();
@@ -279,7 +307,7 @@ async function escolherData(kit) {
   };
   abrirPainel(kit.nome, `
     <div id="galeria-area">${galeria(fotosDaOpcao())}</div>
-    <div class="linha-flex entre" style="gap:8px"><span></span><button type="button" class="btn claro mini" id="compartilhar-kit">↗ Compartilhar</button></div>
+    ${PREVIA ? '' : '<div class="linha-flex entre" style="gap:8px"><span></span><button type="button" class="btn claro mini" id="compartilhar-kit">↗ Compartilhar</button></div>'}
     ${vars.length ? `<h3 style="margin-bottom:0">Escolha a opção</h3>
     <div class="opcoes-kit">${vars.map((v, i) => `<button type="button" class="opcao-kit ${i ? '' : 'sel'}" data-op="${esc(v.id)}"><b>${esc(v.nome)}</b><span>${reais(v.preco)}</span></button>`).join('')}</div>` : ''}
     <div id="pecas-area">${pecasHtml()}</div>
@@ -297,7 +325,7 @@ async function escolherData(kit) {
     </form>`, (p) => {
     ligarGaleria(p);
     desenhar(p);
-    $('#compartilhar-kit', p).onclick = () => compartilharKit(kit);
+    if ($('#compartilhar-kit', p)) $('#compartilhar-kit', p).onclick = () => compartilharKit(kit);
     $$('[data-op]', p).forEach((b) => (b.onclick = () => {
       opcao = vars.find((v) => v.id === b.dataset.op) || opcao;
       $$('[data-op]', p).forEach((x) => x.classList.toggle('sel', x === b));
@@ -322,6 +350,7 @@ async function escolherData(kit) {
       if (nome.length < 2) { erro.textContent = 'Digite seu nome.'; erro.classList.remove('oculto'); return; }
       if (zap.length < 10 || zap.length > 11) { erro.textContent = 'Confira seu WhatsApp: digite o DDD e o número, por exemplo (51) 99999-0000.'; erro.classList.remove('oculto'); return; }
       const b = $('button[type=submit]', form);
+      if (PREVIA) { erro.textContent = 'Isto é uma prévia: os pedidos chegam para você depois de publicar a loja.'; erro.classList.remove('oculto'); return; }
       b.disabled = true; b.textContent = 'Enviando…';
       try {
         const r = await dados.solicitarReserva(slug, kit.id, escolhida, nome, zap, opcao ? opcao.id : null, tema);

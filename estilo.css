@@ -686,3 +686,12 @@ button.cartao.perfil-topo { display: flex; flex-direction: row; align-items: cen
 .plano.anual.seg { background: #fff; border: 2px solid var(--linha); box-shadow: none; margin-top: 8px; }
 .plano.anual.seg .por { font-size: 28px; }
 .ia-cartao .pic, .ia-pronto .pic, .ia-selo .pic { background-color: currentColor; }
+
+/* Loja pronta (prévia do Instagram): pergunta das peças compartilhadas e preços rápidos */
+.ag-grupo { width: 100%; background: var(--fundo2, #FAF6F2); border-radius: 16px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; font-size: 14.5px; }
+.ag-grupo-fotos { display: flex; gap: 6px; }
+.ag-grupo-fotos img { width: 48px; height: 48px; border-radius: 10px; object-fit: cover; }
+.preco-rapido { display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--linha); padding: 8px 0; }
+.preco-rapido img, .preco-rapido .pr-sem { width: 46px; height: 46px; border-radius: 10px; object-fit: cover; flex: none; background: var(--linha); }
+.preco-rapido b { flex: 1; font-size: 14.5px; line-height: 1.25; }
+.preco-rapido input { width: 104px; border: 2px solid var(--linha); border-radius: 12px; padding: 9px 10px; font: inherit; font-size: 15px; }

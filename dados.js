@@ -294,6 +294,24 @@ export async function lojaTestarPush() {
   const s = await cliente();
   return ok(s.rpc('loja_testar_push'));
 }
+// ---------- Loja pronta (prévia montada pelo @ do Instagram) ----------
+export async function previaMinha(id, token) {
+  if (MODO_DEMO) { try { return JSON.parse(localStorage.getItem('apm-previa-demo') || 'null'); } catch (e) { return null; } }
+  const s = await cliente();
+  const { data, error } = await s.rpc('previa_minha', { p_id: id || null, p_token: token || null });
+  if (error) return null;
+  return data || null;
+}
+export async function previaImportar(id, token) {
+  if (MODO_DEMO) {
+    const pv = await previaMinha(); if (!pv) return { ok: true, kits: 0, ids: [] };
+    const ids = (pv.kits || []).map((k) => { const novo = { id: uid(), negocio_id: 'n1', nome: k.nome, preco: 0, sinal: 0, foto_url: k.foto_url, fotos: k.foto_url ? [k.foto_url] : [], categoria: k.categoria || null, preco_consultar: true, ativo: true, pecas: [], variacoes: [], temas: [], estruturas: [], quantidade: 1 }; D().kits.push(novo); return { previa: k.id, kit: novo.id }; });
+    demoSalvar(); try { localStorage.removeItem('apm-previa-demo'); } catch (e) { /* segue */ }
+    return { ok: true, kits: ids.length, ids };
+  }
+  const s = await cliente();
+  return ok(s.rpc('previa_importar', { p_id: id, p_token: token || null }));
+}
 export async function linkDisponivel(slug) {
   if (MODO_DEMO) return true;
   const s = await cliente();
