@@ -90,6 +90,11 @@ function css() {
 @keyframes ckf{from{opacity:0}}@keyframes cks{from{transform:translateY(40px);opacity:.4}}
 .ck{width:100%;max-width:480px;max-height:94vh;overflow:auto;background:#FFFBF7;color:#2A1B3D;border-radius:28px 28px 0 0;padding:10px 22px calc(22px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:14px;font-family:'Nunito Sans',system-ui,-apple-system,sans-serif;animation:cks .25s;box-sizing:border-box}
 .ck *{box-sizing:border-box}
+.pic { display: inline-block; width: 1.2em; height: 1.2em; vertical-align: -.24em; flex: none; background-color: var(--destaque, #C73B48); -webkit-mask: var(--i) center / contain no-repeat; mask: var(--i) center / contain no-repeat; }
+.ck-fo.sel .pic-x { background-color: currentColor; }
+.pic-cadeado { --i: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.9%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Crect x=%225%22 y=%2211%22 width=%2214%22 height=%2210%22 rx=%222%22/%3E%3Cpath d=%22M8 11V8a4 4 0 0 1 8 0v3%22/%3E%3C/svg%3E"); }
+.pic-raio { --i: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.9%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M13 3L5 13.5h6L10 21l8-10.5h-6z%22/%3E%3C/svg%3E"); }
+.pic-cartao { --i: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.9%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Crect x=%223%22 y=%225.5%22 width=%2218%22 height=%2213%22 rx=%222%22/%3E%3Cpath d=%22M3 10h18M7 15h3%22/%3E%3C/svg%3E"); }
 @media(min-width:700px){.ck-veu{align-items:center}.ck{border-radius:28px;max-height:90vh}}
 .ck-puxa{width:46px;height:5px;border-radius:9px;background:#DCD3DF;align-self:center}
 .ck-cab{display:flex;justify-content:space-between;align-items:center}
@@ -199,7 +204,7 @@ export async function abrirCheckout(op = {}) {
         ${passos.map((t, i) => `<div class="ck-p ${i < idx ? 'ok' : i === idx ? 'on' : ''}"><span>${i < idx ? '✓' : i + 1}</span>${esc(t)}</div>`).join('')}</div>`;
   };
   const erroHtml = () => (st.erro ? `<div class="ck-erro" role="alert">${esc(st.erro)}</div>` : '');
-  const seg = '<div class="ck-seg">🔒 Pagamento seguro pela Pagar.me (Stone)</div>';
+  const seg = '<div class="ck-seg"><i class="pic pic-cadeado"></i> Pagamento seguro pela Pagar.me (Stone)</div>';
 
   function desenhar() {
     if (fechado) return;
@@ -294,8 +299,8 @@ export async function abrirCheckout(op = {}) {
           <span><b>Mensal</b><small>por mês</small></span><span class="v">${reais(me.valor)}</span></button>
       </div>
       <div class="ck-formas" ${temCartao ? '' : 'style="grid-template-columns:1fr"'}>
-        <button class="ck-fo ${st.metodo === 'pix' ? 'sel' : ''}" data-metodo="pix"><span class="tag">Na hora</span><b>⚡ Pix</b><small>libera em segundos</small></button>
-        ${temCartao ? `<button class="ck-fo ${st.metodo === 'cartao' ? 'sel' : ''}" data-metodo="cartao"><b>💳 Cartão</b><small>${st.plano === 'anual' ? 'até 12x' : 'cobrança automática'}</small></button>` : ''}
+        <button class="ck-fo ${st.metodo === 'pix' ? 'sel' : ''}" data-metodo="pix"><span class="tag">Na hora</span><b><i class="pic pic-raio"></i> Pix</b><small>libera em segundos</small></button>
+        ${temCartao ? `<button class="ck-fo ${st.metodo === 'cartao' ? 'sel' : ''}" data-metodo="cartao"><b><i class="pic pic-cartao"></i> Cartão</b><small>${st.plano === 'anual' ? 'até 12x' : 'cobrança automática'}</small></button>` : ''}
       </div>
       ${pedeCpf ? `<label>CPF (para a nota do pagamento)<input name="cpf" inputmode="numeric" autocomplete="off" placeholder="000.000.000-00" value="${esc(st.cpf)}" maxlength="14"></label>` : ''}
       ${pedeCpf && !so(st.telefone) && st.contexto !== 'venda' ? `<label>WhatsApp<input name="telefone" type="tel" inputmode="tel" placeholder="(11) 98765-4321" value="${esc(st.telefone)}"></label>` : ''}
@@ -390,7 +395,7 @@ export async function abrirCheckout(op = {}) {
         <button class="ck-btn" type="submit">Pagar ${reais(totalAtual())}</button>
       </form>
       <button class="ck-link" data-voltar style="color:#6B6175">Voltar e pagar com Pix</button>
-      <div class="ck-seg">🔒 Os dados do cartão vão direto para a Pagar.me. O app não guarda.</div>`;
+      <div class="ck-seg"><i class="pic pic-cadeado"></i> Os dados do cartão vão direto para a Pagar.me. O app não guarda.</div>`;
     const f = caixa.querySelector('form');
     const end = { cep: '', rua: '', bairro: '', cidade: '', uf: '' };
     f.numero.oninput = () => { f.numero.value = so(f.numero.value).slice(0, 19).replace(/(\d{4})(?=\d)/g, '$1 '); };

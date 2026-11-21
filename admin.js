@@ -565,7 +565,7 @@ function ligarFicha(tela, p) {
 // Nível de interesse e interações com popups (ficha da pessoa)
 // ---------------------------------------------------------------------
 const NOMES_POPUP = {
-  fim_teste: 'Fim do teste (anual R$ 167 + 48 h)', promo_dia2: 'Promoção do 2º dia do teste', assinar_agora: 'Botão "Assinar agora"',
+  fim_teste: 'Fim do teste (oferta conforme o uso)', promo_dia2: 'Popup do 2º dia (oferta conforme o uso)', assinar_agora: 'Botão "Assinar agora"', fim_mes1: 'Fim do 1º mês (R$ 14,90)',
   aviso_promo: 'Notificação da promoção', comemoracao_link: 'Comemoração da 1ª reserva pelo link', black_friday: 'Black Friday (anual R$ 167)',
   faixa: 'Faixa de pagamento', outro: 'Outros botões de assinar', promo_montagem: 'Montamos sua loja (2º dia, menos de 3 kits)', mensagem: 'Mensagem da Central',
 };
@@ -648,6 +648,38 @@ function abaEstudo(tela) {
 // ---------------------------------------------------------------------
 // Popups e ofertas
 // ---------------------------------------------------------------------
+// Oferta conforme o uso: quem viu o anual ou o mensal em destaque e se comprou
+async function desenharOfertasUso(caixa, dias) {
+  if (!caixa) return;
+  let lista = null;
+  try {
+    if (dados.MODO_DEMO) {
+      const h = (m) => new Date(Date.now() - m * 6e4).toISOString();
+      lista = [{ em: 'juliana@exemplo.com', no: 'Juliana Mendes', kits: 6, oferta: 'anual', viu: [{ onde: 'Popup 2º dia', oferta: 'anual', q: h(600) }], comprou: 'anual', comprou_em: h(590) },
+        { em: 'carla@exemplo.com', no: 'Carla Souza', kits: 1, oferta: 'mensal', viu: [{ onde: 'Popup 2º dia', oferta: 'mensal', q: h(900) }, { onde: 'E-mail 5º dia', oferta: 'mensal', q: h(60) }], comprou: null }];
+    } else lista = await rpcAdmin('admin_ofertas', { p_dias: dias });
+  } catch (e) { lista = null; }
+  if (!caixa.isConnected) return;
+  if (!lista) { caixa.innerHTML = ''; return; }
+  const grupo = (o) => lista.filter((x) => x.oferta === o);
+  const cmp = (o) => grupo(o).filter((x) => x.comprou);
+  const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
+  const kpi = (o) => {
+    const g = grupo(o), c = cmp(o);
+    const an = c.filter((x) => x.comprou === 'anual').length, me = c.length - an;
+    return `<div class="kpi"><small>Viram o ${o} em destaque</small><b>${g.length}</b><i>${o === 'anual' ? '3 kits ou mais' : '0 a 2 kits'}</i></div>
+      <div class="kpi"><small>Compraram</small><b>${c.length}</b><i class="p">${pct(c.length, g.length)}%${c.length ? ` · ${[an ? `${an} anual` : '', me ? `${me} mensal` : ''].filter(Boolean).join(', ')}` : ''}</i></div>`;
+  };
+  const dh = (q) => { const d = new Date(q); return `${d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`; };
+  caixa.innerHTML = `<section class="cartao"><div class="cab-crm"><h2>Oferta conforme o uso</h2><span>3 kits ou mais: anual em destaque · 0 a 2 kits: mensal em destaque</span></div>
+    <div class="kpis-crm k4" style="margin:10px 0">${kpi('anual')}${kpi('mensal')}</div>
+    ${lista.length ? `<p class="pequeno" style="margin:0 0 6px">Cada cliente, qual oferta viu (popup do 2º dia, tela de fim de teste, fim do 1º mês ou e-mail do 5º dia) e se comprou.</p>
+    <div class="pg-lista">${lista.slice(0, 200).map((x) => `<div class="pg-ab"><div style="min-width:0"><b class="t">${esc(x.no || x.loja || x.em)}</b>
+      <small>${esc(x.em)} · ${x.kits ?? 0} ${Number(x.kits) === 1 ? 'kit' : 'kits'} · <span class="st ${x.oferta === 'anual' ? 'st-pago' : 'st-pix_pendente'}">${x.oferta === 'anual' ? 'Anual' : 'Mensal'} em destaque</span></small>
+      <small>Viu: ${esc((x.viu || []).map((v) => `${v.onde} (${v.oferta}) ${dh(v.q)}`).join(' · '))}</small></div>
+      <div class="ld"><span class="v" style="color:${x.comprou ? 'var(--pos)' : 'var(--texto2)'}">${x.comprou ? `Comprou ${esc(x.comprou)} · ${esc(dh(x.comprou_em))}` : 'Ainda não comprou'}</span></div></div>`).join('')}</div>`
+    : '<p class="pequeno">Ainda não há dados. Começa a contar depois desta atualização.</p>'}</section>`;
+}
 async function abaPopups(tela) {
   const dias = { hoje: '1', ontem: '2' }[String(estado.funilDias ?? 30)] || String(estado.funilDias ?? 30);
   tela.innerHTML = '<div id="popups-c" class="coluna" style="gap:16px"><div class="cartao">Carregando…</div></div>';
@@ -662,6 +694,7 @@ async function abaPopups(tela) {
   const escolhido = String(estado.funilDias ?? 30);
   alvo.innerHTML = `
     <div class="nota-crm" style="margin:0">Os popups que você mesma envia (com a lista de quem recebeu) ficam em <button class="link-btn" id="ir-msgs">Mensagens › Mensagens enviadas</button>. Ninguém recebe a mesma mensagem duas vezes.</div>
+    <div id="ofertas-uso"></div>
     ${blocoNiveis()}
     <div class="filtros-crm"><label>Período<select id="f-dias">${per.map(([v, t]) => `<option value="${v}" ${v === escolhido ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label></div>
     <div class="kpis-crm">
@@ -687,6 +720,7 @@ async function abaPopups(tela) {
     </section>`;
   const d = $('#f-dias', alvo);
   if (d) d.onchange = () => { estado.funilDias = d.value; desenhar(); };
+  desenharOfertasUso($('#ofertas-uso', alvo), Number(dias));
   const im = $('#ir-msgs', alvo);
   if (im) im.onclick = () => { estado.aba = 'mensagens'; desenhar(); window.scrollTo(0, 0); };
   ligarNiveis(alvo);
@@ -1339,6 +1373,17 @@ const ZAP_REC = {
   pix_pendente: 'Oi{nome}! Vi que você gerou o Pix do App Pegue e Monte, mas ele não foi pago. Quer que eu te ajude a finalizar? Se o Pix venceu, te mando o link para gerar outro 😊',
   recusado: 'Oi{nome}! Vi que o pagamento no cartão não passou. Quer tentar no Pix ou começar pelo plano mensal? Te ajudo por aqui 😊',
 };
+// Chama uma função do banco direto (sem depender de versão nova do dados.js)
+async function rpcAdmin(nome, args = {}) {
+  const sessao = await dados.sessaoAtual();
+  if (!sessao || !sessao.access_token) return null;
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${nome}`, {
+    method: 'POST', body: JSON.stringify(args),
+    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${sessao.access_token}`, 'Content-Type': 'application/json' },
+  });
+  if (!r.ok) return null; // banco ainda sem a atualização: a tela continua funcionando sem essa parte
+  return r.json();
+}
 // Dados da recuperação (abandonos, telefones, e-mails enviados e vendas recuperadas)
 async function carregarRecuperacao() {
   if (dados.MODO_DEMO) {
@@ -1660,17 +1705,19 @@ async function abaMensagens(tela) {
 
 // ---------- E-mails automáticos ----------
 const EMAILS_TIPOS = [
-  ['boas_vindas', 'Boas-vindas', 'na hora do cadastro'],
+  ['boas_vindas', 'Boas-vindas · mande a foto de um kit', 'na hora do cadastro'],
   ['parada_1', 'Parada: sem loja (etapa 1)', '24 h parada'],
   ['parada_2', 'Parada: sem kit (etapa 2)', '24 h parada'],
   ['parada_3', 'Parada: 1 kit (etapa 3)', '24 h parada'],
   ['parada_4', 'Parada: não divulgou (etapa 4)', '24 h parada'],
   ['parada_5', 'Parada: sem reserva (etapa 5)', '24 h parada'],
   ['primeira_reserva', '1ª reserva de cliente real', 'quando acontece'],
-  ['dia2_montagem', 'Dia 2 · Loja pronta com a IA (menos de 3 kits)', '2º dia'],
+  ['dia2_montagem', 'Dia 2 · 1º kit com a foto (só quem tem 0 kits)', '2º dia'],
   ['dia2_promo', 'Dia 2 · 53% OFF (3+ kits)', '2º dia'],
-  ['dia5_resumo', 'Dia 5 · resumo do que ela fez', '5º dia'],
+  ['dia5_resumo', 'Antigo · dia 5 resumo', 'trocado pela oferta do dia 5'],
   ['teste_amanha', 'Dia 6 · teste acaba amanhã', '6º dia'],
+  ['dia5_anual', 'Dia 5 · oferta do anual (3 kits ou mais)', '5º dia'],
+  ['dia5_mensal', 'Dia 5 · oferta do mensal (0 a 2 kits)', '5º dia'],
   ['teste_acabou', 'Dia 7 · teste acabou (link fora do ar)', '7º dia'],
   ['promo_ultimo_dia', 'Dia 9 · link continua fora do ar', '9º dia'],
   ['carrinho', 'Recuperação · carrinho abandonado', '1 h depois (no app: 2 h)'],
@@ -1678,6 +1725,8 @@ const EMAILS_TIPOS = [
   ['pix_vencido', 'Recuperação · Pix não pago', '1 h depois'],
   ['cartao_recusado', 'Recuperação · cartão recusado', '1 h depois'],
   ['checkout', 'Antigo · foi ao checkout e não comprou', 'trocado pelo carrinho'],
+  ['mes1_liberado', '1º mês · acesso liberado', 'na hora da compra'],
+  ['mes1_acabando', '1º mês · termina em 3 dias', '3 dias antes'],
 ];
 async function abaEmails(tela) {
   tela.innerHTML = '<div id="em-c" class="coluna" style="gap:16px"><div class="cartao">Carregando…</div></div>';

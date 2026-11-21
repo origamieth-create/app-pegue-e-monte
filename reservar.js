@@ -11,7 +11,7 @@ if (dados.DEMONSTRACAO_SITE) {
     if (!a) return;
     e.preventDefault();
     const t = document.getElementById('toast');
-    if (t) { t.textContent = 'Na versão real, o pedido chega direto no WhatsApp da loja 😉'; t.classList.remove('oculto'); setTimeout(() => t.classList.add('oculto'), 3200); }
+    if (t) { t.textContent = 'Na versão real, o pedido chega direto no WhatsApp da loja'; t.classList.remove('oculto'); setTimeout(() => t.classList.add('oculto'), 3200); }
   }, true);
 }
 
@@ -98,7 +98,7 @@ const VENDO_COMO_DONA = !!new URLSearchParams(location.search).get('dona');
 if (VENDO_COMO_DONA) {
   const faixa = document.createElement('div');
   faixa.className = 'faixa-dona';
-  faixa.innerHTML = '<a class="faixa-dona-btn" href="index.html?link=1">‹ Voltar ao app</a><span>👀 Você está vendo sua loja como a cliente vê</span>';
+  faixa.innerHTML = '<a class="faixa-dona-btn" href="index.html?link=1">‹ Voltar ao app</a><span><i class="pic pic-olho"></i> Você está vendo sua loja como a cliente vê</span>';
   document.body.prepend(faixa);
 }
 function contarVisita(slug) {
@@ -131,7 +131,7 @@ async function iniciar() {
       <h1>${esc(loja.nome)}</h1>
       <p class="recado-loja">${esc(loja.recado || recadoPadrao(loja.nome))}</p>
       <p class="pequeno">Escolha o kit e veja as datas livres. ${loja.confirmar ? 'A loja confere a data e confirma pelo WhatsApp.' : 'A reserva é confirmada depois do sinal.'}</p>
-      ${fechadoAgora ? `<p class="nota-amarela pequeno" style="margin:6px 0 0">🔒 ${esc(fechadoAgora.recado || 'A loja não vai atender')} (${esc(dataCurta2(fechadoAgora.de))}${fechadoAgora.ate !== fechadoAgora.de ? ' a ' + esc(dataCurta2(fechadoAgora.ate)) : ''})</p>` : ''}
+      ${fechadoAgora ? `<p class="nota-amarela pequeno" style="margin:6px 0 0"><i class="pic pic-cadeado"></i> ${esc(fechadoAgora.recado || 'A loja não vai atender')} (${esc(dataCurta2(fechadoAgora.de))}${fechadoAgora.ate !== fechadoAgora.de ? ' a ' + esc(dataCurta2(fechadoAgora.ate)) : ''})</p>` : ''}
       <div class="botoes-loja">
         <a class="btn verde mini" href="${esc(linkZap(loja.whatsapp, 'Oi! Vim pelo link de reservas e tenho uma dúvida.'))}" target="_blank" rel="noopener">Dúvidas? Fale no WhatsApp</a>
         ${loja.instagram ? `<a class="btn insta mini" href="https://instagram.com/${encodeURIComponent(loja.instagram)}" target="_blank" rel="noopener">${ICONE_INSTA} Instagram</a>` : ''}
@@ -145,7 +145,7 @@ async function iniciar() {
     ${loja.kits.length ? `<div class="grade">${loja.kits.map((k) => `
       <button class="cartao clicavel kit" data-kit="${esc(k.id)}" data-categoria="${esc(k.categoria || '')}" data-nome="${esc(String(k.nome).toLowerCase())}">
         <span style="position:relative; display:block">${k.foto_url ? fotoCaixa(k.foto_url, '', true) : '<div class="foto-kit foto-vazia">Sem foto</div>'}
-        ${fotosDe(k).length > 1 ? `<span class="contador-fotos">📷 ${fotosDe(k).length}</span>` : ''}</span>
+        ${fotosDe(k).length > 1 ? `<span class="contador-fotos"><i class="pic pic-camera"></i> ${fotosDe(k).length}</span>` : ''}</span>
         ${k.categoria ? `<span class="etiqueta et-categoria">${esc(k.categoria)}</span>` : ''}
         <span class="nome">${esc(k.nome)}</span>
         <span class="preco">${precoTexto(k)}</span>
@@ -270,7 +270,7 @@ async function escolherData(kit) {
     : `<span class="preco" style="font-family:'Fredoka',sans-serif;font-size:22px;font-weight:600">${reais(opcao ? opcao.preco : kit.preco)}</span>
       ${Number(opcao ? opcao.sinal : kit.sinal) > 0 ? `<span class="pequeno">Sinal para reservar: <b>${reais(opcao ? opcao.sinal : kit.sinal)}</b></span>` : ''}`;
   const temasHtml = () => `<div class="temas-link">${temas.map((t) => { const oc = ocupadosTema.includes(t.id); return `<button type="button" class="tema-link ${tema === t.id ? 'sel' : ''}" data-tema="${esc(t.id)}" ${oc ? 'disabled' : ''}>
-      ${t.foto ? `<img src="${esc(t.foto)}" alt="">` : '<span class="tema-sem">🎨</span>'}<b>${esc(t.nome)}</b>${oc ? '<small>já reservado</small>' : ''}</button>`; }).join('')}</div>`;
+      ${t.foto ? `<img src="${esc(t.foto)}" alt="">` : '<span class="tema-sem"><i class="pic pic-paleta"></i></span>'}<b>${esc(t.nome)}</b>${oc ? '<small>já reservado</small>' : ''}</button>`; }).join('')}</div>`;
   const pecasHtml = () => {
     const base = Array.isArray(kit.pecas) ? kit.pecas : [];
     const extras = opcao && Array.isArray(opcao.extras) ? opcao.extras.filter(Boolean) : [];

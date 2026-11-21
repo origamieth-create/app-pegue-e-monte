@@ -3,7 +3,7 @@
 // Abas: Hoje, Agenda, Kits, Mais
 // =====================================================================
 import * as dados from './dados.js?v=20261121e';
-import { abrirCheckout, planos as planosCheckout, linkCakto } from './checkout.js?v=20261121g';
+import { abrirCheckout, planos as planosCheckout, linkCakto } from './checkout.js?v=20261121h';
 import { PERMITIR_CADASTRO, EMAIL_SUPORTE, WHATSAPP_SUPORTE, LINK_MENSAL, LINK_ANUAL, LINK_ANUAL_PROMO, DEMO_SITE, LINK_PLANOS, SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=20261121e';
 
 const { hojeISO, somaDias, cruza } = dados;
@@ -182,9 +182,9 @@ function rastrear(popup, acao, detalhe) {
   if (estado.suporte || DEMO_SITE) return;
   dados.registrarInteracao(popup, acao, detalhe).catch(() => {});
 }
-function popupMedido(nome) {
+function popupMedido(nome, oferta) {
   popupAtual = nome; popupFoiCheckout = false;
-  rastrear(nome, 'viu');
+  rastrear(nome, 'viu', oferta);
   clearTimeout(popupTimer);
   popupTimer = setTimeout(() => { if (popupAtual === nome) rastrear(nome, 'olhou_10s'); }, 10000);
 }
@@ -232,7 +232,7 @@ function abrirPagamento(plano, linkReserva, popup) {
   abrirCheckout({
     plano, contexto: 'app', linkReserva, popup: popup || null,
     email: a.email, telefone: (estado.negocio && estado.negocio.whatsapp) || '', temCliente: !!a.cliente_pagarme,
-    aoConcluir: () => { recarregar().then(() => aviso('Pagamento confirmado! Obrigada 💛')).catch(() => location.reload()); },
+    aoConcluir: () => { recarregar().then(() => aviso('Pagamento confirmado! Obrigada')).catch(() => location.reload()); },
   });
 }
 // Textos dos planos seguem os preços do checkout próprio quando ele está ligado
@@ -263,7 +263,7 @@ const NOVIDADES = {
   desde: '2026-11-19T20:00:00Z', // contas criadas depois disso já nascem com tudo
   ia: true, // só aparece para quem já tem a IA liberada
   itens: [
-    ['✨', 'Montar catálogo com IA', 'Mande fotos, prints, PDF ou o link do Drive. A IA separa os kits com nome e preço, e você só confere e aprova.'],
+    ['<i class="pic pic-brilho"></i>', 'Montar catálogo com IA', 'Mande fotos, prints, PDF ou o link do Drive. A IA separa os kits com nome e preço, e você só confere e aprova.'],
   ],
 };
 // Vídeo tutorial da IA (arquivo na mesma pasta do app). Se o arquivo não existir, o link não aparece.
@@ -297,7 +297,7 @@ function mostrarNovidades() {
   function marcar() { try { localStorage.setItem(chave, NOVIDADES.versao); } catch (e) { /* ignora */ } }
   abrirPopup(`
     ${BANDEIRINHAS}
-    <h2 class="centro" style="font-size:26px">Novidades no app 🎉</h2>
+    <h2 class="centro" style="font-size:26px">Novidades no app <i class="pic pic-festa"></i></h2>
     <p class="centro pequeno">Acabamos de atualizar o App Pegue e Monte. Veja o que chegou:</p>
     <div class="coluna" style="gap:10px">
       ${NOVIDADES.itens.map(([ic, t, d]) => `
@@ -356,7 +356,7 @@ function ligarDemoSite() {
     if (!a) return;
     if (WHATSAPP_SUPORTE && a.href.includes(soDigitos(WHATSAPP_SUPORTE))) return;
     e.preventDefault();
-    aviso('Na versão real, abre o WhatsApp da cliente com a mensagem pronta 😉');
+    aviso('Na versão real, abre o WhatsApp da cliente com a mensagem pronta');
   }, true);
 }
 
@@ -500,7 +500,7 @@ function popupPagamento() {
       await recarregar();
       const ok = estado.assinatura.status === 'ativa' || estado.assinatura.cortesia;
       if (ok) fecharPainel();
-      aviso(ok ? 'Pagamento confirmado! Obrigada 💛' : 'Ainda não recebemos a confirmação. Pode levar alguns minutos.');
+      aviso(ok ? 'Pagamento confirmado! Obrigada' : 'Ainda não recebemos a confirmação. Pode levar alguns minutos.');
     });
     if (!temPix) return;
     $('#pix-copiar', p).onclick = async () => {
@@ -562,17 +562,19 @@ function montagemOfertada() {
   if (!estado.suporte) dados.registrarOfertaMontagem().catch(() => {});
   return true;
 }
-function planosHtml() {
+// Oferta conforme o uso: 3 kits ou mais = anual em destaque; 0 a 2 kits = mensal em destaque
+function ofertaPorUso() { return (estado.kits || []).length >= 3 ? 'anual' : 'mensal'; }
+function planosHtml(destaque = 'anual') {
   const fim = fimDaOfertaAnual();
   const promo = promoAnualLiberada();
-  const montagem = promo && montagemOfertada();
+  const montagem = false; // oferta "a equipe monta sua loja" saiu (a IA faz isso agora)
   const anual = promo
     ? `<div class="plano anual"><span class="fita">${agoraServidor() < fim - HORAS_OFERTA_FIM * 3600e3 ? 'PROMOÇÃO DO TESTE GRÁTIS' : 'OFERTA DE FIM DE TESTE'}</span><span class="desc">53% OFF</span>
         <div class="nome">Plano anual</div>
         <div class="de">De R$ 358,80</div>
         <div class="por">R$ 167 <small>por 12 meses</small></div>
         <div class="mes">Sai por R$ 13,92 por mês · ou parcele no cartão</div>
-        ${estado.ia && estado.ia.disponivel ? '<div class="ia-plano-item">✨ IA monta seu catálogo: ilimitado</div>' : ''}
+        ${estado.ia && estado.ia.disponivel ? '<div class="ia-plano-item"><i class="pic pic-brilho"></i> IA monta seu catálogo: ilimitado</div>' : ''}
         ${montagem ? '<div class="montagem-extra">✓ Nossa equipe cadastra seus kits para você</div>' : ''}
         ${fim - agoraServidor() <= HORAS_OFERTA_FIM * 3600e3 ? `<div class="contagem-oferta">Oferta termina em <b id="oferta-relogio">${tempoRestante(fim - agoraServidor())}</b></div>` : ''}
         <a class="btn verde cheio" style="min-height:52px;font-size:17px" href="${esc(LINK_ANUAL_PROMO)}" target="_blank" rel="noopener">${montagem ? 'Quero o anual com a loja montada' : 'Quero o anual com desconto'}</a>
@@ -581,22 +583,34 @@ function planosHtml() {
         <div class="de">De ${reaisC(precoAnualCheckout().de)}</div>
         <div class="por">${reaisC(precoAnualCheckout().valor).replace(',00', '')} <small>por 12 meses</small></div>
         <div class="mes">Sai por ${reaisC(precoAnualCheckout().mes)} por mês · ou parcele no cartão</div>
-        ${estado.ia && estado.ia.disponivel ? '<div class="ia-plano-item">✨ IA monta seu catálogo: ilimitado</div>' : ''}
+        ${estado.ia && estado.ia.disponivel ? '<div class="ia-plano-item"><i class="pic pic-brilho"></i> IA monta seu catálogo: ilimitado</div>' : ''}
         <a class="btn verde cheio" style="min-height:52px;font-size:17px" href="${esc(LINK_ANUAL)}" target="_blank" rel="noopener">Assinar o anual</a>
       </div>`
     : `<div class="plano anual"><span class="desc">53% OFF</span><div class="nome">Plano anual</div>
         <div class="de">De R$ 358,80</div>
         <div class="por">R$ 167 <small>por 12 meses</small></div>
         <div class="mes">Sai por R$ 13,92 por mês · ou parcele no cartão</div>
-        ${estado.ia && estado.ia.disponivel ? '<div class="ia-plano-item">✨ IA monta seu catálogo: ilimitado</div>' : ''}
+        ${estado.ia && estado.ia.disponivel ? '<div class="ia-plano-item"><i class="pic pic-brilho"></i> IA monta seu catálogo: ilimitado</div>' : ''}
         <a class="btn verde cheio" style="min-height:52px;font-size:17px" href="${esc(LINK_ANUAL)}" target="_blank" rel="noopener">Assinar o anual</a>
       </div>`;
+  if (destaque === 'mensal') {
+    // mensal em cima e em destaque; anual logo abaixo, como segunda opção
+    const anualSeg = anual.replace('class="plano anual"', 'class="plano anual seg"').replace(/<span class="fita">[^<]*<\/span>/, '').replace('class="btn verde cheio"', 'class="btn contorno cheio"');
+    return `<div class="planos">
+      <div class="plano mensal dest"><span class="fita">COMECE POR AQUI</span>
+        <div class="nome">Plano mensal</div>
+        <div class="por">R$ 29,90 <small>por mês</small></div>
+        <div class="mes">Sem compromisso · cancele quando quiser</div>
+        ${estado.ia && estado.ia.disponivel ? '<div class="ia-plano-item"><i class="pic pic-brilho"></i> IA monta seu catálogo: ilimitado</div>' : ''}
+        <a class="btn verde cheio" style="min-height:52px;font-size:17px" href="${esc(LINK_MENSAL)}" target="_blank" rel="noopener">Assinar o mensal</a>
+      </div>${anualSeg}
+    </div>`;
+  }
   return `<div class="planos">${anual}
       <div class="plano mensal">
         <div class="nome">Plano mensal</div>
         <div class="por">R$ 29,90 <small>por mês</small></div>
-        ${estado.ia && estado.ia.disponivel ? '<div class="ia-plano-item">✨ IA monta seu catálogo: ilimitado</div>' : ''}
-        ${montagem ? '<div class="montagem-extra">✓ Nossa equipe cadastra seus kits para você</div>' : ''}
+        ${estado.ia && estado.ia.disponivel ? '<div class="ia-plano-item"><i class="pic pic-brilho"></i> IA monta seu catálogo: ilimitado</div>' : ''}
         <a class="btn contorno cheio" href="${esc(LINK_MENSAL)}" target="_blank" rel="noopener">Assinar o mensal</a>
       </div>
     </div>`;
@@ -631,40 +645,42 @@ function popupPlanosTeste(origem = 'assinar_agora') {
     popupMedido(origem);
   });
 }
+// Fim do 1º mês (oferta de R$ 14,90): planos conforme o uso
+function popupPlanosMes1() {
+  const a = estado.assinatura || {};
+  const oferta = ofertaPorUso();
+  abrirPopup(`
+    <div class="pic-g">${PIC('coracao')}</div>
+    <h2 class="centro" style="font-size:24px;margin:0">Continue com o app</h2>
+    ${blocoResumoTeste('O que você já montou no app')}
+    <p class="centro pequeno" style="margin:0">Escolha seu plano. Seus kits, fotos e reservas continuam do jeitinho que estão.</p>
+    ${planosHtml(oferta)}
+    <div class="nota-amarela pequeno">Assine com o <b>mesmo e-mail</b> (<b>${esc(a.email || '')}</b>) para não perder nada do que já cadastrou.</div>
+    ${botaoZapSuporte('Oi! Meu 1º mês do App Pegue e Monte está acabando e tenho uma dúvida sobre os planos.')}
+    <button class="link-btn" id="mes1-fechar">Agora não</button>`, (p) => {
+    $('#mes1-fechar', p).onclick = () => fecharPainel();
+    popupMedido('fim_mes1', 'oferta_' + oferta);
+  });
+}
 // 2º dia do teste: mostra a promoção do anual uma vez. Depois ela fica no "Assinar agora".
 function mostrarPromoDoTeste() {
   if (situacaoAssinatura() !== 'teste' || !promoAnualLiberada() || painelAberto || !estado.negocio) return;
   const chave = `apm-promo-teste-vista-${estado.negocio.id}`;
   try { if (localStorage.getItem(chave)) return; localStorage.setItem(chave, '1'); } catch (e) { return; }
   const a = estado.assinatura || {};
-  if (montagemOfertada()) {
-    abrirPopup(`
-    ${BANDEIRINHAS}
-    <span class="selo-presente">🎁 PRESENTE DO SEU 2º DIA</span>
-    <h2 class="centro" style="font-size:25px;margin:0">A gente <span style="color:var(--destaque)">monta sua loja</span> para você</h2>
-    <p class="centro pequeno" style="margin:0">Assine hoje (anual ou mensal) e nossa equipe cadastra seus kits com fotos, preços e peças.</p>
-    <div class="nota-amarela pequeno centro"><b>1</b> Assine · <b>2</b> Chame a equipe no WhatsApp · <b>3</b> Mande as fotos dos kits</div>
-    ${planosHtml()}
-    ${WHATSAPP_SUPORTE ? `<a class="btn contorno cheio" href="${esc(linkZap(WHATSAPP_SUPORTE, 'Oi! Quero saber como funciona a montagem da loja pela equipe.'))}" target="_blank" rel="noopener">${ICONE.zap} Tirar dúvidas no WhatsApp</a>` : ''}
-    <div class="nota-amarela pequeno">Assine com o <b>mesmo e-mail do teste</b> (<b>${esc(a.email || '')}</b>) para não perder nada do que já cadastrou.</div>
-    <button class="link-btn" id="promo-fechar">Agora não</button>`, (p) => {
-      $('#promo-fechar', p).onclick = () => fecharPainel();
-      ligarRelogioOferta(p);
-      popupMedido('promo_montagem');
-    });
-    return;
-  }
+  const oferta = ofertaPorUso();
   abrirPopup(`
-    ${BANDEIRINHAS}
-    <h2 class="centro" style="font-size:24px;margin:0">Um presente do seu teste grátis 🎁</h2>
+    <div class="pic-g">${PIC(oferta === 'anual' ? 'brilho' : 'coracao')}</div>
+    <h2 class="centro" style="font-size:24px;margin:0">${oferta === 'anual' ? 'Sua loja já está pronta' : 'Continue com o app'}</h2>
     ${blocoResumoTeste('O que você já montou no app')}
-    <p class="centro pequeno" style="margin:0">Liberamos o plano anual com <b>53% de desconto</b> para quem está testando. A cobrança começa no dia em que você assina.</p>
-    ${planosHtml()}
+    <p class="centro pequeno" style="margin:0">${oferta === 'anual' ? 'Liberamos o plano anual com <b>53% de desconto</b> para quem está testando.' : 'Comece pelo mensal e passe para o anual quando quiser.'} A cobrança começa no dia em que você assina.</p>
+    ${planosHtml(oferta)}
     <div class="nota-amarela pequeno">Assine com o <b>mesmo e-mail do teste</b> (<b>${esc(a.email || '')}</b>) para não perder nada do que já cadastrou.</div>
-    <p class="centro pequeno" style="margin:0">A oferta fica guardada no botão <b>"Assinar agora"</b>, no topo do app.</p>
+    <p class="centro pequeno" style="margin:0">Os planos ficam no botão <b>"Assinar agora"</b>, no topo do app.</p>
     <button class="link-btn" id="promo-fechar">Continuar testando</button>`, (p) => {
     $('#promo-fechar', p).onclick = () => fecharPainel();
-    popupMedido('promo_dia2');
+    ligarRelogioOferta(p);
+    popupMedido('promo_dia2', 'oferta_' + oferta);
   });
 }
 
@@ -687,7 +703,7 @@ function comemorarReservaPeloLink() {
   const emTeste = situacaoAssinatura() === 'teste';
   abrirPopup(`
     ${BANDEIRINHAS}
-    <div class="centro" style="font-size:44px;line-height:1">🎉</div>
+    <div class="pic-g" aria-hidden="true"><i class="pic pic-festa"></i></div>
     <h2 class="centro" style="font-size:24px;margin:0">Uma cliente reservou sozinha pelo seu link!</h2>
     <p class="centro" style="margin:0"><b>${esc(r.cliente_nome || 'Uma cliente')}</b> escolheu o kit <b>${esc(nomeKitReserva(r))}</b> para ${esc(dataLonga(r.data_festa))}.</p>
     <p class="centro pequeno" style="margin:0">É isso que o app faz por você todo dia: a cliente escolhe o kit e a data livre, e o pedido chega pronto.</p>
@@ -711,7 +727,7 @@ function bloqueioFimDoTeste() {
     <h2 class="centro" style="font-size:24px;margin:0">Seu teste grátis terminou</h2>
     ${blocoResumoTeste('Não perca o que você já montou')}
     <p class="centro pequeno" style="margin:0">Escolha seu plano e continue de onde parou. Seus kits, fotos e reservas estão guardados.</p>
-    ${planosHtml()}
+    ${planosHtml(ofertaPorUso())}
     <div class="nota-amarela pequeno">Assine com o <b>mesmo e-mail do teste</b> (<b>${esc(a.email || '')}</b>) para não perder nada do que já cadastrou.</div>
     <button class="btn contorno cheio" id="teste-verificar">Já assinei, verificar</button>
     <button class="btn contorno cheio" id="teste-olhar">Só ver minhas reservas por enquanto</button>
@@ -722,13 +738,13 @@ function bloqueioFimDoTeste() {
   document.body.style.overflow = 'hidden';
   $('#teste-verificar', caixa).onclick = (e) => acao(e.currentTarget, async () => {
     await recarregar();
-    if (situacaoAssinatura() !== 'teste_fim') { caixa.remove(); document.body.style.overflow = ''; aviso('Assinatura confirmada! Bem-vinda 💛'); }
+    if (situacaoAssinatura() !== 'teste_fim') { caixa.remove(); document.body.style.overflow = ''; aviso('Assinatura confirmada! Bem-vinda'); }
     else aviso('Ainda não recebemos a confirmação. Pode levar alguns minutos.');
   });
   const normal = $('#demo-normal', caixa);
   if (normal) normal.onclick = async () => { dados.demoSimular('normal'); caixa.remove(); document.body.style.overflow = ''; await recarregar(); montarApp(); };
   $('#teste-sair', caixa).onclick = async () => { await dados.sair(); caixa.remove(); document.body.style.overflow = ''; telaLogin('entrar'); };
-  if (popupAtual !== 'fim_teste') popupMedido('fim_teste');
+  if (popupAtual !== 'fim_teste') popupMedido('fim_teste', 'oferta_' + ofertaPorUso());
   $('#teste-olhar', caixa).onclick = () => { fimDoPopupMedido(); clearInterval(relogioOferta); caixa.remove(); document.body.style.overflow = ''; try { sessionStorage.setItem('apm-fim-teste-visto', '1'); } catch (e) { /* segue */ } };
   ligarRelogioOferta(caixa);
 }
@@ -769,10 +785,35 @@ function desenharFaixaAssinatura() {
   const sit = situacaoAssinatura();
   if (sit !== 'teste_fim' && $('#bloqueio')) { $('#bloqueio').remove(); document.body.style.overflow = ''; }
   const ass = estado.assinatura || {};
+  // 1º mês (oferta de R$ 14,90): aviso 3 dias antes de acabar e, depois, escolher o plano
+  if (ass.primeiro_mes && ass.vence_em && (sit === null || sit === 'cancelada')) {
+    const fimMes = new Date(ass.vence_em).getTime();
+    const dataFim = new Date(ass.vence_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    if (sit === null) {
+      if (fimMes - agoraServidor() > 3 * 864e5) { faixa.innerHTML = base; return; }
+      faixa.innerHTML = base + `
+        <div class="faixa-pagamento teste" role="status">
+          <div>${PIC('relogio')} <b>Seu 1º mês termina dia ${esc(dataFim)}.</b> Escolha seu plano para continuar sem parar.</div>
+          <button class="btn mini" id="faixa-mes1">Ver planos</button>
+        </div>`;
+    } else {
+      const ainda = ass.liberado && ass.carencia_ate;
+      faixa.innerHTML = base + `
+        <div class="faixa-pagamento ${ainda ? '' : 'suspensa'}" role="alert">
+          <div><b>Seu 1º mês terminou.</b> ${ainda ? `Escolha seu plano em <b id="contagem">${tempoRestante(new Date(ass.carencia_ate).getTime() - agoraServidor())}</b> para não parar.` : 'Escolha seu plano para voltar a usar. Seus kits, fotos e reservas estão guardados.'}</div>
+          <button class="btn mini" id="faixa-mes1">Ver planos</button>
+        </div>`;
+      let visto = '';
+      try { visto = sessionStorage.getItem('apm-fim-mes1-visto') || ''; } catch (e) { /* segue */ }
+      if (!visto && !$('#painel').innerHTML) { try { sessionStorage.setItem('apm-fim-mes1-visto', '1'); } catch (e) { /* segue */ } setTimeout(popupPlanosMes1, 300); }
+    }
+    $('#faixa-mes1', faixa).onclick = popupPlanosMes1;
+    return;
+  }
   if (!sit && ass.status === 'ativa' && ass.gateway === 'pagarme' && ass.pix_codigo && ass.vence_em) {
     faixa.innerHTML = base + `
       <div class="faixa-pagamento teste" role="status">
-        <div>🔔 <b>Sua assinatura renova dia ${esc(new Date(ass.vence_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }))}.</b> O Pix já está pronto: pague e continue usando sem parar.</div>
+        <div><i class="pic pic-sino"></i> <b>Sua assinatura renova dia ${esc(new Date(ass.vence_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }))}.</b> O Pix já está pronto: pague e continue usando sem parar.</div>
         <button class="btn mini" id="faixa-renovar">Pagar com Pix</button>
       </div>`;
     $('#faixa-renovar', faixa).onclick = popupPagamento;
@@ -785,7 +826,7 @@ function desenharFaixaAssinatura() {
     const dias = Math.max(1, Math.ceil((new Date(a.teste_ate).getTime() - agoraServidor()) / 864e5));
     faixa.innerHTML = base + `
       <div class="faixa-pagamento teste" role="status">
-        <div>🎁 <b>Seu teste grátis termina ${dias === 1 ? 'amanhã' : `em ${dias} dias`}.</b> ${textoResumoTeste() ? `Você já tem ${esc(textoResumoTeste())}.` : 'Assine com este mesmo e-mail e continue com tudo que cadastrou.'}</div>
+        <div><i class="pic pic-presente"></i> <b>Seu teste grátis termina ${dias === 1 ? 'amanhã' : `em ${dias} dias`}.</b> ${textoResumoTeste() ? `Você já tem ${esc(textoResumoTeste())}.` : 'Assine com este mesmo e-mail e continue com tudo que cadastrou.'}</div>
         <button class="btn mini" id="faixa-planos">Assinar agora</button>
       </div>`;
     $('#faixa-planos', faixa).onclick = () => popupPlanosTeste('assinar_agora');
@@ -1254,7 +1295,8 @@ function montarApp() {
   irPara(['hoje', 'agenda', 'kits', 'mais'].includes(deHash) ? deHash : 'hoje');
   if (abrirPeloAviso()) return;
   if (estado.suporte) return; // no modo suporte não aparece nenhum aviso da dona
-  if (estado.mostrarAssistente) { estado.mostrarAssistente = false; setTimeout(() => assistenteAgenda(), 400); return; }
+  if (estado.mostrarAssistente) { estado.mostrarAssistente = false; setTimeout(() => assistenteAgenda(() => { if (!estado.kits.length) montarLojaGuiado(); }), 400); return; }
+  if (!estado.kits.length && podeEditar() && !DEMO_SITE && !(() => { try { return sessionStorage.getItem('apm-guia-sessao'); } catch (e) { return '1'; } })()) { setTimeout(montarLojaGuiado, 500); return; }
   setTimeout(mostrarNovidades, 600);
   setTimeout(mostrarBlackFriday, 1200);
   setTimeout(comemorarReservaPeloLink, 1800);
@@ -1271,6 +1313,7 @@ function abrirPeloAviso() {
   if (q.get('video')) { try { history.replaceState(null, '', location.pathname); } catch (e) { /* segue */ } setTimeout(abrirVideoTutorial, 400); return true; }
   if (q.get('link')) { try { history.replaceState(null, '', location.pathname); } catch (e) { /* segue */ } irPara('kits'); return true; }
   if (q.get('ia')) { try { history.replaceState(null, '', location.pathname); } catch (e) { /* segue */ } irPara('kits'); setTimeout(iaAbrirPendente, 400); return true; }
+  if (q.get('foto')) { try { history.replaceState(null, '', location.pathname); } catch (e) { /* segue */ } if (podeEditar()) { setTimeout(guiaFotoKit, 400); return true; } return false; }
   if (!reserva && !planos) return false;
   try { history.replaceState(null, '', location.pathname + location.hash); } catch (e) { /* segue */ }
   if (reserva && (estado.reservas || []).some((r) => r.id === reserva)) { setTimeout(() => abrirReserva(reserva), 300); return true; }
@@ -1324,7 +1367,7 @@ function mostrarBlackFriday() {
 // ---------------------------------------------------------------------
 let pedidoInstalacao = null;
 window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); pedidoInstalacao = e; });
-window.addEventListener('appinstalled', () => { pedidoInstalacao = null; aviso('App instalado! Agora é só abrir pelo ícone 🎉'); });
+window.addEventListener('appinstalled', () => { pedidoInstalacao = null; aviso('App instalado! Agora é só abrir pelo ícone'); });
 function appInstalado() {
   return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
 }
@@ -1337,9 +1380,9 @@ function ehComputador() {
 }
 // Link "Instalar o app" do e-mail de boas-vindas: o navegador só deixa instalar com um toque dentro do app.
 function convidarInstalacao() {
-  if (appInstalado()) { aviso('O app já está instalado neste celular 🎉'); return; }
+  if (appInstalado()) { aviso('O app já está instalado neste celular'); return; }
   abrirPopup(`
-    <div style="font-size:48px;text-align:center" aria-hidden="true">📲</div>
+    <div class="pic-g" aria-hidden="true"><i class="pic pic-celular"></i></div>
     <h2 class="centro" style="font-size:23px;margin:0">Coloque o app na sua tela inicial</h2>
     <p class="centro pequeno" style="margin:0">Fica com um ícone igual a um aplicativo: é só tocar para abrir sua agenda de kits.</p>
     <button class="btn principal cheio" id="conv-instalar">Instalar agora</button>
@@ -1364,8 +1407,8 @@ async function instalarApp() {
     ${foraDoSafari ? '<div class="nota-amarela pequeno">Primeiro abra este app no <b>Safari</b> (no iPhone, só o Safari instala). Copie o endereço e cole no Safari.</div>' : ''}
     ${!iphone ? '<div class="nota-amarela pequeno">Se o app abriu dentro do Gmail ou do Instagram, toque nos <b>3 pontinhos ⋮</b> e em <b>"Abrir no Chrome"</b> antes.</div>' : ''}
     ${iphone
-      ? passo(1, 'Toque em <b>Compartilhar</b> <span class="ic-compart">⇧</span> na barra do Safari') + passo(2, 'Role e toque em <b>"Adicionar à Tela de Início"</b> ➕') + passo(3, 'Toque em <b>Adicionar</b>. Pronto, o ícone aparece na sua tela 🎉')
-      : passo(1, 'Toque nos <b>3 pontinhos ⋮</b> no canto do navegador') + passo(2, 'Toque em <b>"Instalar app"</b> ou <b>"Adicionar à tela inicial"</b>') + passo(3, 'Confirme. Pronto, o ícone aparece na sua tela 🎉')}
+      ? passo(1, 'Toque em <b>Compartilhar</b> <span class="ic-compart">⇧</span> na barra do Safari') + passo(2, 'Role e toque em <b>"Adicionar à Tela de Início"</b> <i class="pic pic-mais"></i>') + passo(3, 'Toque em <b>Adicionar</b>. Pronto, o ícone aparece na sua tela <i class="pic pic-festa"></i>')
+      : passo(1, 'Toque nos <b>3 pontinhos ⋮</b> no canto do navegador') + passo(2, 'Toque em <b>"Instalar app"</b> ou <b>"Adicionar à tela inicial"</b>') + passo(3, 'Confirme. Pronto, o ícone aparece na sua tela <i class="pic pic-festa"></i>')}
     <button class="btn principal cheio" id="inst-ok">Entendi</button>`, (p) => { $('#inst-ok', p).onclick = () => fecharPainel(); });
 }
 
@@ -1459,7 +1502,7 @@ async function desenharCartaoContrato(caixa, r) {
   const primeiro = r.cliente_nome.split(' ')[0];
   const msg = c ? `Oi, ${primeiro}! Segue o contrato da sua reserva do ${kitComPalavra(nomeKitReserva(r))}. É só abrir, conferir e tocar em "Aceitar contrato": ${linkContrato(c.token)}` : '';
   caixa.innerHTML = `
-    <div class="linha-flex entre"><h3 style="margin:0">📄 Contrato</h3>${situacao}</div>
+    <div class="linha-flex entre"><h3 style="margin:0"><i class="pic pic-doc"></i> Contrato</h3>${situacao}</div>
     ${c && c.aceito_em
       ? `<div class="pequeno">Aceito por <b>${esc(c.aceito_nome || '')}</b> em ${esc(new Date(c.aceito_em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }))}</div>
          <div class="linha-flex" style="gap:8px;flex-wrap:wrap"><a class="btn contorno mini" href="${esc(linkContrato(c.token))}" target="_blank" rel="noopener">Ver contrato</a><a class="btn contorno mini" href="${esc(linkContrato(c.token))}&pdf=1" target="_blank" rel="noopener">⬇️ PDF</a></div>`
@@ -1594,6 +1637,28 @@ async function copiarMeuLink() {
     estado.negocio.link_copiado_em = new Date().toISOString();
   }
 }
+// Checklist do teste grátis (no topo do Início): 1º kit, 3 kits, 1ª reserva. Some quando completa.
+function reservasValidas() { return (estado.reservas || []).filter((r) => r.status !== 'cancelada').length; }
+function mostrarChecklist() {
+  if (!estado.negocio || DEMO_SITE || !podeEditar() || situacaoAssinatura() !== 'teste') return false;
+  return !(estado.kits.length >= 3 && reservasValidas() >= 1);
+}
+function cartaoChecklist() {
+  const k = estado.kits.length, r = reservasValidas();
+  const itens = [[k >= 1, '1º kit', ''], [k >= 3, '3 kits', k >= 1 && k < 3 ? `(${k} de 3)` : ''], [r >= 1, '1ª reserva na agenda', '']];
+  const feitos = itens.filter((x) => x[0]).length;
+  const botao = k < 1 ? `${PIC('camera')}Cadastrar meu 1º kit com foto` : k < 3 ? `${PIC('camera')}Cadastrar o ${k + 1}º kit com foto` : `${PIC('calendario')}Criar minha 1ª reserva`;
+  return `<section class="ck-lista">
+    <div class="t">Sua loja pronta em 3 passos <small>${feitos} de 3</small></div>
+    <div class="ck-barra"><i style="width:${Math.max(4, Math.round(feitos / 3 * 100))}%"></i></div>
+    <div class="ck-itens">${itens.map(([ok, t, sub], i) => `<div class="ck-it ${ok ? 'ok' : itens.findIndex((x) => !x[0]) === i ? '' : 'falta'}">${PIC(ok ? 'ok' : 'vazio')}<span>${t}</span>${sub ? `<small>${sub}</small>` : ''}</div>`).join('')}</div>
+    <button type="button" class="btn principal cheio ck-bt" id="ck-prox">${botao}</button>
+  </section>`;
+}
+function ligarChecklist(tela) {
+  const b = $('#ck-prox', tela);
+  if (b) b.onclick = () => (estado.kits.length < 3 ? (estado.kits.length ? guiaFotoKit() : montarLojaGuiado()) : formReserva({}));
+}
 function cartaoPassos() {
   const f = passosFeitos();
   const feitos = [f.perfil, f.kit, f.reserva, f.link].filter(Boolean).length;
@@ -1604,7 +1669,7 @@ function cartaoPassos() {
     </div>`;
   const proximo = !f.perfil ? 1 : !f.kit ? 2 : !f.reserva ? 3 : 4;
   return `<section class="cartao coluna primeiros">
-    <div class="linha-flex entre"><h2>🚀 Comece em 4 passos</h2><b class="pequeno">${feitos} de 4</b></div>
+    <div class="linha-flex entre"><h2><i class="pic pic-foguete"></i> Comece em 4 passos</h2><b class="pequeno">${feitos} de 4</b></div>
     <div class="prog"><i style="width:${Math.max(4, Math.round((feitos / 4) * 100))}%"></i></div>
     <button class="btn-video" id="passos-video"><span class="play" aria-hidden="true">▶</span><span>Prefere ver como faz? <b>Assista ao vídeo passo a passo (2 min)</b></span></button>
     ${passo(1, f.perfil, 'Coloque sua logo e o seu Instagram', 'Eles aparecem no topo do seu link de reservas.', 'Completar perfil', 'passo-perfil', proximo === 1)}
@@ -1639,7 +1704,7 @@ function ligarPassos(tela) {
 }
 function popupParabens() {
   abrirPopup(`
-    <div style="font-size:54px;text-align:center" aria-hidden="true">🎉</div>
+    <div class="pic-g" aria-hidden="true"><i class="pic pic-festa"></i></div>
     <h2 class="centro" style="font-size:25px">Seu app está pronto!</h2>
     <p class="centro">Você cadastrou seu kit, criou uma reserva e já tem seu link. Agora é só deixar suas clientes reservarem sozinhas.</p>
     <div class="nota-amarela pequeno"><b>Dica:</b> coloque o link na bio do Instagram e na mensagem automática do WhatsApp Business.</div>
@@ -1657,7 +1722,7 @@ function cartaoMontagem() {
   const m = estado.montagem;
   if (!m || m.pediu_em || m.concluida_em || estado.suporte || !WHATSAPP_SUPORTE) return '';
   return `<section class="cartao coluna cartao-montagem">
-    <span class="selo-ok">🎉 ASSINATURA ATIVA</span>
+    <span class="selo-ok"><i class="pic pic-festa"></i> ASSINATURA ATIVA</span>
     <h2 style="margin:0;font-size:22px">Agora é com a gente: <span style="color:var(--destaque)">vamos montar sua loja</span></h2>
     <p class="pequeno" style="margin:0">Seu plano inclui a montagem dos seus kits pela nossa equipe. Para começar, chame a gente no WhatsApp e mande as fotos, os nomes e os preços dos kits.</p>
     <a class="btn verde cheio" id="pedir-montagem" href="${esc(linkZap(WHATSAPP_SUPORTE, `Oi! Assinei o plano anual com a montagem da loja (${estado.negocio.nome}). Como envio meus kits?`))}" target="_blank" rel="noopener">${ICONE.zap} Pedir a montagem da minha loja</a>
@@ -1733,9 +1798,11 @@ function abaHoje(tela) {
     </section>`;
   const algumAlerta = atrasadas.length + pendentes.length + retiradas.length + devolucoes.length > 0;
 
-  const comPassos = mostrarPassos();
+  const comLista = mostrarChecklist();
+  const comPassos = !comLista && situacaoAssinatura() !== 'teste' && mostrarPassos();
   tela.innerHTML = `
     ${cartaoMontagem()}
+    ${comLista ? cartaoChecklist() : ''}
     ${comPassos ? cartaoPassos() : ''}
     <section class="fin">
       <div class="linha-flex entre">
@@ -1774,10 +1841,11 @@ function abaHoje(tela) {
     ${devolucoes.length ? bloco('Devoluções de hoje', '#1E5FA8', devolucoes, () => 'Abra para conferir as peças') : ''}
     ${algumAlerta ? '' : '<div class="cartao res-concluida tudo-em-dia"><b>Tudo em dia!</b><div class="pequeno">Nenhuma pendência para hoje.</div></div>'}
     ${proximas.length ? bloco('Próximos 7 dias', '#4E4459', proximas, (r) => `Retirada ${dataCurta(r.data_retirada)}`) : ''}
-    ${estado.kits.length === 0 && !comPassos ? `<div class="cartao coluna"><h3>Comece cadastrando seus kits</h3><p class="pequeno">Eles aparecem no seu link de reservas.</p><button class="btn principal" id="ir-kits">Cadastrar meu primeiro kit</button></div>` : ''}`;
+    ${estado.kits.length === 0 && !comPassos && !comLista ? `<div class="cartao coluna"><h3>Comece cadastrando seus kits</h3><p class="pequeno">Eles aparecem no seu link de reservas.</p><button class="btn principal" id="ir-kits">Cadastrar meu primeiro kit</button></div>` : ''}`;
   ligarItens(tela);
   ligarCartaoMontagem(tela);
   if (comPassos) ligarPassos(tela);
+  if (comLista) ligarChecklist(tela);
   const muda = (delta) => { const [a, m] = mes.split('-').map(Number); estado.mesFin = dados.isoDe(new Date(a, m - 1 + delta, 1)).slice(0, 7); abaHoje(tela); };
   $('#fin-ant', tela).onclick = () => muda(-1);
   $('#fin-prox', tela).onclick = () => muda(1);
@@ -1895,7 +1963,7 @@ function abaAgenda(tela) {
     const usados = ativas.filter((x) => cruza(x, dia, dia)).reduce((t, x) => { const kk = kitDe(x.kit_id); const u = (kk.estruturas || []).find((y) => y.id === e.id); return t + (u ? Math.max(1, Number(u.qtd) || 1) : 0); }, 0);
     return usados ? `${esc(e.nome)}: ${usados} de ${e.quantidade}` : '';
   }).filter(Boolean);
-  const topoDia = `${fechadoDia ? `<div class="nota-amarela pequeno">🔒 Dia fechado no seu link${fechadoDia.recado ? `: ${esc(fechadoDia.recado)}` : ''}</div>` : ''}
+  const topoDia = `${fechadoDia ? `<div class="nota-amarela pequeno"><i class="pic pic-cadeado"></i> Dia fechado no seu link${fechadoDia.recado ? `: ${esc(fechadoDia.recado)}` : ''}</div>` : ''}
     ${lim || usoEstr.length ? `<div class="pequeno ag-uso">${lim ? `<b>Festas nesse dia: ${noDia} de ${lim}</b>${noDia >= lim ? ' · <span class="ag-no">lotado no link</span>' : ''}` : ''}${usoEstr.length ? `${lim ? ' · ' : ''}${usoEstr.join(' · ')}` : ''}</div>` : ''}`;
 
   const nomeMes = maiuscula(primeiro.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }));
@@ -1947,15 +2015,15 @@ function abaKits(tela) {
     ${k.ativo && !DEMO_SITE ? `<button class="kit-compartilhar" data-compartilhar="${esc(k.id)}" aria-label="Compartilhar o kit ${esc(k.nome)}" title="Compartilhar este kit">↗</button>` : ''}
     </div>`;
   }).join('');
-  const insta = n.instagram ? `<a class="btn insta mini" href="https://instagram.com/${encodeURIComponent(n.instagram)}" target="_blank" rel="noopener">📷 @${esc(n.instagram)}</a>` : '';
+  const insta = n.instagram ? `<a class="btn insta mini" href="https://instagram.com/${encodeURIComponent(n.instagram)}" target="_blank" rel="noopener"><i class="pic pic-camera"></i> @${esc(n.instagram)}</a>` : '';
   tela.innerHTML = `
     <section class="cartao vitrine-loja">
-      ${podeEditar() ? '<button class="vitrine-editar" id="vitrine-editar">✏️ Editar</button>' : ''}
+      ${podeEditar() ? '<button class="vitrine-editar" id="vitrine-editar"><i class="pic pic-lapis"></i> Editar</button>' : ''}
       ${n.logo_url ? `<img class="vitrine-logo" src="${esc(n.logo_url)}" alt="Logo da loja">` : ''}
       <div class="vitrine-nome">${esc(n.nome)}</div>
       <p class="vitrine-recado">${esc(n.recado_link || recadoPadrao(n.nome))}</p>
       ${insta}
-      <div class="vitrine-links"><a href="${esc(linkDona())}">👀 Ver como a cliente vê</a><button class="link-btn" id="vitrine-copiar">🔗 Copiar link da loja</button></div>
+      <div class="vitrine-links"><a href="${esc(linkDona())}"><i class="pic pic-olho"></i> Ver como a cliente vê</a><button class="link-btn" id="vitrine-copiar"><i class="pic pic-link"></i> Copiar link da loja</button></div>
     </section>
     <div id="ia-caixa" class="coluna" style="gap:10px">${cartaoIA()}</div>
     <div class="secao-titulo"><h1>Meus kits</h1>${podeEditar() ? `<button class="btn principal mini" id="novo-kit">${ICONE.mais1} Novo kit</button>` : ''}</div>
@@ -1985,8 +2053,8 @@ function compartilharKit(k) {
     <p class="pequeno" style="margin:0">A cliente abre direto neste kit, com as fotos e as datas livres.</p>
     <div class="cartao" style="background: var(--lilas); word-break: break-all; font-weight:700; font-size:13px">${esc(link)}</div>
     <a class="btn verde cheio" href="${esc('https://wa.me/?text=' + encodeURIComponent(texto))}" target="_blank" rel="noopener">${ICONE.zap} Enviar no WhatsApp</a>
-    <button class="btn contorno cheio" id="ck-copiar">🔗 Copiar link do kit</button>
-    ${navigator.share ? '<button class="btn contorno cheio" id="ck-mais">📤 Mais opções (Instagram, Direct…)</button>' : ''}
+    <button class="btn contorno cheio" id="ck-copiar"><i class="pic pic-link"></i> Copiar link do kit</button>
+    ${navigator.share ? '<button class="btn contorno cheio" id="ck-mais"><i class="pic pic-enviar"></i> Mais opções (Instagram, Direct…)</button>' : ''}
     <button class="link-btn" id="ck-fechar">Fechar</button>`, (p) => {
     $('#ck-fechar', p).onclick = () => fecharPainel();
     $('#ck-copiar', p).onclick = async () => {
@@ -2026,32 +2094,32 @@ function cartaoIA() {
   if (!iaLigada()) return '';
   if (ia.processando) {
     return `<section class="ia-cartao">
-      <span class="ia-selo">⏳ Organizando agora</span>
-      <p class="ia-t">✨ A IA está organizando seu catálogo</p>
+      <span class="ia-selo"><i class="pic pic-relogio"></i> Organizando agora</span>
+      <p class="ia-t"><i class="pic pic-brilho"></i> A IA está organizando seu catálogo</p>
       <p class="ia-p">Leva de 1 a 3 minutos. Pode usar o app normalmente: avisamos quando estiver pronto.</p>
       <button class="ia-bt" data-ia="andamento">Ver andamento</button></section>`;
   }
   let topo = '';
   if (ia.escolher) {
-    topo = `<button class="ia-pronto" data-ia="escolher"><span class="ia-pronto-ic">✨</span><span><b>A IA organizou seus kits!</b><small>Escolha quais ${ia.restante === 1 ? 'kit' : `${ia.restante} kits`} você quer montar agora.</small></span><span class="ia-pronto-bt">Escolher</span></button>`;
+    topo = `<button class="ia-pronto" data-ia="escolher"><span class="ia-pronto-ic"><i class="pic pic-brilho"></i></span><span><b>A IA organizou seus kits!</b><small>Escolha quais ${ia.restante === 1 ? 'kit' : `${ia.restante} kits`} você quer montar agora.</small></span><span class="ia-pronto-bt">Escolher</span></button>`;
   } else if (ia.lote && ia.pendentes) {
     topo = ia.liberados
-      ? `<button class="ia-pronto verde" data-ia="conferir"><span class="ia-pronto-ic">🎁</span><span><b>${plural(ia.liberados, 'kit liberado', 'kits liberados')}!</b><small>Os kits que a IA guardou no seu teste estão prontos para você conferir.</small></span><span class="ia-pronto-bt">Conferir</span></button>`
-      : `<button class="ia-pronto" data-ia="conferir"><span class="ia-pronto-ic">✨</span><span><b>${plural(ia.pendentes, 'kit pronto', 'kits prontos')} para conferir</b><small>A IA terminou. Confira e aprove um por um.</small></span><span class="ia-pronto-bt">Conferir</span></button>`;
+      ? `<button class="ia-pronto verde" data-ia="conferir"><span class="ia-pronto-ic"><i class="pic pic-presente"></i></span><span><b>${plural(ia.liberados, 'kit liberado', 'kits liberados')}!</b><small>Os kits que a IA guardou no seu teste estão prontos para você conferir.</small></span><span class="ia-pronto-bt">Conferir</span></button>`
+      : `<button class="ia-pronto" data-ia="conferir"><span class="ia-pronto-ic"><i class="pic pic-brilho"></i></span><span><b>${plural(ia.pendentes, 'kit pronto', 'kits prontos')} para conferir</b><small>A IA terminou. Confira e aprove um por um.</small></span><span class="ia-pronto-bt">Conferir</span></button>`;
   }
   const erro = ia.erro ? `<p class="ia-erro">A última tentativa não deu certo: ${esc(ia.erro)}</p>` : '';
   if (ia.plano === 'teste' && !ia.restante) {
     return `${topo}<section class="ia-cartao cinza">
       <span class="ia-selo">Teste grátis · 0 de ${ia.limite} kits restantes</span>
-      <p class="ia-t">✨ Seus ${ia.limite} kits da IA já estão no catálogo</p>
+      <p class="ia-t"><i class="pic pic-brilho"></i> Seus ${ia.limite} kits da IA já estão no catálogo</p>
       <p class="ia-p">${ia.guardados ? `${plural(ia.guardados, 'kit está pronto', 'kits estão prontos')} com cadeado esperando. ` : ''}Assine e a IA monta o resto do seu catálogo, sem limite.</p>
       <button class="ia-bt coral" data-ia="assinar">Assinar e liberar ilimitado</button>
       <button class="ia-bt-link" data-ia="comecar">Mandar mais material (fica pronto com cadeado até você assinar)</button></section>`;
   }
   const pago = ia.plano === 'pago';
   return `${topo}<section class="ia-cartao">
-    <span class="ia-selo">${ia.suporte ? '🛟 Modo suporte · sem limite (não conta no teste da cliente)' : pago ? '✓ Ilimitado no seu plano' : `Teste grátis · ${ia.restante} de ${ia.limite} kits para o catálogo`}</span>
-    <p class="ia-t">✨ ${pago && estado.kits.length ? 'Adicionar kits com IA' : 'Montar meu catálogo com IA'}</p>
+    <span class="ia-selo">${ia.suporte ? '<i class="pic pic-suporte"></i> Modo suporte · sem limite (não conta no teste da cliente)' : pago ? '✓ Ilimitado no seu plano' : `Teste grátis · ${ia.restante} de ${ia.limite} kits para o catálogo`}</span>
+    <p class="ia-t"><i class="pic pic-brilho"></i> ${pago && estado.kits.length ? 'Adicionar kits com IA' : 'Montar meu catálogo com IA'}</p>
     <p class="ia-p">${pago && estado.kits.length ? 'Mande fotos, PDF ou lista de preços quantas vezes quiser. Kits novos, de temporada ou o catálogo inteiro.' : 'Mande suas fotos, PDF ou lista de preços. A IA separa os kits e você só confere e aprova.'}</p>
     ${erro}
     <button class="ia-bt" data-ia="comecar">Começar</button></section>`;
@@ -2081,39 +2149,276 @@ async function iaAbrirPendente() {
   else { irPara('kits'); setTimeout(iaEnviar, 300); } // link dos e-mails: abre direto o "Montar com IA"
 }
 
+// ---------------------------------------------------------------------
+// Primeiro acesso guiado: montar a loja com a IA (ou sozinha).
+// Aparece depois das perguntas de como ela trabalha, e toda vez que abrir o app com 0 kits.
+// ---------------------------------------------------------------------
+const PIC = (n) => `<i class="pic pic-${n}"></i>`;
+function guiaIAVisto() { return !!(estado.negocio && guardado(`apm-ia-guia-${estado.negocio.id}`)); }
+function marcarGuiaIA() { if (estado.negocio) guardado(`apm-ia-guia-${estado.negocio.id}`, '1'); }
+function opcaoGuia(v, ic, titulo, sub, rapido) {
+  return `<button type="button" class="guia-op ${rapido ? 'rec' : ''}" data-g="${v}"><span class="guia-ic">${PIC(ic)}</span><span><b>${titulo}</b><small>${sub}</small>${rapido ? '<span class="guia-tag">MAIS RÁPIDO</span>' : ''}</span></button>`;
+}
+function montarLojaGuiado() {
+  if (!estado.negocio || !podeEditar()) return;
+  marcarGuiaIA();
+  try { sessionStorage.setItem('apm-guia-sessao', '1'); } catch (e) { /* segue */ }
+  if (!iaLigada()) { irPara('kits'); setTimeout(() => formKit(null), 250); return; }
+  const temKits = estado.kits.length > 0;
+  abrirPainel('', `<div class="coluna guia-tela">
+    <div class="pic-g">${PIC('brilho')}</div>
+    <h2 class="guia-titulo">${temKits ? 'Vamos colocar mais kits na sua loja' : 'Agora vamos montar sua loja'}</h2>
+    <p class="guia-sub">A IA cadastra seus kits com as suas fotos. Escolha onde estão as fotos:</p>
+    ${opcaoGuia('fotos', 'camera', 'Fotos dos kits no celular', 'tire agora ou escolha da galeria', true)}
+    ${opcaoGuia('insta', 'insta', 'No meu Instagram', 'a gente te ensina a tirar print dos posts')}
+    ${opcaoGuia('outros', 'conversa', 'No WhatsApp ou num PDF', 'catálogo, prints, arquivo ou a conversa')}
+    ${opcaoGuia('manual', 'lapis', 'Prefiro cadastrar sozinha', 'preencho nome, foto e preço do kit')}
+    <p class="pequeno centro" style="margin:0">Em qualquer opção, a gente mostra o passo a passo.</p>
+    ${temKits ? '' : '<button type="button" class="link-btn" data-g="depois" style="align-self:center">Agora não, ver o app primeiro</button>'}
+  </div>`, (p) => {
+    $$('[data-g]', p).forEach((b) => (b.onclick = () => {
+      const v = b.dataset.g;
+      if (v === 'fotos') guiaFotoKit();
+      else if (v === 'insta') guiaInstagram();
+      else if (v === 'outros') { fecharPainel(); irPara('kits'); setTimeout(iaEnviar, 300); }
+      else if (v === 'manual') { fecharPainel(); irPara('kits'); setTimeout(() => formKit(null), 300); }
+      else fecharPainel();
+    }));
+  });
+}
+function entradaFotos(id, texto, sub) {
+  return `<label class="guia-grande" style="cursor:pointer"><span class="l">${PIC(id === 'gf-arq' ? 'camera' : 'enviar')}${texto}</span><small>${sub}</small><input type="file" accept="image/*,.heic,.heif" multiple class="oculto" id="${id}"></label>`;
+}
+function guiaFotoKit() {
+  const n = estado.kits.length;
+  abrirPainel('', `<div class="coluna guia-tela">
+    <div class="guia-passos"><i class="f"></i><i class="f"></i><i></i></div>
+    <h2 class="guia-titulo">${n ? `Cadastre seu ${n + 1}º kit em 1 minuto` : 'Cadastre seu 1º kit em 1 minuto'}</h2>
+    <p class="guia-sub">Tire ou envie a foto de um kit e a IA monta tudo para você: nome, peças e preço.</p>
+    <div class="guia-foto"><div class="pic-g">${PIC('camera')}</div><b>Uma foto do kit montado</b><span class="pequeno">pode ser da galeria ou um print do WhatsApp ou do Instagram</span></div>
+    ${entradaFotos('gf-arq', 'Enviar foto do kit', 'tirar agora ou escolher da galeria')}
+    <div class="guia-dicas"><span>${PIC('ok')}Se o preço estiver escrito na foto, a IA já coloca</span><span>${PIC('ok')}Mandou fotos de vários kits? A IA separa cada um</span><span>${PIC('ok')}Depois você ajusta o que quiser</span></div>
+    <button type="button" class="link-btn" id="gf-manual" style="align-self:center">Prefiro cadastrar sozinha</button>
+  </div>`, (p) => {
+    $('#gf-arq', p).onchange = (e) => { const f = [...e.target.files]; e.target.value = ''; if (f.length) iaFotoRapida(f); };
+    $('#gf-manual', p).onclick = () => { fecharPainel(); irPara('kits'); setTimeout(() => formKit(null), 300); };
+  }, () => montarLojaGuiado());
+}
+function guiaInstagram() {
+  const passo = (n, t, s, extra = '') => `<div class="guia-passo"><span class="n">${n}</span><div style="flex:1"><b>${t}</b><small>${s}</small></div>${extra}</div>`;
+  abrirPainel('', `<div class="coluna guia-tela">
+    <div class="guia-passos"><i class="f"></i><i class="f"></i><i></i></div>
+    <div class="pic-g">${PIC('insta')}</div>
+    <h2 class="guia-titulo">Do Instagram em 4 passos</h2>
+    <p class="guia-sub">A IA monta a loja com os prints dos posts dos seus kits.</p>
+    <div class="coluna" style="gap:10px">
+      ${passo(1, 'Abra o seu perfil no Instagram', 'no app do Instagram, toque na sua foto embaixo à direita')}
+      ${passo(2, 'Toque no post de um kit', 'deixe a legenda aparecer se o preço estiver nela', '<span class="guia-cel" aria-hidden="true"><i></i><i class="s"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>')}
+      ${passo(3, 'Tire print da tela', 'iPhone: botão de bloquear + aumentar volume juntos<br>Android: botão de ligar + diminuir volume juntos')}
+      ${passo(4, 'Repita em cada kit e volte aqui', 'pode mandar todos os prints de uma vez')}
+    </div>
+    ${entradaFotos('gi-arq', 'Enviar os prints', 'escolha vários de uma vez')}
+  </div>`, (p) => {
+    $('#gi-arq', p).onchange = (e) => { const f = [...e.target.files]; e.target.value = ''; if (f.length) iaFotoRapida(f); };
+  }, () => montarLojaGuiado());
+}
+// Manda as fotos para a IA e espera aqui mesmo. 1 kit: entra direto na loja. Vários: mostra a prévia.
+async function iaFotoRapida(arquivos) {
+  const ia = estado.ia || {};
+  const maximo = ia.plano === 'teste' ? 10 : IA_MAX_FOTOS;
+  const fotos = arquivos.filter((f) => /^image\//.test(f.type) || /\.(heic|heif|jpe?g|png|webp)$/i.test(f.name || ''));
+  if (!fotos.length) { aviso('Escolha uma foto (imagem) do kit.'); return; }
+  if (fotos.length > maximo) { aviso(`Mandamos as ${maximo} primeiras fotos. O resto você manda depois.`); fotos.length = maximo; }
+  let fechou = false;
+  const etapa = (i) => ['Foto recebida', 'Lendo o kit e as peças', 'Colocando na sua loja'].map((t, n) => `<div class="${n < i ? '' : n === i ? 'agora' : 'falta'}">${PIC(n < i ? 'ok' : n === i ? 'relogio' : 'vazio')}${n === 0 && fotos.length > 1 ? `${fotos.length} fotos recebidas` : t}</div>`).join('');
+  abrirPainel('', `<div class="coluna guia-tela" style="justify-content:center;min-height:70vh">
+    <div class="guia-gira" aria-hidden="true"></div>
+    <h2 class="guia-titulo">A IA está montando ${fotos.length > 1 ? 'seus kits' : 'seu kit'}…</h2>
+    <p class="guia-sub" id="gr-sub">${fotos.length > 1 ? 'Leva de 1 a 3 minutos.' : 'Leva uns 30 segundos.'} Não feche o app.</p>
+    <div class="guia-etapas" id="gr-et">${etapa(0)}</div>
+    <div class="erro oculto" id="gr-erro"></div>
+    <div class="coluna oculto" id="gr-acoes" style="gap:10px">
+      <button type="button" class="btn principal cheio" id="gr-outra">Tentar com outra foto</button>
+      <button type="button" class="btn contorno cheio" id="gr-manual">Cadastrar sozinha</button>
+    </div>
+  </div>`, (p) => {
+    $('#gr-outra', p).onclick = () => guiaFotoKit();
+    $('#gr-manual', p).onclick = () => { fecharPainel(); irPara('kits'); setTimeout(() => formKit(null), 300); };
+  }, () => { fechou = true; fecharPainel(); atualizarIA().then(() => desenharAba()); });
+  const painel = $('#painel');
+  const vivo = () => !fechou && !!$('#gr-et', painel);
+  const falhou = (msg) => {
+    if (!vivo()) return;
+    const c = $('#gr-erro', painel); c.textContent = msg; c.classList.remove('oculto');
+    $('#gr-acoes', painel).classList.remove('oculto');
+    $('.guia-gira', painel).classList.add('oculto');
+  };
+  try {
+    const material = await prepararMaterial({ fotos, pdfs: [], prints: [], drive: [], texto: '', conversa: '', origens: ['galeria'] }, () => {});
+    if (!material.imagens.length) throw new Error(material.avisos[0] || 'Não consegui ler essa foto. Tente outra.');
+    if (vivo()) $('#gr-et', painel).innerHTML = etapa(1);
+    const { lote } = await dados.iaOrganizar({ pasta: material.pasta, imagens: material.imagens, prints: material.prints, paginas: material.paginas, texto: material.texto });
+    await atualizarIA();
+    const inicio = Date.now();
+    let l = null;
+    while (!fechou) {
+      await new Promise((r) => setTimeout(r, 3000));
+      try { l = await dados.iaLote(lote); } catch (e) { l = null; }
+      if (l && (l.status === 'pronto' || l.status === 'erro')) break;
+      if (Date.now() - inicio > 6 * 60e3) throw new Error('A IA está demorando mais que o normal. Quando terminar, o aviso aparece na aba Kits.');
+    }
+    if (fechou) return;
+    if (l.status === 'erro') throw new Error(l.erro || 'Não deu certo. Tente de novo.');
+    if (vivo()) $('#gr-et', painel).innerHTML = etapa(2);
+    await atualizarIA();
+    await iaRecortar(l);
+    if (!vivo()) return;
+    resultadoFotoRapida(l);
+  } catch (e) { falhou(e.message || 'Não deu certo. Tente de novo.'); }
+}
+// Publica kits que a IA leu (igual ao "Publicar" da conferência)
+async function publicarDaIA(lote, lista) {
+  const nomes = [];
+  for (const k of lista) {
+    const vars = (k.variacoes || []).map((v) => ({ id: v.id || 'v' + Math.random().toString(36).slice(2, 9), nome: v.nome, preco: Number(v.preco) || 0, sinal: Number(v.sinal) || 0, extras: v.extras || [], fotos: [] }));
+    const barata = [...vars].sort((a, b) => a.preco - b.preco)[0];
+    const fotos = (k.fotos || []).slice(0, MAX_FOTOS);
+    await dados.salvarKit({
+      nome: k.nome || 'Kit sem nome', preco: k.consultar ? 0 : barata ? barata.preco : Number(k.preco) || 0, sinal: k.consultar ? 0 : barata ? barata.sinal : Number(k.sinal) || 0,
+      pecas: (k.pecas || []).slice(0, 100), categoria: null, fotos, foto_url: fotos[0] || null, ativo: true, variacoes: vars,
+      ...(k.consultar ? { preco_consultar: true } : {}),
+    });
+    k.situacao = 'publicado';
+    nomes.push(k.nome || 'Kit sem nome');
+    await dados.iaSalvar(lote.id, lote.kits).catch(() => {});
+  }
+  await recarregar();
+  await atualizarIA();
+  return nomes;
+}
+function resultadoFotoRapida(lote) {
+  const novos = (lote.kits || []).filter((k) => k.situacao === 'conferir');
+  const cabe = estado.ia && estado.ia.plano === 'teste' ? Math.max(0, estado.ia.restante || 0) : Infinity;
+  if (!novos.length) {
+    if ((lote.kits || []).some((k) => k.situacao === 'guardado') || lote.escolher > 0) { iaConferir(lote.id); return; }
+    abrirPainel('', `<div class="coluna guia-tela">
+      <div class="pic-g">${PIC('camera')}</div>
+      <h2 class="guia-titulo">A IA não achou um kit nessa foto</h2>
+      <p class="guia-sub">Tente uma foto com o kit montado e bem iluminado, ou cadastre sozinha.</p>
+      <button type="button" class="btn principal cheio" id="gr-outra">Tentar com outra foto</button>
+      <button type="button" class="btn contorno cheio" id="gr-manual">Cadastrar sozinha</button></div>`, (p) => {
+      $('#gr-outra', p).onclick = () => guiaFotoKit();
+      $('#gr-manual', p).onclick = () => { fecharPainel(); irPara('kits'); setTimeout(() => formKit(null), 300); };
+    });
+    return;
+  }
+  if (novos.length === 1 && cabe >= 1) {
+    publicarDaIA(lote, novos).then(([nome]) => telaKitPronto(nome)).catch((e) => { aviso(e.message || 'Não consegui salvar o kit. Confira e salve por aqui.'); iaConferir(lote.id); });
+    return;
+  }
+  previaLoja(lote, novos, cabe);
+}
+function telaKitPronto(nome) {
+  const total = estado.kits.length;
+  const kit = [...estado.kits].reverse().find((k) => k.nome === nome) || estado.kits[estado.kits.length - 1];
+  const falta = Math.max(0, 3 - total);
+  const pecas = kit && Array.isArray(kit.pecas) ? kit.pecas.map((x) => (typeof x === 'string' ? x : x && x.nome)).filter(Boolean).join(', ') : '';
+  abrirPainel('', `<div class="coluna guia-tela">
+    <div class="guia-passos"><i class="f"></i><i class="f"></i><i class="f"></i></div>
+    <div class="pic-g">${PIC('festa')}</div>
+    <h2 class="guia-titulo">${total === 1 ? 'Pronto! Seu 1º kit está na sua loja' : 'Pronto! Seu kit está na sua loja'}</h2>
+    ${kit ? `<div class="guia-kit">${kit.foto_url ? `<img src="${esc(kit.foto_url)}" alt="">` : ''}<div class="c"><b class="n">${esc(kit.nome)}</b><span class="p">${kit.preco_consultar ? 'Preço a consultar' : Number(kit.preco) > 0 ? reais(kit.preco) : 'Sem preço ainda: toque em "Ajustar este kit"'}</span>${pecas ? `<span class="pc">${esc(pecas)}</span>` : ''}</div></div>` : ''}
+    ${falta ? `<div class="guia-prox">Próximo passo: <b>cadastre mais ${plural(falta, 'kit', 'kits')}</b> para montar sua agenda</div>` : '<div class="guia-prox">Sua loja já tem <b>' + plural(total, 'kit', 'kits') + '</b>. Agora é divulgar o seu link!</div>'}
+    <button type="button" class="guia-grande" id="kp-mais"><span class="l">${PIC('camera')}Cadastrar o ${total + 1}º kit</span></button>
+    ${kit ? '<button type="button" class="btn contorno cheio" id="kp-ajustar">Ajustar este kit</button>' : ''}
+    <button type="button" class="link-btn" id="kp-loja" style="align-self:center">Ver minha loja</button></div>`, (p) => {
+    $('#kp-mais', p).onclick = () => guiaFotoKit();
+    const aj = $('#kp-ajustar', p); if (aj) aj.onclick = () => { fecharPainel(); irPara('kits'); setTimeout(() => formKit(kit), 300); };
+    $('#kp-loja', p).onclick = () => { fecharPainel(); irPara('kits'); };
+  }, () => { fecharPainel(); irPara('hoje'); });
+}
+function previaLoja(lote, novos, cabe) {
+  const entram = novos.slice(0, cabe === Infinity ? novos.length : cabe);
+  const ficam = novos.slice(entram.length);
+  abrirPainel('', `<div class="coluna guia-tela">
+    <div class="guia-passos"><i class="f"></i><i class="f"></i><i class="f"></i></div>
+    <div class="pic-g">${PIC('festa')}</div>
+    <h2 class="guia-titulo">Assim fica a sua loja</h2>
+    <p class="guia-sub">A IA achou <b>${plural(novos.length, 'kit', 'kits')}</b>.${ficam.length ? ` No teste grátis, <b>${entram.length ? `${entram.length} já ${entram.length === 1 ? 'entra' : 'entram'} agora` : 'nenhum cabe agora'}</b>; ${ficam.length === 1 ? 'o outro fica pronto' : 'os outros ficam prontos'} com cadeado até você assinar.` : ''}</p>
+    <div class="guia-grade">${novos.map((k) => `<div class="gk ${entram.includes(k) ? '' : 'lock'}">${k.fotos && k.fotos[0] ? `<img src="${esc(k.fotos[0])}" alt="">` : '<span class="gk-sem">' + PIC('balao') + '</span>'}<span class="m">${PIC(entram.includes(k) ? 'ok' : 'cadeado')}</span><span class="t">${esc(k.nome || 'Kit')}</span></div>`).join('')}</div>
+    <div class="erro oculto" id="pv-erro"></div>
+    ${entram.length ? `<button type="button" class="guia-grande" id="pv-pub"><span class="l">Colocar ${entram.length === 1 ? 'o kit' : `os ${entram.length} kits`} na minha loja</span></button>` : ''}
+    ${ficam.length && !entram.length ? '<button type="button" class="btn verde cheio" id="pv-assinar">Assinar e liberar todos</button>' : ''}
+    <button type="button" class="btn contorno cheio" id="pv-conf">Conferir um por um antes</button></div>`, (p) => {
+    $('#pv-conf', p).onclick = () => iaConferir(lote.id);
+    const ass = $('#pv-assinar', p);
+    if (ass) ass.onclick = () => acao(ass, async () => { ficam.forEach((k) => { k.situacao = 'guardado'; }); await dados.iaSalvar(lote.id, lote.kits).catch(() => {}); fecharPainel(); setTimeout(() => popupPlanosTeste('ia_limite'), 50); });
+    const pub = $('#pv-pub', p);
+    if (pub) pub.onclick = () => acao(pub, async () => {
+      try {
+        ficam.forEach((k) => { k.situacao = 'guardado'; });
+        const nomes = await publicarDaIA(lote, entram);
+        if (nomes.length === 1) telaKitPronto(nomes[0]); else lojaPronta(nomes.length, nomes);
+      } catch (e) { const c = $('#pv-erro', p); c.textContent = (e.message || 'Não deu certo.') + ' Toque em "Conferir um por um" para terminar.'; c.classList.remove('oculto'); }
+    });
+  }, () => { fecharPainel(); atualizarIA().then(() => desenharAba()); });
+}
+// Quem já usa o app e abre a IA pela primeira vez: guia rápido de 3 passos
+function guiaPrimeiraVezIA(seguir) {
+  marcarGuiaIA();
+  const passo = (n, t, s) => `<div class="guia-passo"><span class="n">${n}</span><div style="flex:1"><b>${t}</b><small>${s}</small></div></div>`;
+  abrirPopup(`
+    <div class="pic-g">${PIC('brilho')}</div>
+    <h2 class="centro" style="font-size:23px;margin:0">Primeira vez com a IA? É assim:</h2>
+    <div class="coluna" style="gap:10px">
+      ${passo(1, 'Mande as fotos dos kits', 'foto do celular, print do Instagram ou do WhatsApp, ou o PDF do catálogo')}
+      ${passo(2, 'A IA separa os kits', 'nome, peças e preço (se estiver na foto ou na legenda). Leva de 1 a 3 minutos')}
+      ${passo(3, 'Você confere e aprova', 'muda o que quiser antes de entrar na loja')}
+    </div>
+    <button class="btn principal cheio" id="gp-ok">Entendi, começar</button>
+    <button class="btn contorno cheio oculto" id="gp-video">${PIC('play')} Ver o vídeo (2 min)</button>
+    <button class="link-btn" id="gp-manual">Prefiro cadastrar sozinha</button>`, (p) => {
+    $('#gp-ok', p).onclick = () => { fecharPainel(); setTimeout(seguir, 60); };
+    $('#gp-manual', p).onclick = () => { fecharPainel(); irPara('kits'); setTimeout(() => formKit(null), 300); };
+    const v = $('#gp-video', p);
+    temVideoIA().then((ok) => { if (ok && document.body.contains(v)) { v.classList.remove('oculto'); v.onclick = () => verVideoIA(() => guiaPrimeiraVezIA(seguir)); } });
+  });
+}
+
 // ----- 2. Enviar o material: passo a passo guiado (uma pergunta por tela) -----
 // Em qualquer caminho o botão aceita fotos, prints e PDF juntos: a IA lê tudo.
 const IA_ORIGENS = {
-  galeria: { ic: '📱', nome: 'Na galeria do celular', sub: 'fotos que você tirou', titulo: 'Da galeria',
+  galeria: { ic: '<i class="pic pic-celular"></i>', nome: 'Na galeria do celular', sub: 'fotos que você tirou', titulo: 'Da galeria',
     passos: ['Toque no botão abaixo', 'Escolha as <b>fotos dos kits</b> (pode marcar várias de uma vez)', 'Toque em <b>Continuar</b>'] },
-  whatsapp: { ic: '💬', nome: 'No WhatsApp', sub: 'catálogo ou fotos que você manda', titulo: 'Do WhatsApp',
+  whatsapp: { ic: '<i class="pic pic-conversa"></i>', nome: 'No WhatsApp', sub: 'catálogo ou fotos que você manda', titulo: 'Do WhatsApp',
     passos: ['Abra o seu <b>catálogo</b> no WhatsApp (ou a conversa onde estão as fotos)', '<b>Tire print</b> das telas com os kits, ou salve as fotos no celular', 'Volte aqui e toque no botão abaixo'] },
-  instagram: { ic: '📸', nome: 'No Instagram', sub: 'posts e destaques', titulo: 'Do Instagram',
+  instagram: { ic: '<i class="pic pic-insta"></i>', nome: 'No Instagram', sub: 'posts e destaques', titulo: 'Do Instagram',
     passos: ['Abra o seu perfil e os <b>posts dos kits</b> (ou os destaques)', '<b>Tire print</b> de cada kit. Se o preço estiver na legenda, deixe a legenda aparecer no print', 'Volte aqui e toque no botão abaixo'],
-    dica: '💡 Fotos originais da galeria ficam com mais qualidade que prints.' },
-  pdf: { ic: '📄', nome: 'Num PDF ou catálogo pronto', sub: '', titulo: 'Do PDF',
+    dica: '<i class="pic pic-lampada"></i> Fotos originais da galeria ficam com mais qualidade que prints.' },
+  pdf: { ic: '<i class="pic pic-doc"></i>', nome: 'Num PDF ou catálogo pronto', sub: '', titulo: 'Do PDF',
     passos: ['Toque no botão abaixo', 'Escolha o <b>arquivo do catálogo</b> (PDF) no celular ou no computador', 'Toque em <b>Continuar</b>'] },
-  drive: { ic: '☁️', nome: 'No Google Drive', sub: '', titulo: 'Do Google Drive' },
-  conversa: { ic: '🗨️', nome: 'Numa conversa do WhatsApp', sub: 'cole a conversa onde os kits foram combinados', titulo: 'Da conversa' },
-  misto: { ic: '🤷', nome: 'Um pouco de cada', sub: '', titulo: 'Seus arquivos',
+  drive: { ic: '<i class="pic pic-nuvem"></i>', nome: 'No Google Drive', sub: '', titulo: 'Do Google Drive' },
+  conversa: { ic: '<i class="pic pic-conversa"></i>', nome: 'Numa conversa do WhatsApp', sub: 'cole a conversa onde os kits foram combinados', titulo: 'Da conversa' },
+  misto: { ic: '<i class="pic pic-mistura"></i>', nome: 'Um pouco de cada', sub: '', titulo: 'Seus arquivos',
     passos: ['Toque no botão abaixo', 'Escolha <b>fotos, prints e PDF</b>, tudo junto', 'Se tiver uma pasta no Google Drive, cole o link logo abaixo'] },
 };
 function iaEnviar() {
   if (!iaLigada()) return;
+  if (!guiaIAVisto() && !estado.suporte) { guiaPrimeiraVezIA(iaEnviar); return; }
   const mat = { fotos: [], pdfs: [], prints: [], drive: [], texto: '', conversa: '', origens: [] };
   let passo = 1, origem = null, precos = null;
   const ia = estado.ia;
   const total = () => mat.fotos.length + mat.pdfs.length + mat.drive.length;
   const progresso = () => `<div class="ia-passos">${[1, 2, 3, 4].map((n) => `<i class="${n <= passo ? 'f' : ''}"></i>`).join('')}</div>`;
   const opc = (valor, ic, nome, sub, sel) => `<button type="button" class="ia-opc ${sel ? 'sel' : ''}" data-v="${valor}"><span class="ia-opc-ic">${ic}</span><span><b>${nome}</b>${sub ? `<small>${sub}</small>` : ''}</span></button>`;
-  const botaoArquivos = (secundario) => `<label class="${secundario ? 'btn contorno cheio' : 'ia-grande'}" style="cursor:pointer">📎 Escolher fotos, prints ou PDF${secundario ? '' : '<small>pode escolher vários de uma vez</small>'}<input type="file" accept="image/*,application/pdf,.pdf,.heic,.heif" multiple class="oculto" id="ia-in-arq"></label>`;
-  const campoDrive = () => `<div class="ia-drive-linha"><input id="ia-drive" inputmode="url" placeholder="Cole aqui o link do Google Drive" autocomplete="off"><button type="button" class="btn claro mini" id="ia-drive-ok">Buscar</button></div><span class="dica" id="ia-drive-msg">${mat.drive.length ? `✅ ${plural(mat.drive.length, 'arquivo encontrado', 'arquivos encontrados')} no Drive` : ''}</span>`;
+  const botaoArquivos = (secundario) => `<label class="${secundario ? 'btn contorno cheio' : 'ia-grande'}" style="cursor:pointer"><i class="pic pic-clipe"></i> Escolher fotos, prints ou PDF${secundario ? '' : '<small>pode escolher vários de uma vez</small>'}<input type="file" accept="image/*,application/pdf,.pdf,.heic,.heif" multiple class="oculto" id="ia-in-arq"></label>`;
+  const campoDrive = () => `<div class="ia-drive-linha"><input id="ia-drive" inputmode="url" placeholder="Cole aqui o link do Google Drive" autocomplete="off"><button type="button" class="btn claro mini" id="ia-drive-ok">Buscar</button></div><span class="dica" id="ia-drive-msg">${mat.drive.length ? `<i class="pic pic-ok"></i> ${plural(mat.drive.length, 'arquivo encontrado', 'arquivos encontrados')} no Drive` : ''}</span>`;
   const escolhidos = () => {
     const partes = [];
     if (mat.fotos.length) partes.push(plural(mat.fotos.length, 'foto ou print', 'fotos ou prints'));
     if (mat.pdfs.length) partes.push(plural(mat.pdfs.length, 'PDF', 'PDFs'));
     if (mat.drive.length) partes.push(plural(mat.drive.length, 'arquivo do Drive', 'arquivos do Drive'));
-    return partes.length ? `<div class="ia-escolhidos">✅ ${partes.join(' · ')}<span class="ia-thumbs">${miniaturas(mat.fotos)}</span></div>` : '';
+    return partes.length ? `<div class="ia-escolhidos"><i class="pic pic-ok"></i> ${partes.join(' · ')}<span class="ia-thumbs">${miniaturas(mat.fotos)}</span></div>` : '';
   };
   const telas = {
     1: () => `
@@ -2128,8 +2433,8 @@ function iaEnviar() {
           <div class="passo-inst"><b>1</b><span>No WhatsApp, abra a conversa, toque e segure numa mensagem, marque as mensagens dos kits e toque em <b>Copiar</b>. Ou use <b>⋮ › Mais › Exportar conversa</b> e escolha "sem mídia".</span></div>
           <div class="passo-inst"><b>2</b><span>Cole aqui embaixo (ou anexe o arquivo .txt exportado). Depois escolha as <b>fotos dos kits</b>.</span></div>
           <textarea id="ia-conversa" rows="7" maxlength="60000" placeholder="Cole a conversa aqui">${esc(mat.conversa)}</textarea>
-          <label class="btn contorno mini" style="cursor:pointer;align-self:flex-start">📄 Anexar conversa exportada (.txt)<input type="file" accept=".txt,text/plain" class="oculto" id="ia-in-txt"></label>
-          <div class="ia-dica">💡 A IA usa só o que foi combinado sobre os kits (nomes, preços, sinal, peças). Se o valor mudou na conversa, vale o último. Conversa fiada e dados pessoais são ignorados.</div>
+          <label class="btn contorno mini" style="cursor:pointer;align-self:flex-start"><i class="pic pic-doc"></i> Anexar conversa exportada (.txt)<input type="file" accept=".txt,text/plain" class="oculto" id="ia-in-txt"></label>
+          <div class="ia-dica"><i class="pic pic-lampada"></i> A IA usa só o que foi combinado sobre os kits (nomes, preços, sinal, peças). Se o valor mudou na conversa, vale o último. Conversa fiada e dados pessoais são ignorados.</div>
           ${botaoArquivos(true)}
           ${escolhidos()}
           <button class="btn principal cheio" id="ia-cont" ${total() || mat.conversa.trim() ? '' : 'disabled'}>Continuar</button>`;
@@ -2153,31 +2458,31 @@ function iaEnviar() {
     },
     3: () => `
       <p class="ia-perg">Os preços dos kits aparecem nas fotos ou prints?</p>
-      ${opc('sim', '✅', 'Sim, estão escritos neles', '', precos === 'sim')}
-      ${opc('lista', '📝', 'Não, tenho uma lista separada', 'no WhatsApp, num papel, num print', precos === 'lista')}
-      ${opc('digitar', '✍️', 'Não tenho: vou digitar na conferência', '', precos === 'digitar')}
+      ${opc('sim', '<i class="pic pic-ok"></i>', 'Sim, estão escritos neles', '', precos === 'sim')}
+      ${opc('lista', '<i class="pic pic-nota"></i>', 'Não, tenho uma lista separada', 'no WhatsApp, num papel, num print', precos === 'lista')}
+      ${opc('digitar', '<i class="pic pic-lapis"></i>', 'Não tenho: vou digitar na conferência', '', precos === 'digitar')}
       ${precos === 'lista' ? `<div class="cartao coluna" style="gap:8px">
         <b style="font-size:14.5px">Cole a lista ou mande um print dela</b>
         <textarea id="ia-texto" rows="4" maxlength="15000" placeholder="Ex.: Kit Safari R$ 350, sinal R$ 100">${esc(mat.texto)}</textarea>
-        <label class="btn contorno mini" style="cursor:pointer;align-self:flex-start">📷 Mandar print da lista<input type="file" accept="image/*" multiple class="oculto" id="ia-in-prints"></label>
+        <label class="btn contorno mini" style="cursor:pointer;align-self:flex-start"><i class="pic pic-camera"></i> Mandar print da lista<input type="file" accept="image/*" multiple class="oculto" id="ia-in-prints"></label>
         <span class="ia-thumbs">${miniaturas(mat.prints)}</span></div>` : ''}
       <div class="ia-espaco"></div>
       <button class="btn principal cheio" id="ia-cont" ${precos ? '' : 'disabled'}>Continuar</button>`,
     4: () => `
       <p class="ia-perg">Tudo pronto para a IA organizar</p>
       <div class="cartao ia-resumo-env">
-        ${mat.fotos.length ? `<div>🖼️ ${plural(mat.fotos.length, 'foto ou print', 'fotos ou prints')}<span>✓</span></div>` : ''}
-        ${mat.pdfs.length ? `<div>📄 ${plural(mat.pdfs.length, 'PDF', 'PDFs')}<span>✓</span></div>` : ''}
-        ${mat.drive.length ? `<div>☁️ ${plural(mat.drive.length, 'arquivo do Drive', 'arquivos do Drive')}<span>✓</span></div>` : ''}
-        ${mat.conversa.trim() ? '<div>🗨️ Conversa do WhatsApp<span>✓</span></div>' : ''}
-        ${mat.texto.trim() || mat.prints.length ? '<div>📝 Lista de preços<span>✓</span></div>' : ''}
+        ${mat.fotos.length ? `<div><i class="pic pic-galeria"></i> ${plural(mat.fotos.length, 'foto ou print', 'fotos ou prints')}<span>✓</span></div>` : ''}
+        ${mat.pdfs.length ? `<div><i class="pic pic-doc"></i> ${plural(mat.pdfs.length, 'PDF', 'PDFs')}<span>✓</span></div>` : ''}
+        ${mat.drive.length ? `<div><i class="pic pic-nuvem"></i> ${plural(mat.drive.length, 'arquivo do Drive', 'arquivos do Drive')}<span>✓</span></div>` : ''}
+        ${mat.conversa.trim() ? '<div><i class="pic pic-conversa"></i> Conversa do WhatsApp<span>✓</span></div>' : ''}
+        ${mat.texto.trim() || mat.prints.length ? '<div><i class="pic pic-nota"></i> Lista de preços<span>✓</span></div>' : ''}
       </div>
-      ${opc('mais', '➕', 'Mandar mais arquivos', 'de outro lugar (galeria, PDF, Drive…)', false)}
+      ${opc('mais', '<i class="pic pic-mais"></i>', 'Mandar mais arquivos', 'de outro lugar (galeria, PDF, Drive…)', false)}
       <div class="ia-aviso"><b>A IA só organiza:</b> não mexe nas suas fotos e não inventa preço. Você confere tudo antes de publicar.</div>
       <div class="erro oculto" id="ia-erro"></div>
       <div class="ia-prog oculto" id="ia-prog"><div class="ia-barra"><i></i></div><span id="ia-prog-tx">Preparando…</span></div>
       <div class="ia-espaco"></div>
-      <button class="btn principal cheio" id="ia-ir">✨ Organizar com IA</button>`,
+      <button class="btn principal cheio" id="ia-ir"><i class="pic pic-brilho"></i> Organizar com IA</button>`,
   };
   const titulos = { 1: 'Montar com IA', 2: () => IA_ORIGENS[origem].titulo, 3: 'Os preços', 4: 'Tudo pronto?' };
   const ir = (n) => { passo = n; desenhar(); };
@@ -2437,7 +2742,7 @@ function iaAndamento(loteId, fontes) {
   const inicio = Date.now();
   abrirPainel('Montar com IA', `
     <div class="cartao centro coluna" style="gap:10px;padding:20px 16px">
-      <div style="font-size:40px" aria-hidden="true">✨</div>
+      <div class="pic-g" aria-hidden="true"><i class="pic pic-brilho"></i></div>
       <h2>Organizando seu catálogo…</h2>
       <div class="ia-barra"><i id="ia-and-barra" style="width:8%"></i></div>
       <p class="pequeno" id="ia-and-fontes">${fontes ? esc([fontes.fotos ? plural(fontes.fotos, 'foto', 'fotos') : '', fontes.paginas ? plural(fontes.paginas, 'página de PDF', 'páginas de PDF') : '', fontes.prints ? plural(fontes.prints, 'print', 'prints') : '', fontes.texto ? 'lista de preços' : ''].filter(Boolean).join(' · ')) : ''}</p>
@@ -2451,7 +2756,7 @@ function iaAndamento(loteId, fontes) {
     const desenharEtapas = (atual) => {
       const el = $('#ia-etapas', p);
       if (!el) return;
-      el.innerHTML = etapas.map((t, i) => `<div class="ia-linha ${i < atual ? 'feita' : i === atual ? 'agora' : ''}">${i < atual ? '✅' : i === atual ? '⏳' : '○'} ${t}</div>`).join('');
+      el.innerHTML = etapas.map((t, i) => `<div class="ia-linha ${i < atual ? 'feita' : i === atual ? 'agora' : ''}">${i < atual ? '<i class="pic pic-ok"></i>' : i === atual ? '<i class="pic pic-relogio"></i>' : '○'} ${t}</div>`).join('');
     };
     const tique = async () => {
       if (parar || !document.body.contains(p)) return;
@@ -2571,12 +2876,12 @@ function iaConferir(loteId, posInicial) {
         : `<div class="ia-val"><small>${rotulo}</small><b>${reais(v)}</b></div>`;
       const precoBox = vars.length ? '' : k.consultar ? `
         <div class="ia-preco">
-          <p class="ia-preco-t">💰 Preço a consultar</p>
+          <p class="ia-preco-t"><i class="pic pic-dinheiro"></i> Preço a consultar</p>
           <p class="ia-trecho">No seu link vai aparecer "Preço a consultar": a cliente reserva a data e você passa o valor pelo WhatsApp.</p>
           <button type="button" class="btn claro mini" id="ia-tira-consultar">Colocar preço</button>
         </div>` : `
         <div class="ia-preco">
-          <p class="ia-preco-t">💰 Preço e sinal: confira com atenção</p>
+          <p class="ia-preco-t"><i class="pic pic-dinheiro"></i> Preço e sinal: confira com atenção</p>
           <div class="grade-2">${campoValor('preco', 'Preço', k.preco, k.preco == null)}${campoValor('sinal', 'Sinal', k.sinal, k.sinal == null)}</div>
           ${k.preco == null ? '<button type="button" class="btn claro mini" id="ia-consultar" style="align-self:flex-start">Deixar a consultar</button>' : ''}
           <p class="ia-trecho">${k.preco == null && k.sinal == null ? 'Não encontrei o preço nem o sinal no seu material. Digite ou deixe a consultar.'
@@ -2586,7 +2891,7 @@ function iaConferir(loteId, posInicial) {
         </div>`;
       const opcoes = !vars.length ? '' : `
         <div class="ia-preco">
-          <p class="ia-preco-t">💰 Opções do kit: confira preço e sinal de cada uma</p>
+          <p class="ia-preco-t"><i class="pic pic-dinheiro"></i> Opções do kit: confira preço e sinal de cada uma</p>
           ${vars.map((v, i) => `<div class="ia-opcao" data-v="${i}">
             ${editar(!v.nome) ? `<input class="v-nome" value="${esc(v.nome || '')}" placeholder="Nome da opção" maxlength="60">` : `<b>${esc(v.nome)}</b>`}
             <div class="grade-2">${campoValor('vp' + i, 'Preço', v.preco, v.preco == null)}${campoValor('vs' + i, 'Sinal', v.sinal, v.sinal == null)}</div>
@@ -2596,12 +2901,12 @@ function iaConferir(loteId, posInicial) {
         </div>`;
       const cabeTeste = estado.ia && estado.ia.plano === 'teste' ? estado.ia.restante || 0 : null;
       const avisoTeste = pos === 0 && cabeTeste != null && lista.length > cabeTeste
-        ? `<div class="ia-trava">🔒 <span>No teste grátis, ${cabeTeste ? `<b>${plural(cabeTeste, 'kit da IA pode', 'kits da IA podem')}</b> ir para o catálogo agora` : 'seus 5 kits da IA já estão no catálogo'}. Pode conferir todos: no fim você escolhe ${cabeTeste ? 'quais publicar' : 'guardar'}, e o resto fica pronto com cadeado até você assinar.</span></div>` : '';
+        ? `<div class="ia-trava"><i class="pic pic-cadeado"></i> <span>No teste grátis, ${cabeTeste ? `<b>${plural(cabeTeste, 'kit da IA pode', 'kits da IA podem')}</b> ir para o catálogo agora` : 'seus 5 kits da IA já estão no catálogo'}. Pode conferir todos: no fim você escolhe ${cabeTeste ? 'quais publicar' : 'guardar'}, e o resto fica pronto com cadeado até você assinar.</span></div>` : '';
       raiz.innerHTML = `
         <div class="linha-flex entre"><span class="ia-pos">Kit ${pos + 1} de ${lista.length}</span>${k.situacao !== 'conferir' ? `<span class="etiqueta ${k.situacao === 'aprovado' ? 'et-confirmada' : 'et-cancelada'}">${k.situacao === 'aprovado' ? 'Aprovado' : 'Descartado'}</span>` : ''}</div>
         <div class="ia-pontos">${pontos}</div>
         ${avisoTeste}
-        ${k.existe ? `<div class="ia-existe">⚠️ Parece que você já tem o <b>${esc(k.existe)}</b> no catálogo. Se for o mesmo kit, toque em <b>Descartar</b>.</div>` : ''}
+        ${k.existe ? `<div class="ia-existe"><i class="pic pic-alerta"></i> Parece que você já tem o <b>${esc(k.existe)}</b> no catálogo. Se for o mesmo kit, toque em <b>Descartar</b>.</div>` : ''}
         ${fotos.length ? `<div class="ia-foto-grande">${fotoCaixa(fotos[fotoAtual], 'Foto do kit')}<span class="ia-foto-q">${fotoAtual + 1} de ${fotos.length} · foto inteira</span></div>
           ${fotos.length > 1 ? `<div class="ia-minis">${fotos.map((f, i) => `<button type="button" class="ia-mini ${i === fotoAtual ? 'on' : ''}" data-f="${i}" aria-label="Ver foto ${i + 1}"><img src="${esc(f)}" alt=""></button>`).join('')}</div>` : ''}
           ${editando ? `<div class="linha-flex" style="gap:8px;flex-wrap:wrap">${fotoAtual > 0 ? '<button type="button" class="btn claro mini" id="ia-principal">Tornar principal</button>' : '<span class="dica">Esta é a foto principal.</span>'}${fotos.length > 1 ? '<button type="button" class="btn perigo mini" id="ia-tirar-foto">Tirar esta foto do kit</button>' : ''}</div>` : ''}`
@@ -2712,7 +3017,7 @@ function miniaturaGuardada(k) {
     const pos = `${r.w >= 1 ? 0 : ((r.x / (1 - r.w)) * 100).toFixed(2)}% ${r.h >= 1 ? 0 : ((r.y / (1 - r.h)) * 100).toFixed(2)}%`;
     return `<div class="ia-esc-foto"><div class="ia-esc-recorte" style="aspect-ratio:${(r.w / r.h).toFixed(3)};background-image:url('${esc(r.url)}');background-size:${tam};background-position:${pos}"></div></div>`;
   }
-  return '<div class="ia-esc-foto ia-esc-sem">🎈</div>';
+  return '<div class="ia-esc-foto ia-esc-sem"><i class="pic pic-balao"></i></div>';
 }
 function iaEscolherKits(lote) {
   const cabe = Math.min(lote.escolher, 10);
@@ -2761,7 +3066,7 @@ function iaResumo(lote) {
     const vars = k.variacoes || [];
     const preco = vars.length ? `a partir de ${reais(Math.min(...vars.map((v) => Number(v.preco) || 0)))} · ${plural(vars.length, 'opção', 'opções')}` : `${reais(k.preco)} · sinal ${reais(k.sinal)}`;
     const st = { aprovado: ['ok', 'Aprovado'], descartado: ['x', 'Descartado'], publicado: ['ok', 'Já publicado'] }[k.situacao] || ['x', k.situacao];
-    return `<div class="ia-rk">${k.fotos && k.fotos[0] ? `<img src="${esc(k.fotos[0])}" alt="">` : '<span class="ia-rk-sem">🎈</span>'}<div><b>${esc(k.nome || 'Sem nome')}</b><small>${k.situacao === 'descartado' ? '—' : preco}</small></div><span class="ia-st ${st[0]}">${st[1]}</span></div>`;
+    return `<div class="ia-rk">${k.fotos && k.fotos[0] ? `<img src="${esc(k.fotos[0])}" alt="">` : '<span class="ia-rk-sem"><i class="pic pic-balao"></i></span>'}<div><b>${esc(k.nome || 'Sem nome')}</b><small>${k.situacao === 'descartado' ? '—' : preco}</small></div><span class="ia-st ${st[0]}">${st[1]}</span></div>`;
   };
   const pago = estado.ia && estado.ia.plano === 'pago';
   // Teste grátis: só cabem alguns kits da IA no catálogo; a dona escolhe quais
@@ -2774,10 +3079,10 @@ function iaResumo(lote) {
       <div class="x"><b>${desc}</b><small>${desc === 1 ? 'descartado' : 'descartados'}</small></div>
       <div class="g"><b>${guard}</b><small>${guard === 1 ? 'guardado' : 'guardados'}</small></div>
     </div>
-    ${escolhe && cabe > 0 ? `<div class="ia-trava">✨ <span>No teste grátis, <b>${plural(cabe, 'kit da IA pode', 'kits da IA podem')}</b> ir para o catálogo agora. Toque nos aprovados para escolher; os outros ficam prontos com cadeado até você assinar.</span></div>` : ''}
-    ${escolhe && !cabe ? `<div class="ia-trava">🔒 <span>Seus 5 kits da IA do teste já estão no catálogo. Os aprovados ficam <b>prontos com cadeado</b> e vão para a loja quando você assinar.</span></div>` : ''}
-    ${ap.length + desc + pub + guard ? `<div class="cartao ia-lista">${kits.filter((k) => ['aprovado', 'descartado', 'publicado'].includes(k.situacao)).map((k) => (escolhe && cabe > 0 && k.situacao === 'aprovado' ? `<button type="button" class="ia-rk ia-rk-esc ${marcados.has(k) ? 'on' : ''}" data-ap="${ap.indexOf(k)}">${linha(k).replace(/^<div class="ia-rk">|<\/div>$/g, '')}<span class="ia-rk-ck">✓</span></button>` : linha(k))).join('')}${pago ? '' : kits.filter((k) => k.situacao === 'guardado').map((k) => `<div class="ia-rk"><span class="ia-rk-sem">🔒</span><div><b>${esc(k.nome || 'Kit sem nome')}</b><small>liberado quando você assinar</small></div><span class="ia-st x">Guardado</span></div>`).join('')}</div>` : ''}
-    ${guard && !pago ? `<div class="ia-trava">🔒 <span><b>${plural(guard, 'kit guardado', 'kits guardados')}</b> esperando. Assine para a IA montar o resto do seu catálogo (ilimitado).</span></div>` : ''}
+    ${escolhe && cabe > 0 ? `<div class="ia-trava"><i class="pic pic-brilho"></i> <span>No teste grátis, <b>${plural(cabe, 'kit da IA pode', 'kits da IA podem')}</b> ir para o catálogo agora. Toque nos aprovados para escolher; os outros ficam prontos com cadeado até você assinar.</span></div>` : ''}
+    ${escolhe && !cabe ? `<div class="ia-trava"><i class="pic pic-cadeado"></i> <span>Seus 5 kits da IA do teste já estão no catálogo. Os aprovados ficam <b>prontos com cadeado</b> e vão para a loja quando você assinar.</span></div>` : ''}
+    ${ap.length + desc + pub + guard ? `<div class="cartao ia-lista">${kits.filter((k) => ['aprovado', 'descartado', 'publicado'].includes(k.situacao)).map((k) => (escolhe && cabe > 0 && k.situacao === 'aprovado' ? `<button type="button" class="ia-rk ia-rk-esc ${marcados.has(k) ? 'on' : ''}" data-ap="${ap.indexOf(k)}">${linha(k).replace(/^<div class="ia-rk">|<\/div>$/g, '')}<span class="ia-rk-ck">✓</span></button>` : linha(k))).join('')}${pago ? '' : kits.filter((k) => k.situacao === 'guardado').map((k) => `<div class="ia-rk"><span class="ia-rk-sem"><i class="pic pic-cadeado"></i></span><div><b>${esc(k.nome || 'Kit sem nome')}</b><small>liberado quando você assinar</small></div><span class="ia-st x">Guardado</span></div>`).join('')}</div>` : ''}
+    ${guard && !pago ? `<div class="ia-trava"><i class="pic pic-cadeado"></i> <span><b>${plural(guard, 'kit guardado', 'kits guardados')}</b> esperando. Assine para a IA montar o resto do seu catálogo (ilimitado).</span></div>` : ''}
     <div class="erro oculto" id="ia-pub-erro"></div>
     ${ap.length && escolhe && !cabe ? `<button class="btn principal cheio" id="ia-guardar">Guardar ${plural(ap.length, 'kit', 'kits')} com cadeado</button>` : ''}
     ${ap.length && !(escolhe && !cabe) ? `<button class="btn principal cheio" id="ia-publicar">Publicar ${plural(escolhe ? marcados.size : ap.length, 'kit', 'kits')} no catálogo</button>
@@ -2855,16 +3160,16 @@ function lojaPronta(publicados, nomes = []) {
   const comFoto = estado.kits.filter((k) => k.ativo && k.foto_url).sort((a, b) => novos.has(b.nome) - novos.has(a.nome)).slice(0, 4);
   const textoZap = `Olá! Agora você pode ver todos os kits da ${n.nome} e reservar a sua data pelo link: ${link}`;
   abrirPainel('Sua loja está no ar!', `
-    <div class="ia-festa"><div style="font-size:34px" aria-hidden="true">🎉</div><b>${plural(publicados, 'kit publicado', 'kits publicados')}</b><span>Sua cliente já pode escolher e reservar pelo link.</span></div>
+    <div class="ia-festa"><div class="pic-g" aria-hidden="true"><i class="pic pic-festa"></i></div><b>${plural(publicados, 'kit publicado', 'kits publicados')}</b><span>Sua cliente já pode escolher e reservar pelo link.</span></div>
     <div class="ia-loja">
       <div class="ia-loja-topo">${n.logo_url ? `<img class="vitrine-logo" src="${esc(n.logo_url)}" alt="">` : ''}<b>${esc(n.nome)}</b></div>
       ${comFoto.length ? `<div class="ia-loja-grade">${comFoto.map((k) => `<div>${fotoCaixa(k.foto_url, k.nome)}<small>${esc(k.nome)}</small></div>`).join('')}</div>` : ''}
     </div>
-    <a class="btn contorno cheio" href="${esc(linkDona())}">👀 Ver como a cliente vê</a>
-    <div class="ia-link"><span>🔗 ${esc(link.replace(/^https?:\/\//, ''))}</span><button type="button" class="btn claro mini" id="lp-copiar">Copiar</button></div>
-    <button class="btn insta cheio" id="lp-bio">📸 Colocar na bio do Instagram</button>
+    <a class="btn contorno cheio" href="${esc(linkDona())}"><i class="pic pic-olho"></i> Ver como a cliente vê</a>
+    <div class="ia-link"><span><i class="pic pic-link"></i> ${esc(link.replace(/^https?:\/\//, ''))}</span><button type="button" class="btn claro mini" id="lp-copiar">Copiar</button></div>
+    <button class="btn insta cheio" id="lp-bio"><i class="pic pic-insta"></i> Colocar na bio do Instagram</button>
     <div class="grade-2">
-      <button class="btn contorno" id="lp-stories">⭐ Postar nos stories</button>
+      <button class="btn contorno" id="lp-stories"><i class="pic pic-estrela"></i> Postar nos stories</button>
       <a class="btn verde" href="${esc('https://wa.me/?text=' + encodeURIComponent(textoZap))}" target="_blank" rel="noopener">${ICONE.zap} WhatsApp</a>
     </div>
     <button class="link-btn" id="lp-fim" style="align-self:center">Fechar</button>`, (p) => {
@@ -2888,7 +3193,7 @@ async function popupBio(voltar) {
     ${passo(3, 'Segure no campo, toque em <b>Colar</b> e depois em <b>✓ Concluir</b>')}
     <a class="btn insta cheio" href="${esc(n.instagram ? `https://www.instagram.com/${encodeURIComponent(n.instagram)}/` : 'https://www.instagram.com/')}" target="_blank" rel="noopener">Abrir o Instagram</a>
     <button class="link-btn" id="bio-feito" style="align-self:center">Já coloquei: <b style="color:var(--verde)">marcar como feito ✓</b></button>`, (p) => {
-    $('#bio-feito', p).onclick = async () => { await dados.marcarLinkBio().catch(() => {}); aviso('Marcado! Agora suas clientes acham sua loja pela bio. 💛'); if (voltar) voltar(); else fecharPainel(); };
+    $('#bio-feito', p).onclick = async () => { await dados.marcarLinkBio().catch(() => {}); aviso('Marcado! Agora suas clientes acham sua loja pela bio.'); if (voltar) voltar(); else fecharPainel(); };
   }, voltar);
 }
 // ----- 9. Stories: o app monta a imagem com a logo e os kits -----
@@ -3123,7 +3428,7 @@ function lerRascunho(ch) {
 function gravarRascunho(ch, dadosR) { try { localStorage.setItem(ch, JSON.stringify({ t: Date.now(), d: dadosR })); } catch (e) { /* cheio: segue */ } }
 function apagarRascunho(ch) { try { localStorage.removeItem(ch); } catch (e) { /* segue */ } }
 function faixaRascunho(ch) {
-  return lerRascunho(ch) ? `<div class="ag-rasc" id="rasc-faixa"><span>📝 Você tinha começado a preencher e não salvou.</span><div><button type="button" class="btn principal mini" id="rasc-voltar">Recuperar</button><button type="button" class="link-btn" id="rasc-descartar">Descartar</button></div></div>` : '';
+  return lerRascunho(ch) ? `<div class="ag-rasc" id="rasc-faixa"><span><i class="pic pic-nota"></i> Você tinha começado a preencher e não salvou.</span><div><button type="button" class="btn principal mini" id="rasc-voltar">Recuperar</button><button type="button" class="link-btn" id="rasc-descartar">Descartar</button></div></div>` : '';
 }
 function ligarFaixaRascunho(p, ch, recuperar) {
   const v = $('#rasc-voltar', p), d = $('#rasc-descartar', p);
@@ -3152,7 +3457,7 @@ function formKit(kit, rascunho) {
         <select name="categoria">
           <option value="">Sem categoria</option>
           ${opcoesCategoria(k.categoria).map((c) => `<option value="${esc(c)}" ${c === k.categoria ? 'selected' : ''}>${esc(c)}</option>`).join('')}
-          <option value="__nova">➕ Criar nova categoria…</option>
+          <option value="__nova">+ Criar nova categoria…</option>
         </select>
       </label>
       <label class="campo oculto" id="campo-nova-cat">Nome da nova categoria
@@ -3200,7 +3505,7 @@ function formKit(kit, rascunho) {
     const areaTemas = $('#area-temas', p);
     const lerTemas = () => { $$('[data-tn]', areaTemas).forEach((i) => { const t = temas[Number(i.dataset.tn)]; if (t) t.nome = i.value.trim().slice(0, 60); }); };
     const desenharTemas = () => {
-      areaTemas.innerHTML = `${temas.map((t, i) => `<div class="ag-tema">${t.foto ? `<img src="${esc(t.foto)}" alt="">` : '<span class="ag-tema-sem">🎨</span>'}
+      areaTemas.innerHTML = `${temas.map((t, i) => `<div class="ag-tema">${t.foto ? `<img src="${esc(t.foto)}" alt="">` : '<span class="ag-tema-sem"><i class="pic pic-paleta"></i></span>'}
           <input data-tn="${i}" value="${esc(t.nome || '')}" maxlength="60" placeholder="Nome do tema (ex.: Sonic)" ${so ? 'disabled' : ''}>
           ${so ? '' : `<button type="button" class="mini-tirar" data-tt="${i}" aria-label="Tirar tema">×</button>`}</div>`).join('')}
         ${Array.from({ length: enviandoTemas }, () => '<div class="ag-tema"><span class="ag-tema-sem">…</span><span class="dica">Enviando foto…</span></div>').join('')}
@@ -3248,7 +3553,7 @@ function formKit(kit, rascunho) {
           ${so ? '' : `<button type="button" class="mini-tirar" data-tirar="${i}" aria-label="Tirar foto ${i + 1}">×</button>`}
         </div>`).join('');
       const carregando = Array.from({ length: enviando }, () => '<div class="mini-foto carregando-foto">…</div>').join('');
-      area.innerHTML = `${principal}${fotos[0] && !so ? '<button type="button" class="btn claro mini" id="ajustar-foto" style="margin-top:6px">✂️ Ajustar esta foto (zoom e posição)</button>' : ''}${fotos.length + enviando > 0 ? `<div class="minis">${minis}${carregando}</div>` : ''}`;
+      area.innerHTML = `${principal}${fotos[0] && !so ? '<button type="button" class="btn claro mini" id="ajustar-foto" style="margin-top:6px"><i class="pic pic-tesoura"></i> Ajustar esta foto (zoom e posição)</button>' : ''}${fotos.length + enviando > 0 ? `<div class="minis">${minis}${carregando}</div>` : ''}`;
       const aj = $('#ajustar-foto', area);
       if (aj) aj.onclick = () => acao(aj, async () => {
         let blob;
@@ -3468,7 +3773,7 @@ function cartaoAvisosLoja() {
   // Depois de ativar, o cartão some da aba Mais (volta só se os avisos forem desligados no celular).
   if (avisosLigados()) return '';
   return `<section class="cartao coluna avisos-loja">
-    <div class="linha-flex" style="gap:12px;align-items:center"><span style="font-size:30px" aria-hidden="true">🔔</span><div><b style="font-size:17px">Avisos de reservas no celular</b><div class="pequeno">Receba um aviso na hora em que uma cliente reservar pelo seu link, mesmo com o app fechado.</div></div></div>
+    <div class="linha-flex" style="gap:12px;align-items:center"><div class="pic-g" aria-hidden="true"><i class="pic pic-sino"></i></div><div><b style="font-size:17px">Avisos de reservas no celular</b><div class="pequeno">Receba um aviso na hora em que uma cliente reservar pelo seu link, mesmo com o app fechado.</div></div></div>
     <button class="btn principal cheio" id="avisos-ativar">Ativar avisos neste celular</button>
   </section>`;
 }
@@ -3576,7 +3881,7 @@ function assistenteAgenda(depois) {
   const fim = () => { fecharPainel(); if (depois) depois(); };
   const telas = [
     () => `<div class="coluna ag-tela ag-centro">
-        <div style="font-size:56px" aria-hidden="true">🎈</div>
+        <div class="pic-g" aria-hidden="true"><i class="pic pic-balao"></i></div>
         <h2 class="ag-titulo">Vamos deixar sua agenda do seu jeito</h2>
         <p class="pequeno" style="margin:0">Só 2 perguntas para o app <b>nunca aceitar reserva a mais</b> do que você consegue entregar.</p>
         <div class="ia-espaco"></div>
@@ -3587,25 +3892,23 @@ function assistenteAgenda(depois) {
         <p class="ia-perg" style="margin:0">Quantas festas você consegue atender no mesmo dia?</p>
         <p class="pequeno" style="margin:-4px 0 4px">Somando todos os seus kits. Pense em carro, tempo e quem ajuda a entregar.</p>
         <div class="${semLimite ? 'ag-apagado' : ''}" id="ag-num-caixa">${contador('limite', limite, 1, 200)}</div>
-        <button type="button" class="ia-opc ${semLimite ? 'sel' : ''}" id="ag-sem"><span class="ia-opc-ic">♾️</span><span><b>Não tenho limite</b><small>Cada kit só sai uma vez por dia</small></span></button>
+        <button type="button" class="ia-opc ${semLimite ? 'sel' : ''}" id="ag-sem"><span class="ia-opc-ic"><i class="pic pic-infinito"></i></span><span><b>Não tenho limite</b><small>Cada kit só sai uma vez por dia</small></span></button>
         <div class="ia-espaco"></div>
         <button class="btn principal cheio" data-ir="2">Continuar</button></div>`,
     () => `<div class="coluna ag-tela">
         <div class="ia-passos"><i class="f"></i><i class="f"></i></div>
         <p class="ia-perg" style="margin:0">Quando uma cliente pedir pelo seu link...</p>
-        <button type="button" class="ag-opc ${confirmar ? 'sel' : ''}" data-conf="1"><span class="ag-rec">RECOMENDADO</span><b>✅ Eu confirmo pelo WhatsApp antes do Pix</b><small>A data fica guardada até você aceitar.</small></button>
-        <button type="button" class="ag-opc ${confirmar ? '' : 'sel'}" data-conf="0"><b>⚡ Mostrar a chave Pix na hora</b><small>Se a data não der, você devolve o sinal.</small></button>
+        <button type="button" class="ag-opc ${confirmar ? 'sel' : ''}" data-conf="1"><span class="ag-rec">RECOMENDADO</span><b><i class="pic pic-ok"></i> Eu confirmo pelo WhatsApp antes do Pix</b><small>A data fica guardada até você aceitar.</small></button>
+        <button type="button" class="ag-opc ${confirmar ? '' : 'sel'}" data-conf="0"><b><i class="pic pic-raio"></i> Mostrar a chave Pix na hora</b><small>Se a data não der, você devolve o sinal.</small></button>
         <div class="ia-espaco"></div>
         <button class="btn principal cheio" data-salvar>Continuar</button></div>`,
     () => `<div class="coluna ag-tela ag-centro">
-        <div style="font-size:50px" aria-hidden="true">🎉</div>
+        <div class="pic-g" aria-hidden="true"><i class="pic pic-festa"></i></div>
         <h2 class="ag-titulo">Pronto!</h2>
         ${simulacaoTexto(semLimite ? null : limite)}
-        ${estado.kits.length ? '' : `<p class="pequeno" style="margin:6px 0 0">Agora coloque seus kits no app:</p>
-        ${iaLigada() ? '<button type="button" class="ia-opc sel" data-kits="ia" style="padding:15px"><span class="ia-opc-ic">✨</span><span><b>Montar meu catálogo com IA</b><small>Mande fotos, prints, PDF ou a conversa do WhatsApp</small></span></button>' : ''}
-        <button type="button" class="ia-opc" data-kits="manual" style="padding:15px"><span class="ia-opc-ic">✍️</span><span><b>${iaLigada() ? 'Prefiro cadastrar sozinha' : 'Cadastrar meu primeiro kit'}</b></span></button>`}
+        ${estado.kits.length ? '' : '<p class="pequeno" style="margin:6px 0 0">Agora vamos colocar seus kits na loja. A IA faz quase tudo.</p>'}
         <div class="ia-espaco"></div>
-        ${estado.kits.length ? '<button class="btn principal cheio" data-fim>Fechar</button>' : ''}
+        ${estado.kits.length ? '<button class="btn principal cheio" data-fim>Fechar</button>' : '<button class="btn principal cheio" data-kits="guia">Montar minha loja</button>'}
         <button class="link-btn" data-ir="1" style="align-self:center">Mudar as respostas</button></div>`,
   ];
   const desenhar = () => abrirPainel(passo ? 'Sua agenda' : '', telas[passo](), (p) => {
@@ -3620,7 +3923,7 @@ function assistenteAgenda(depois) {
       estado.negocio = await dados.salvarNegocio({ limite_dia: semLimite ? null : limite, confirmar_whatsapp: confirmar, agenda_config_em: new Date().toISOString() });
       passo = 3; desenhar();
     });
-    $$('[data-kits]', p).forEach((b) => (b.onclick = () => { fecharPainel(); if (b.dataset.kits === 'ia') { irPara('kits'); setTimeout(iaEnviar, 300); } else { irPara('kits'); setTimeout(() => formKit(null), 300); } }));
+    $$('[data-kits]', p).forEach((b) => (b.onclick = () => montarLojaGuiado()));
   }, passo > 0 ? () => { passo = Math.max(0, passo - 1); desenhar(); } : null);
   desenhar();
 }
@@ -3640,8 +3943,8 @@ function painelOrganizacao() {
     </section>
     <section class="cartao coluna">
       <h2 style="margin:0">Pedidos pelo link</h2>
-      <button type="button" class="ag-opc ${n.confirmar_whatsapp !== false ? 'sel' : ''}" data-conf="1"><b>✅ Eu confirmo pelo WhatsApp antes do Pix</b><small>A cliente só vê a chave Pix depois que você aceitar.</small></button>
-      <button type="button" class="ag-opc ${n.confirmar_whatsapp === false ? 'sel' : ''}" data-conf="0"><b>⚡ Mostrar a chave Pix na hora</b><small>Se a data não der, você devolve o sinal.</small></button>
+      <button type="button" class="ag-opc ${n.confirmar_whatsapp !== false ? 'sel' : ''}" data-conf="1"><b><i class="pic pic-ok"></i> Eu confirmo pelo WhatsApp antes do Pix</b><small>A cliente só vê a chave Pix depois que você aceitar.</small></button>
+      <button type="button" class="ag-opc ${n.confirmar_whatsapp === false ? 'sel' : ''}" data-conf="0"><b><i class="pic pic-raio"></i> Mostrar a chave Pix na hora</b><small>Se a data não der, você devolve o sinal.</small></button>
     </section>
     <section class="cartao coluna">
       <h2 style="margin:0">Dias fechados</h2>
@@ -3705,7 +4008,7 @@ function painelEstruturas() {
   const lista = estado.estruturas || [];
   const usoDe = (id) => estado.kits.filter((k) => (k.estruturas || []).some((x) => x.id === id)).length;
   abrirPainel('Peças compartilhadas', `
-    <div class="ia-dica">🛒 <b>Comprou mais uma?</b> Aumente aqui. Cada peça a mais abre mais uma vaga na sua agenda no mesmo dia.</div>
+    <div class="ia-dica"><i class="pic pic-carrinho"></i> <b>Comprou mais uma?</b> Aumente aqui. Cada peça a mais abre mais uma vaga na sua agenda no mesmo dia.</div>
     ${lista.map((e) => `<div class="ag-estr" data-e="${esc(e.id)}">
       <div class="ag-estr-t"><b>${esc(e.nome)}</b><small>${plural(usoDe(e.id), 'kit usa', 'kits usam')}${e.fora_qtd && e.fora_ate >= hojeISO() ? ` · ${e.fora_qtd} em conserto até ${esc(dataCurta(e.fora_ate))}` : ''}</small></div>
       ${contador('e' + e.id, e.quantidade, 0, 200)}
@@ -3805,10 +4108,10 @@ function abaMais(tela) {
       <span class="perfil-txt"><b>Editar dados</b><span class="perfil-nome">${esc(estado.negocio.nome)}</span><span class="pequeno">Logo, Instagram, recado do link, WhatsApp, Pix e dias de retirada</span></span>
       <span class="perfil-seta" aria-hidden="true">›</span>
     </button>
-    ${temOfertaBF() ? `<div class="bf-card"><div style="font-size:30px" aria-hidden="true">🏷️</div><div class="t"><b>Black Friday: anual por R$ 167</b><span>53% OFF · só até 29/11</span></div><button class="btn principal mini" id="ver-bf">Ver oferta</button></div>` : ''}
+    ${temOfertaBF() ? `<div class="bf-card"><div class="pic-g" aria-hidden="true"><i class="pic pic-etiqueta"></i></div><div class="t"><b>Black Friday: anual por R$ 167</b><span>53% OFF · só até 29/11</span></div><button class="btn principal mini" id="ver-bf">Ver oferta</button></div>` : ''}
     ${cartaoAvisosLoja()}
     ${mostrarInstalar ? `<section class="cartao coluna instalar">
-      <div style="display:flex;gap:12px;align-items:center"><div style="font-size:36px" aria-hidden="true">📲</div><div><b style="font-size:17px">Instale o app no seu celular</b><div class="pequeno">Abra direto pela tela inicial, como um aplicativo.</div></div></div>
+      <div style="display:flex;gap:12px;align-items:center"><div class="pic-g" aria-hidden="true"><i class="pic pic-celular"></i></div><div><b style="font-size:17px">Instale o app no seu celular</b><div class="pequeno">Abra direto pela tela inicial, como um aplicativo.</div></div></div>
       <button class="btn verde cheio" id="instalar">Instalar o app na tela inicial</button></section>` : ''}
     <section class="cartao coluna mais-link">
       <h2>Meu link de reservas</h2>
@@ -4054,7 +4357,7 @@ function formReserva(pre, existente, rascunho) {
       disp.innerHTML = !m ? `<span class="etiqueta et-livre">Kit livre nessas datas</span>`
         : m === 'kit' ? `<div class="erro">${conflito ? `Esse kit já está com ${esc(conflito.cliente_nome)} de ${dataCurta(conflito.data_retirada)} a ${dataCurta(conflito.data_devolucao)}.` : `Os ${qtd} deste kit já estão reservados nessas datas.`}</div>`
         : m === 'tema' ? `<div class="erro">Esse tema já está reservado nessas datas. Escolha outro tema.</div>`
-        : `<div class="nota-amarela pequeno">⚠️ ${m === 'fechado' ? 'Você marcou esses dias como fechados.' : m === 'limite' ? `Esse dia já tem ${estado.negocio.limite_dia} festas (o seu limite).` : `Falta ${esc(m.replace('estrutura:', '').toLowerCase())} nesses dias.`} Você pode salvar mesmo assim.</div>`;
+        : `<div class="nota-amarela pequeno"><i class="pic pic-alerta"></i> ${m === 'fechado' ? 'Você marcou esses dias como fechados.' : m === 'limite' ? `Esse dia já tem ${estado.negocio.limite_dia} festas (o seu limite).` : `Falta ${esc(m.replace('estrutura:', '').toLowerCase())} nesses dias.`} Você pode salvar mesmo assim.</div>`;
     };
     form.festa.onchange = () => {
       if (!form.festa.value) return;
@@ -4162,7 +4465,7 @@ function alterarDatas(r) {
       const m = form.ret.value && form.dev.value ? dados.motivoAgenda(ctxAgenda(), r.kit_id, r.tema_id || null, form.ret.value, form.dev.value, r.id, true) : null;
       $('#ad-disp', p).innerHTML = !m ? '<span class="etiqueta et-livre">Livre nessas datas</span>'
         : m === 'kit' || m === 'tema' ? `<div class="erro">${esc(dados.mensagemAgenda(m))}</div>`
-        : '<div class="nota-amarela pequeno">⚠️ Esses dias passam do seu limite ou estão fechados. Você pode salvar mesmo assim.</div>';
+        : '<div class="nota-amarela pequeno"><i class="pic pic-alerta"></i> Esses dias passam do seu limite ou estão fechados. Você pode salvar mesmo assim.</div>';
     };
     form.ret.onchange = checar; form.dev.onchange = checar; checar();
     form.onsubmit = (e) => { e.preventDefault(); const c = $('#ad-erro', p); c.classList.add('oculto');
@@ -4183,7 +4486,7 @@ function abrirReserva(id) {
   const botoes = [];
   if (ed) {
     if (r.status === 'aguardando_sinal') {
-      botoes.push(`<a class="btn verde cheio" href="${esc(linkZap(r.cliente_whatsapp, mensagem('sinal', r)))}" target="_blank" rel="noopener">✅ Aceitar e cobrar o sinal</a>`);
+      botoes.push(`<a class="btn verde cheio" href="${esc(linkZap(r.cliente_whatsapp, mensagem('sinal', r)))}" target="_blank" rel="noopener"><i class="pic pic-ok"></i> Aceitar e cobrar o sinal</a>`);
       botoes.push('<button class="btn contorno cheio" data-acao="confirmar">Sinal recebido: confirmar reserva</button>');
       botoes.push('<button class="btn contorno cheio" data-acao="naovai">Não vai dar (avisar a cliente)</button>');
     }
@@ -4216,7 +4519,7 @@ function abrirReserva(id) {
         <a class="btn claro mini" href="${esc(linkZap(r.cliente_whatsapp, `Oi, ${r.cliente_nome.split(' ')[0]}!`))}" target="_blank" rel="noopener">${ICONE.zap} Chamar</a></div>
       <div class="grade-2">
         <div><div class="pequeno">Festa</div><b>${dataCurta(r.data_festa)}</b></div>
-        <div><div class="pequeno">Retirada → devolução</div><b>${dataCurta(r.data_retirada)} → ${dataCurta(r.data_devolucao)}</b>${ed && r.status !== 'concluida' ? ' <button type="button" class="btn claro mini" data-acao="datas" style="min-height:30px;padding:0 10px">✏️ Alterar</button>' : ''}</div>
+        <div><div class="pequeno">Retirada → devolução</div><b>${dataCurta(r.data_retirada)} → ${dataCurta(r.data_devolucao)}</b>${ed && r.status !== 'concluida' ? ' <button type="button" class="btn claro mini" data-acao="datas" style="min-height:30px;padding:0 10px"><i class="pic pic-lapis"></i> Alterar</button>' : ''}</div>
         <div><div class="pequeno">Valor total</div><b>${r.valor_a_combinar && !Number(r.valor_total) ? '<span class="etiqueta et-aguardando_sinal">combinar valor</span>' : reais(r.valor_total)}</b></div>
         <div><div class="pequeno">Sinal</div><b>${reais(r.valor_sinal)}</b> ${r.sinal_recebido ? '<span class="etiqueta et-concluida">pago</span>' : ''}</div>
       </div>
@@ -4226,7 +4529,7 @@ function abrirReserva(id) {
     </div>
     ${r.status !== 'cancelada' ? '<section class="cartao coluna ct" id="ct-reserva"><div class="pequeno">Carregando contrato…</div></section>' : ''}
     <div class="cartao coluna anotacao">
-      <label class="campo" style="margin:0">📝 Observação
+      <label class="campo" style="margin:0"><i class="pic pic-nota"></i> Observação
         <textarea id="obs-reserva" maxlength="500" rows="3" placeholder="Anote o que precisar: horário de entrega, pedido especial, endereço do salão…" ${ed ? '' : 'disabled'}>${esc(r.obs || '')}</textarea>
       </label>
       ${ed ? '<button class="btn claro mini oculto" id="salvar-obs" style="align-self:flex-end">Salvar observação</button>' : ''}
@@ -4248,7 +4551,7 @@ function abrirReserva(id) {
     ligar('datas', () => alterarDatas(r));
     ligar('naovai', (b) => {
       const primeiro = r.cliente_nome.split(' ')[0];
-      const txt = `Oi, ${primeiro}! Infelizmente ${dataCurta(r.data_festa)} não vai dar para o ${kitComPalavra(nomeKitReserva(r))}. 😕 Quer escolher outra data ou outro kit? Veja aqui: ${linkPublico(estado.negocio.slug)}`;
+      const txt = `Oi, ${primeiro}! Infelizmente ${dataCurta(r.data_festa)} não vai dar para o ${kitComPalavra(nomeKitReserva(r))}. Quer escolher outra data ou outro kit? Veja aqui: ${linkPublico(estado.negocio.slug)}`;
       abrirPopup(`
         <h2 class="centro" style="font-size:22px;margin:0">Avisar ${esc(primeiro)} e liberar a data?</h2>
         <p class="centro pequeno" style="margin:0">A mensagem abre pronta no WhatsApp e a reserva é cancelada, liberando a data no seu link.</p>

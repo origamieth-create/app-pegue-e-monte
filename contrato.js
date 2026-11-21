@@ -73,11 +73,11 @@ function telaAceito(c) {
   const primeiro = String(c.aceito_nome || '').split(' ')[0];
   raiz.innerHTML = `<div class="nao-imprimir coluna" style="gap:12px">
       ${topo(c)}
-      <div class="ok-grande" aria-hidden="true">✅</div>
+      <div class="ok-grande" aria-hidden="true"><i class="pic pic-ok"></i></div>
       <h2 class="centro" style="font-size:26px;margin:0">Contrato aceito!</h2>
       <p class="centro" style="margin:0">Obrigada, ${esc(primeiro)}. A ${esc(c.loja || 'loja')} já recebeu seu aceite.${c.retirada ? `<br><b>Retirada: ${esc(dataBR(c.retirada))}</b>` : ''}</p>
       <button class="btn contorno cheio" id="pdf">⬇️ Baixar minha cópia (PDF)</button>
-      ${c.whatsapp ? `<a class="btn verde cheio" href="${esc(zap(c.whatsapp, `Oi! Aceitei o contrato da minha reserva do kit ${c.kit || ''}.`))}" target="_blank" rel="noopener">💬 Falar com a ${esc(c.loja || 'loja')}</a>` : ''}
+      ${c.whatsapp ? `<a class="btn verde cheio" href="${esc(zap(c.whatsapp, `Oi! Aceitei o contrato da minha reserva do kit ${c.kit || ''}.`))}" target="_blank" rel="noopener"><i class="pic pic-conversa"></i> Falar com a ${esc(c.loja || 'loja')}</a>` : ''}
     </div>
     <div class="so-impressao">${folha(c)}</div>`;
   $('#pdf', raiz).onclick = () => window.print();
