@@ -3,7 +3,7 @@
 // Só abre para e-mails cadastrados na tabela "administradores".
 // Quem confere é o banco de dados: esta página só mostra o resultado.
 // =====================================================================
-import * as dados from './dados.js?v=20261123a';
+import * as dados from './dados.js?v=20261124a';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=20261121e';
 
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -1499,7 +1499,7 @@ function abaPagamentos(tela) {
     return `<div class="pg-ab">
       <div style="min-width:0"><b class="t">${esc(x.no || x.em)}</b>
         <small>${esc([x.no ? x.em : '', telBonito(c.tel)].filter(Boolean).join(' · '))}</small>
-        <small><span class="st st-${esc(x.st)}">${esc(etiqueta)}</span> ${esc([titulo, dataHora(x.q), x.st === 'abandono' ? 'Cakto' : x.gw === 'pagarme' ? 'Pagar.me' : 'Cakto'].filter(Boolean).join(' · '))}</small>
+        <small><span class="st st-${esc(x.st)}">${esc(etiqueta)}</span> ${esc([titulo, dataHora(x.q), x.st === 'abandono' ? 'Cakto' : x.gw === 'pagarme' ? 'Pagar.me' : x.gw === 'appmax' ? 'Appmax' : 'Cakto'].filter(Boolean).join(' · '))}</small>
         ${x.cp || x.pp ? `<small>${esc([x.cp ? 'Anúncio: ' + x.cp : '', x.pp ? 'Popup: ' + (NOMES_POPUP[x.pp] || x.pp) : ''].filter(Boolean).join(' · '))}</small>` : ''}
         ${x.st === 'pago' ? '' : emailsRec(c)}</div>
       <div class="ld"><span class="v">${x.b ? esc(reais(x.b)) : ''}</span>${zap ? `<a class="zapb" href="${esc(zap)}" target="_blank" rel="noopener">Chamar no WhatsApp</a>` : ''}</div></div>`;

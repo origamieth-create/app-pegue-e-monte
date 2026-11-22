@@ -2,8 +2,8 @@
 // App Pegue e Monte — app da dona
 // Abas: Hoje, Agenda, Kits, Mais
 // =====================================================================
-import * as dados from './dados.js?v=20261123a';
-import { abrirCheckout, planos as planosCheckout, linkCakto } from './checkout.js?v=20261123a';
+import * as dados from './dados.js?v=20261124a';
+import { abrirCheckout, planos as planosCheckout, linkCakto } from './checkout.js?v=20261124a';
 import { PERMITIR_CADASTRO, EMAIL_SUPORTE, WHATSAPP_SUPORTE, LINK_MENSAL, LINK_ANUAL, LINK_ANUAL_PROMO, DEMO_SITE, LINK_PLANOS, SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=20261121e';
 
 const { hojeISO, somaDias, cruza } = dados;
@@ -505,8 +505,8 @@ const ZAP_PAGAMENTO = 'Oi! Sou cliente do App Pegue e Monte e preciso de ajuda c
 function popupPagamento() {
   const a = estado.assinatura || {};
   const temPix = !!(a.pix_codigo && a.pix_vence && new Date(a.pix_vence).getTime() > agoraServidor());
-  if (!temPix && a.gateway === 'pagarme') {
-    // pagou pela Pagar.me: paga aqui mesmo (Pix na hora ou outro cartão)
+  if (!temPix && (a.gateway === 'pagarme' || a.gateway === 'appmax')) {
+    // pagou pelo checkout do app (Appmax ou Pagar.me): paga aqui mesmo (Pix na hora ou outro cartão)
     planosCheckout().then((c) => { estado.checkout = c; abrirPagamento(a.plano === 'anual' ? 'anual' : 'mensal', null, 'pagamento_pendente'); })
       .catch(() => aviso('Não consegui abrir o pagamento agora. Tente de novo em instantes.'));
     return;
@@ -850,7 +850,7 @@ function desenharFaixaAssinatura() {
     $('#faixa-mes1', faixa).onclick = popupPlanosMes1;
     return;
   }
-  if (!sit && ass.status === 'ativa' && ass.gateway === 'pagarme' && ass.pix_codigo && ass.vence_em) {
+  if (!sit && ass.status === 'ativa' && (ass.gateway === 'pagarme' || ass.gateway === 'appmax') && ass.pix_codigo && ass.vence_em) {
     faixa.innerHTML = base + `
       <div class="faixa-pagamento teste" role="status">
         <div><i class="pic pic-sino"></i> <b>Sua assinatura renova dia ${esc(new Date(ass.vence_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }))}.</b> O Pix já está pronto: pague e continue usando sem parar.</div>

@@ -305,7 +305,7 @@ export async function previaMinha(id, token) {
 export async function previaImportar(id, token, somar = false) {
   if (MODO_DEMO) {
     const pv = await previaMinha(); if (!pv) return { ok: true, kits: 0, ids: [] };
-    const pago = (D().assinatura || {}).status === 'ativa', max = pago ? 40 : 10;
+    const pago = (D().assinatura || {}).status === 'ativa', max = pago ? 40 : 5;
     const nomes = new Set(D().kits.map((k) => String(k.nome).trim().toLowerCase()));
     const ids = (pv.kits || []).filter((k) => !somar || !nomes.has(String(k.nome).trim().toLowerCase())).slice(0, max).map((k) => { const novo = { id: uid(), negocio_id: 'n1', nome: k.nome, preco: 0, sinal: 0, foto_url: k.foto_url, fotos: k.foto_url ? [k.foto_url] : [], categoria: k.categoria || null, preco_consultar: true, ativo: true, pecas: [], variacoes: [], temas: [], estruturas: [], quantidade: 1 }; D().kits.push(novo); return { previa: k.id, kit: novo.id }; });
     const resto = (pv.kits || []).slice(max);

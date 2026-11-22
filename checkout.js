@@ -1,10 +1,10 @@
 // =====================================================================
-// App Pegue e Monte — checkout próprio (Pagar.me) dentro do app e das páginas de vendas
+// App Pegue e Monte — checkout próprio (Appmax; Pagar.me guardada) dentro do app e das páginas de vendas
 // Uso: import { abrirCheckout, checkoutAtivo } from './checkout.js?v=...'
 //      abrirCheckout({ plano: 'anual', contexto: 'app' | 'venda', linkReserva: 'https://pay.cakto...' })
-// O cartão vira "token" direto na Pagar.me (chave pública); o número nunca passa pelo nosso servidor.
+// O cartão vira "token" direto na Appmax (Appmax JS) ou na Pagar.me; o número nunca passa pelo nosso servidor.
 // =====================================================================
-import * as dados from './dados.js?v=20261123a';
+import * as dados from './dados.js?v=20261124a';
 import { PAGARME_PK } from './config.js?v=20261121e';
 
 const PASSOS = ['Sua conta', 'Pagamento', 'Acesso'];
@@ -12,11 +12,64 @@ const reais = (c) => (c / 100).toLocaleString('pt-BR', { style: 'currency', curr
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const so = (v) => String(v ?? '').replace(/\D/g, '');
 let planosCache = null;
+// Qual função de pagamento usar: a Appmax responde se ela é a ligada; se não, usa a Pagar.me (guardada)
+let FUNCAO = 'pagarme';
 
 export async function planos() {
   if (planosCache) return planosCache;
+  try {
+    const r = await dados.chamarFuncao('appmax', { acao: 'planos' });
+    if (r && r.gateway === 'appmax') { FUNCAO = 'appmax'; planosCache = r; return r; }
+  } catch (e) { /* função da Appmax ainda não publicada: segue com a Pagar.me */ }
   planosCache = await dados.chamarFuncao('pagarme', { acao: 'planos' });
   return planosCache;
+}
+
+// ---------------------------------------------------------------------
+// Appmax JS: transforma o cartão em token no navegador e pega o IP de quem compra
+// (a Appmax lê os campos pelos nomes card-number, card-holder-name, exp-month, exp-year e cvv)
+// ---------------------------------------------------------------------
+const appmax = { pronto: null, ip: '', espera: null };
+function carregarAppmax(cat) {
+  if (appmax.pronto) return appmax.pronto;
+  appmax.pronto = new Promise((ok) => {
+    if (dados.MODO_DEMO || !cat || !cat.external_id) { ok(false); return; }
+    const cli = document.createElement('form'); cli.setAttribute('data-appmax-customer', ''); cli.hidden = true;
+    const f = document.createElement('form'); f.setAttribute('data-appmax-checkout', ''); f.method = 'POST'; f.id = 'apm-cartao';
+    f.style.cssText = 'position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden';
+    f.innerHTML = ['card-number', 'card-holder-name', 'exp-month', 'exp-year', 'cvv'].map((n) => `<input name="${n}" required>`).join('') + '<button type="submit">ok</button>';
+    f.addEventListener('submit', (e) => e.preventDefault());
+    document.body.append(cli, f);
+    const sc = document.createElement('script'); sc.src = cat.script; sc.async = true;
+    sc.onload = () => {
+      try {
+        window.AppmaxScripts.init({
+          externalId: cat.external_id,
+          onIp: (d) => { appmax.ip = (d && d.ip) || ''; },
+          onTokenize: (d) => { const t = d && (d.token || (typeof d === 'string' ? d : '')); if (appmax.espera) { appmax.espera.ok(t); appmax.espera = null; } },
+          onError: (err) => { if (appmax.espera) { appmax.espera.erro(err); appmax.espera = null; } },
+        });
+        ok(true);
+      } catch (e) { ok(false); }
+    };
+    sc.onerror = () => ok(false);
+    document.head.appendChild(sc);
+  });
+  return appmax.pronto;
+}
+async function tokenAppmax(c) {
+  if (!(await appmax.pronto)) throw new Error('Não deu para carregar o pagamento com cartão. Recarregue a página ou pague com Pix.');
+  const f = document.getElementById('apm-cartao');
+  f.elements['card-number'].value = c.numero; f.elements['card-holder-name'].value = c.titular;
+  f.elements['exp-month'].value = c.mes; f.elements['exp-year'].value = c.ano; f.elements.cvv.value = c.cvv;
+  const t = await new Promise((ok, erro) => {
+    appmax.espera = { ok, erro };
+    setTimeout(() => { if (appmax.espera) { appmax.espera = null; erro(new Error('tempo')); } }, 20000);
+    if (f.requestSubmit) f.requestSubmit(); else f.querySelector('button').click();
+  }).catch(() => '');
+  ['card-number', 'card-holder-name', 'exp-month', 'exp-year', 'cvv'].forEach((n) => { f.elements[n].value = ''; });
+  if (!t) throw new Error('Confira os dados do cartão.');
+  return t;
 }
 export async function checkoutAtivo() {
   try { return !!(await planos()).ativo; } catch (e) { return false; }
@@ -178,7 +231,10 @@ export async function abrirCheckout(op = {}) {
     passo: sessao || op.contexto !== 'venda' ? 'plano' : 'conta',
     erro: '', pagamento: null,
   };
-  const temCartao = !!PAGARME_PK || dados.MODO_DEMO;
+  const ehAppmax = FUNCAO === 'appmax';
+  if (ehAppmax) carregarAppmax(cat);
+  const temCartao = dados.MODO_DEMO || (ehAppmax ? !!cat.cartao : !!PAGARME_PK);
+  const empresa = ehAppmax ? 'Appmax' : 'Pagar.me';
   const veu = document.createElement('div');
   veu.className = 'ck-veu';
   veu.innerHTML = '<div class="ck" role="dialog" aria-modal="true" aria-label="Pagamento"></div>';
@@ -204,7 +260,7 @@ export async function abrirCheckout(op = {}) {
         ${passos.map((t, i) => `<div class="ck-p ${i < idx ? 'ok' : i === idx ? 'on' : ''}"><span>${i < idx ? '✓' : i + 1}</span>${esc(t)}</div>`).join('')}</div>`;
   };
   const erroHtml = () => (st.erro ? `<div class="ck-erro" role="alert">${esc(st.erro)}</div>` : '');
-  const seg = '<div class="ck-seg"><i class="pic pic-cadeado"></i> Pagamento seguro pela Pagar.me (Stone)</div>';
+  const seg = `<div class="ck-seg"><i class="pic pic-cadeado"></i> Pagamento seguro pela ${ehAppmax ? 'Appmax' : 'Pagar.me (Stone)'}</div>`;
 
   function desenhar() {
     if (fechado) return;
@@ -366,7 +422,7 @@ export async function abrirCheckout(op = {}) {
       if (fechado) return;
       voltas++;
       try {
-        const r = await dados.chamarFuncao('pagarme', { acao: 'status', id });
+        const r = await dados.chamarFuncao(FUNCAO, { acao: 'status', id });
         if (r.status === 'pago') { clearInterval(consulta); st.venceEm = r.vence_em; concluir(r); }
         else if (r.status === 'vencido') { clearInterval(consulta); st.erro = 'Este Pix venceu. Gere outro para continuar.'; st.passo = 'plano'; desenhar(); }
         else if (r.status === 'recusado' && st.passo === 'cartao') { clearInterval(consulta); }
@@ -395,7 +451,7 @@ export async function abrirCheckout(op = {}) {
         <button class="ck-btn" type="submit">Pagar ${reais(totalAtual())}</button>
       </form>
       <button class="ck-link" data-voltar style="color:#6B6175">Voltar e pagar com Pix</button>
-      <div class="ck-seg"><i class="pic pic-cadeado"></i> Os dados do cartão vão direto para a Pagar.me. O app não guarda.</div>`;
+      <div class="ck-seg"><i class="pic pic-cadeado"></i> Os dados do cartão vão direto para a ${empresa}. O app não guarda.</div>`;
     const f = caixa.querySelector('form');
     const end = { cep: '', rua: '', bairro: '', cidade: '', uf: '' };
     f.numero.oninput = () => { f.numero.value = so(f.numero.value).slice(0, 19).replace(/(\d{4})(?=\d)/g, '$1 '); };
@@ -428,7 +484,7 @@ export async function abrirCheckout(op = {}) {
       try {
         evento('AddPaymentInfo', { payment_type: 'cartao', content_name: st.plano, value: totalAtual() / 100, currency: 'BRL' });
         const token = await tokenizar({ number: numero, holder_name: f.titular.value.trim().toUpperCase(), exp_month: Number(mm), exp_year: Number('20' + so(aa)), cvv });
-        const r = await pagar({ metodo: 'cartao', card_token: token, parcelas: st.plano === 'anual' ? st.parcelas : 1,
+        const r = await pagar({ metodo: 'cartao', card_token: token, titular: f.titular.value.trim().toUpperCase(), parcelas: st.plano === 'anual' ? st.parcelas : 1,
           endereco: { ...end, cep: so(f.cep.value), numero: f.num.value.trim() } });
         st.pagamento = r;
         if (r.status === 'pago') { st.venceEm = r.vence_em; concluir(r); return; }
@@ -468,6 +524,7 @@ export async function abrirCheckout(op = {}) {
   }
   async function tokenizar(card) {
     if (dados.MODO_DEMO) return /^4000/.test(card.number) ? 'token_ruim' : 'token_ok';
+    if (ehAppmax) return tokenAppmax({ numero: card.number, titular: card.holder_name, mes: String(card.exp_month).padStart(2, '0'), ano: String(card.exp_year), cvv: card.cvv });
     const r = await fetch(`https://api.pagar.me/core/v5/tokens?appId=${encodeURIComponent(PAGARME_PK)}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'card', card }),
     });
@@ -476,8 +533,9 @@ export async function abrirCheckout(op = {}) {
     return j.id;
   }
   async function pagar(extra) {
-    return dados.chamarFuncao('pagarme', {
-      acao: 'pagar', plano: st.plano, cpf: so(st.cpf), nome: st.nome, telefone: so(st.telefone),
+    if (ehAppmax) await Promise.race([appmax.pronto, new Promise((ok) => setTimeout(ok, 1500))]);
+    return dados.chamarFuncao(FUNCAO, {
+      acao: 'pagar', plano: st.plano, cpf: so(st.cpf), nome: st.nome, telefone: so(st.telefone), ip: appmax.ip || undefined,
       email: st.logado ? undefined : st.email, origem: origemAnuncio(), popup: op.popup || null,
       fbp: cookie('_fbp'), fbc: cookie('_fbc'), pagina: location.origin + location.pathname, ...extra,
     });
