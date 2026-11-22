@@ -11,19 +11,28 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Pegue e Monte">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito+Sans:wght@400;600;700;800&display=swap">
-<link rel="stylesheet" href="estilo.css?v=20261124a">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap">
+<link rel="stylesheet" href="estilo.css?v=20261125a">
 <style>
-  body { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
+  body { padding-bottom: calc(108px + env(safe-area-inset-bottom)); }
   #faixa { position: sticky; top: 0; z-index: 40; }
-  .topo { position: sticky; top: var(--altura-faixa, 0px); z-index: 20; background: var(--fundo); padding: calc(14px + env(safe-area-inset-top)) 18px 10px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-  .topo .marca { display: flex; align-items: center; gap: 10px; min-width: 0; font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 18px; }
+  .topo { position: sticky; top: var(--altura-faixa, 0px); z-index: 20; background: var(--fundo); padding: calc(14px + env(safe-area-inset-top)) 20px 8px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .topo .marca { display: none; align-items: center; gap: 10px; min-width: 0; font-family: var(--fonte); font-weight: 800; font-size: 18px; }
+  .topo-titulo { font-size: 30px; font-weight: 800; letter-spacing: -.02em; margin: 0; }
+  body[data-aba="hoje"] .topo { display: none; }
+  body[data-aba="mais"] .topo-titulo { display: none; }
+  body[data-aba="mais"] .topo { padding-bottom: 0; }
   .topo .marca svg { flex: 0 0 auto; }
   .marca-nome { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   main { max-width: 640px; margin: 0 auto; padding: 4px 18px 24px; display: flex; flex-direction: column; gap: 16px; }
-  nav.abas { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: #fff; border-top: 1px solid var(--linha); display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); padding-bottom: env(safe-area-inset-bottom); }
-  nav.abas button { border: 0; background: none; min-height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 13px; font-weight: 800; color: var(--texto2); cursor: pointer; }
+  nav.abas { position: fixed; left: 12px; right: 12px; bottom: calc(10px + env(safe-area-inset-bottom)); z-index: 30; background: #fff; border-radius: 26px; box-shadow: 0 10px 30px rgba(42,27,61,.14); display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); max-width: 560px; margin: 0 auto; }
+  nav.abas.com-reserva { grid-template-columns: 1fr 1fr 84px 1fr 1fr; }
+  nav.abas button { border: 0; background: none; min-height: 70px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 12px; font-weight: 700; color: #9A90A3; cursor: pointer; font-family: inherit; }
+  nav.abas button svg { width: 24px; height: 24px; }
   nav.abas button.ativa { color: var(--destaque); }
+  nav.abas .nav-reserva { color: var(--destaque); }
+  nav.abas .nav-reserva .fab { width: 58px; height: 58px; border-radius: 20px; margin-top: -35px; background: linear-gradient(145deg, var(--coral), var(--destaque)); color: #fff; display: grid; place-items: center; box-shadow: 0 10px 22px rgba(199,59,72,.38); }
+  nav.abas .nav-reserva .fab svg { width: 28px; height: 28px; }
   nav.abas button { position: relative; }
   .contador { position: absolute; top: 6px; left: calc(50% + 6px); min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px; background: var(--destaque); color: #fff; font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center; border: 2px solid #fff; }
   .secao-titulo { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 4px; }
@@ -40,32 +49,46 @@
   .logo-app { width: 72px; height: 72px; display: flex; align-items: center; justify-content: center; margin: 0 auto; }
   .bandeirinhas { width: 100%; max-width: 320px; height: auto; display: block; margin: 0 auto -4px; }
   .fin { display: flex; flex-direction: column; gap: 12px; }
-  .fin-mes { font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 22px; }
+  .fin-mes { font-family: var(--fonte); font-weight: 800; font-size: 22px; }
   .fin-destaque { background: var(--tinta); color: #fff; border-radius: 22px; padding: 20px; display: flex; flex-direction: column; gap: 4px; }
-  .fin-rotulo { font-size: 14px; font-weight: 700; color: #D9CFE6; }
-  .fin-valor { font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 38px; line-height: 1.1; }
-  .fin-sub { font-size: 14px; font-weight: 800; color: #9FE3BD; }
+  .fin-rotulo { font-size: 13px; font-weight: 700; color: var(--texto2); }
+  .fin-valor { font-family: var(--fonte); font-weight: 800; font-size: 28px; line-height: 1.15; letter-spacing: -.02em; }
+  .fin-sub { font-size: 12.5px; font-weight: 800; color: var(--verde); }
   .fin-grade { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-  .fin-cartao { background: #fff; border: 1px solid var(--linha); border-radius: 16px; padding: 12px; display: flex; flex-direction: column; gap: 2px; text-align: left; }
-  .fin-cartao b { font-size: 16px; }
-  .clicavel-fin { cursor: pointer; font: inherit; color: inherit; box-shadow: inset 0 0 0 2px var(--lilas); }
+  .fin-cartao { background: #fff; border: 0; border-radius: 18px; padding: 12px; display: flex; flex-direction: column; gap: 2px; text-align: left; box-shadow: var(--sombra-leve); }
+  .fin-cartao b { font-size: 15.5px; font-weight: 800; }
+  .fin-cartao .pequeno { display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; }
+  .clicavel-fin { cursor: pointer; font: inherit; color: inherit; }
   .titulo-alerta { display: flex; align-items: center; gap: 8px; }
   .titulo-alerta::before { content: ''; width: 12px; height: 12px; border-radius: 99px; background: var(--cor); flex: 0 0 auto; }
   .num-alerta { min-width: 26px; height: 26px; padding: 0 8px; border-radius: 999px; color: #fff; font-weight: 800; font-size: 14px; display: inline-flex; align-items: center; justify-content: center; }
-  .resumo-num { font-family: 'Fredoka', sans-serif; font-size: 28px; font-weight: 700; }
+  .resumo-num { font-family: var(--fonte); font-weight: 800; font-size: 28px; font-weight: 700; }
 
 /* Versão para computador (telas largas). No celular nada muda. */
 @media (min-width: 1024px) {
   body { padding-bottom: 0; padding-left: 248px; }
-  nav.abas { top: 0; bottom: 0; right: auto; width: 248px; display: flex; flex-direction: column; gap: 4px; padding: 96px 14px 20px; border-top: 0; border-right: 1px solid var(--linha); }
+  nav.abas, nav.abas.com-reserva { top: 0; bottom: 0; left: 0; right: auto; width: 248px; display: flex; flex-direction: column; gap: 4px; padding: 96px 14px 20px; border-radius: 0; box-shadow: none; border-right: 1px solid var(--linha); max-width: none; margin: 0; }
+  nav.abas .nav-reserva { order: -1; flex-direction: row; justify-content: center; gap: 10px; min-height: 52px; margin-bottom: 10px; border-radius: 16px; background: linear-gradient(145deg, var(--coral), var(--destaque)); color: #fff; font-size: 16px; font-weight: 800; }
+  nav.abas .nav-reserva .fab { width: auto; height: auto; margin: 0; background: none; box-shadow: none; }
+  nav.abas .nav-reserva .fab svg { width: 22px; height: 22px; }
+  nav.abas .nav-reserva:hover { background: linear-gradient(145deg, var(--coral), var(--destaque-escuro)); }
+  body[data-aba="hoje"] .topo { display: flex; }
+  .ola { margin: 0; padding: 22px 24px 0; }
+  .ola::before { border-radius: 26px; }
+  .ola::after { display: none; }
+  main > .ola { grid-column: 1 / -1; }
+  main > .hoje-lista { grid-column: 2; }
+  main > .passos-linha { grid-column: 2; }
   nav.abas::before { content: ''; position: absolute; left: 22px; top: 26px; width: 40px; height: 40px; background: url(icone.svg) center/contain no-repeat; }
-  nav.abas::after { content: 'Pegue e Monte'; position: absolute; left: 72px; top: 32px; font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 19px; color: var(--tinta); }
+  nav.abas::after { content: 'Pegue e Monte'; position: absolute; left: 72px; top: 34px; font-family: var(--fonte); font-weight: 800; font-size: 18px; color: var(--tinta); }
   nav.abas button { flex-direction: row; justify-content: flex-start; gap: 12px; min-height: 50px; padding: 0 16px; border-radius: 14px; font-size: 16px; }
   nav.abas button:hover { background: var(--lilas); }
   nav.abas button.ativa { background: #FCE9EB; }
   nav.abas .contador { position: static; margin-left: auto; border: 0; }
   .topo { padding: 18px 32px 12px; border-bottom: 1px solid var(--linha); }
   .topo .marca svg, .topo .marca img { display: none; }
+  .topo .marca { display: flex; }
+  .topo-titulo { display: none; }
   .topo .marca { font-size: 22px; }
   main { max-width: 1440px; padding: 24px 40px 40px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px 24px; align-items: start; }
   main > * { grid-column: 1 / -1; }
@@ -97,11 +120,11 @@
   main:has(> .fin) > .tudo-em-dia { grid-column: 2; align-self: start; }
   /* Aba Mais no computador */
   main:has(> .perfil-topo) > h1 { order: 0; }
-  main:has(> .perfil-topo) > .perfil-topo { order: 1; grid-column: 1; align-self: stretch; padding: 22px 24px; gap: 18px; }
+  main:has(> .perfil-topo) > .perfil-topo { order: 2; grid-column: 1; align-self: stretch; padding: 22px 24px; gap: 18px; }
   main:has(> .perfil-topo) > .perfil-topo:hover { border-color: var(--tinta); }
   main:has(> .perfil-topo) > section.cartao.mais-link { order: 2; grid-column: 2; }
-  main:has(> .perfil-topo) > .bf-card { order: 3; }
-  main:has(> .perfil-topo) > .avisos-loja, main:has(> .perfil-topo) > .instalar { order: 4; grid-column: auto; }
+  main:has(> .perfil-topo) > .bf-card { order: 1; grid-column: 1 / -1; }
+  main:has(> .perfil-topo) > .botao-instalar { order: 1; grid-column: 1 / -1; }
   main:has(> .perfil-topo) > .mais-atalhos { order: 5; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
   main:has(> .perfil-topo) > .mais-atalhos > .cartao { margin: 0; padding: 20px; display: flex; flex-direction: column; justify-content: center; gap: 4px; min-height: 96px; }
   main:has(> .perfil-topo) > section.cartao.mais-ajuda { order: 6; grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: center; }
@@ -127,6 +150,6 @@
 <div id="raiz"><div class="carregando">Carregando…</div></div>
 <div id="painel"></div>
 <div id="toast" class="toast oculto" role="status" aria-live="polite"></div>
-<script type="module" src="app.js?v=20261124a"></script>
+<script type="module" src="app.js?v=20261125a"></script>
 </body>
 </html>

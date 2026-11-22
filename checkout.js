@@ -4,7 +4,7 @@
 //      abrirCheckout({ plano: 'anual', contexto: 'app' | 'venda', linkReserva: 'https://pay.cakto...' })
 // O cartão vira "token" direto na Appmax (Appmax JS) ou na Pagar.me; o número nunca passa pelo nosso servidor.
 // =====================================================================
-import * as dados from './dados.js?v=20261124a';
+import * as dados from './dados.js?v=20261125a';
 import { PAGARME_PK } from './config.js?v=20261121e';
 
 const PASSOS = ['Sua conta', 'Pagamento', 'Acesso'];
@@ -141,7 +141,7 @@ function css() {
   s.textContent = `
 .ck-veu{position:fixed;inset:0;background:rgba(42,27,61,.42);z-index:2147483000;display:flex;align-items:flex-end;justify-content:center;animation:ckf .2s}
 @keyframes ckf{from{opacity:0}}@keyframes cks{from{transform:translateY(40px);opacity:.4}}
-.ck{width:100%;max-width:480px;max-height:94vh;overflow:auto;background:#FFFBF7;color:#2A1B3D;border-radius:28px 28px 0 0;padding:10px 22px calc(22px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:14px;font-family:'Nunito Sans',system-ui,-apple-system,sans-serif;animation:cks .25s;box-sizing:border-box}
+.ck{width:100%;max-width:480px;max-height:94vh;overflow:auto;background:#FFFBF7;color:#2A1B3D;border-radius:28px 28px 0 0;padding:10px 22px calc(22px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:14px;font-family:'Plus Jakarta Sans','Nunito Sans',system-ui,-apple-system,sans-serif;animation:cks .25s;box-sizing:border-box}
 .ck *{box-sizing:border-box}
 .pic { display: inline-block; width: 1.2em; height: 1.2em; vertical-align: -.24em; flex: none; background-color: var(--destaque, #C73B48); -webkit-mask: var(--i) center / contain no-repeat; mask: var(--i) center / contain no-repeat; }
 .ck-fo.sel .pic-x { background-color: currentColor; }
@@ -151,7 +151,7 @@ function css() {
 @media(min-width:700px){.ck-veu{align-items:center}.ck{border-radius:28px;max-height:90vh}}
 .ck-puxa{width:46px;height:5px;border-radius:9px;background:#DCD3DF;align-self:center}
 .ck-cab{display:flex;justify-content:space-between;align-items:center}
-.ck-cab b{font-family:'Fredoka','Nunito Sans',sans-serif;font-size:21px;font-weight:700}
+.ck-cab b{font-family:'Plus Jakarta Sans','Nunito Sans',system-ui,sans-serif;font-size:21px;font-weight:700}
 .ck-x{width:38px;height:38px;border-radius:12px;background:#fff;border:0;box-shadow:0 2px 10px rgba(0,0,0,.08);font-size:18px;color:#8A8093;cursor:pointer}
 .ck-passos{display:grid;grid-template-columns:repeat(3,1fr);position:relative}
 .ck-passos:before{content:'';position:absolute;top:17px;left:16%;right:16%;height:3px;background:#EDE3D8}
@@ -159,7 +159,7 @@ function css() {
 .ck-p{display:flex;flex-direction:column;align-items:center;gap:6px;position:relative;font-size:13px;color:#6B6175;font-weight:700}
 .ck-p span{width:36px;height:36px;border-radius:50%;background:#fff;border:2px solid #EDE3D8;display:grid;place-items:center;font-weight:800;color:#9A90A3}
 .ck-p.on span,.ck-p.ok span{background:#C73B48;border-color:#C73B48;color:#fff}.ck-p.on{color:#2A1B3D}
-.ck h2{font-family:'Fredoka','Nunito Sans',sans-serif;font-size:23px;margin:0;line-height:1.2}
+.ck h2{font-family:'Plus Jakarta Sans','Nunito Sans',system-ui,sans-serif;font-size:23px;margin:0;line-height:1.2}
 .ck .ck-sub{color:#6B6175;font-size:14.5px;margin:-8px 0 0}
 .ck label{display:flex;flex-direction:column;gap:5px;font-size:13.5px;font-weight:700;color:#6B6175}
 .ck input,.ck select{width:100%;background:#fff;border:1.5px solid #EDE3D8;border-radius:14px;padding:13px 14px;font:inherit;font-size:16px;color:#2A1B3D;font-weight:600}
@@ -174,8 +174,8 @@ function css() {
 .ck-pl.sel{background:#FBEFF0;box-shadow:inset 0 0 0 1.5px #C73B48}
 .ck-pl .r{width:22px;height:22px;border-radius:50%;border:2px solid #CFC6D6}.ck-pl.sel .r{border:7px solid #C73B48}
 .ck-pl b{font-size:16.5px;display:block}.ck-pl small{color:#6B6175;font-size:12.5px}
-.ck-pl .v{font-family:'Fredoka','Nunito Sans',sans-serif;font-weight:700;font-size:20px;text-align:right;white-space:nowrap}
-.ck-pl .v s{display:block;font-size:12px;color:#9A90A3;font-weight:600;font-family:'Nunito Sans',sans-serif}
+.ck-pl .v{font-family:'Plus Jakarta Sans','Nunito Sans',system-ui,sans-serif;font-weight:700;font-size:20px;text-align:right;white-space:nowrap}
+.ck-pl .v s{display:block;font-size:12px;color:#9A90A3;font-weight:600;font-family:'Plus Jakarta Sans','Nunito Sans',system-ui,sans-serif}
 .ck-selo{display:inline-block;background:#EEF8F2;color:#1F7A52;font-size:11.5px;font-weight:800;border-radius:99px;padding:2px 8px;margin:3px 0}
 .ck-formas{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .ck-fo{background:#fff;border-radius:16px;padding:13px 14px;border:1.5px solid #EDE3D8;position:relative;font:inherit;color:inherit;text-align:left;cursor:pointer}

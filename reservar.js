@@ -2,7 +2,7 @@
 // App Pegue e Monte — link público de reservas (a cliente final usa)
 // Endereço: reservar.html?l=<link-do-negocio>
 // =====================================================================
-import * as dados from './dados.js?v=20261124a';
+import * as dados from './dados.js?v=20261125a';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=20261121e';
 
 // Demonstração do site: botões de WhatsApp mostram um aviso em vez de abrir conversa.
@@ -112,10 +112,10 @@ function aviso(msg) {
 // Telas internas em tela cheia, com botão "Voltar". O voltar do celular
 // também fecha a tela em vez de sair da página.
 let painelAberto = false;
-function abrirPainel(titulo, corpo, aoMontar) {
+function abrirPainel(titulo, corpo, aoMontar, classe = '') {
   const p = $('#painel');
   if (!painelAberto) { history.pushState({ painel: true }, ''); painelAberto = true; }
-  p.innerHTML = `<div class="painel-fundo"><div class="painel" role="dialog" aria-modal="true" aria-label="${esc(titulo)}">
+  p.innerHTML = `<div class="painel-fundo ${classe}"><div class="painel" role="dialog" aria-modal="true" aria-label="${esc(titulo)}">
     <div class="painel-barra"><button class="btn-voltar" type="button">${ESQ} Voltar</button></div>
     <h1 class="painel-titulo">${esc(titulo)}</h1>${corpo}</div></div>`;
   $('.btn-voltar', p).onclick = () => fechar();
@@ -175,11 +175,12 @@ async function iniciar() {
   const fechadoAgora = (loja.fechado || []).find((f) => f.ate >= hojeISO() && f.de <= dados.somaDias(hojeISO(), 30));
   const categorias = [...new Set(loja.kits.filter((k) => !k.bloqueado).map((k) => (k.categoria || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
   raiz.innerHTML = `
+    <div class="capa-loja" aria-hidden="true"></div>
     <header class="cabeca">
       ${loja.logo_url ? `<img src="${esc(loja.logo_url)}" alt="Logo de ${esc(loja.nome)}" onload="var r=this.naturalWidth/this.naturalHeight;if(r>0.9&&r<1.1)this.classList.add('logo-quadrada')">` : ''}
       <h1>${esc(loja.nome)}</h1>
       <p class="recado-loja">${esc(loja.recado || recadoPadrao(loja.nome))}</p>
-      <p class="pequeno">Escolha o kit e veja as datas livres. ${loja.confirmar ? 'A loja confere a data e confirma pelo WhatsApp.' : 'A reserva é confirmada depois do sinal.'}</p>
+      <div class="info-loja"><span>${loja.kits.length} ${loja.kits.length === 1 ? 'kit' : 'kits'}</span><span>${loja.confirmar ? 'Confirmação pelo WhatsApp' : 'Reserva com sinal'}</span></div>
       ${fechadoAgora ? `<p class="nota-amarela pequeno" style="margin:6px 0 0"><i class="pic pic-cadeado"></i> ${esc(fechadoAgora.recado || 'A loja não vai atender')} (${esc(dataCurta2(fechadoAgora.de))}${fechadoAgora.ate !== fechadoAgora.de ? ' a ' + esc(dataCurta2(fechadoAgora.ate)) : ''})</p>` : ''}
       <div class="botoes-loja">
         <a class="btn verde mini" href="${esc(linkZap(loja.whatsapp, 'Oi! Vim pelo link de reservas e tenho uma dúvida.'))}" target="_blank" rel="noopener">Dúvidas? Fale no WhatsApp</a>
@@ -200,11 +201,10 @@ async function iniciar() {
       </button>` : `
       <button class="cartao clicavel kit" data-kit="${esc(k.id)}" data-categoria="${esc(k.categoria || '')}" data-nome="${esc(String(k.nome).toLowerCase())}">
         <span style="position:relative; display:block">${k.foto_url ? fotoCaixa(k.foto_url, '', true) : '<div class="foto-kit foto-vazia">Sem foto</div>'}
-        ${fotosDe(k).length > 1 ? `<span class="contador-fotos"><i class="pic pic-camera"></i> ${fotosDe(k).length}</span>` : ''}</span>
-        ${k.categoria ? `<span class="etiqueta et-categoria">${esc(k.categoria)}</span>` : ''}
+        ${fotosDe(k).length > 1 ? `<span class="contador-fotos"><i class="pic pic-camera"></i> ${fotosDe(k).length}</span>` : ''}
+        ${k.categoria ? `<span class="etiqueta et-categoria cat-foto">${esc(k.categoria)}</span>` : ''}</span>
         <span class="nome">${esc(k.nome)}</span>
-        <span class="preco">${precoTexto(k)}</span>
-        <span class="btn principal mini">Ver datas livres</span>
+        <span class="kit-rodape"><span class="preco">${precoTexto(k)}</span><span class="ver-datas">Ver datas</span></span>
       </button>`).join('')}</div>
     <p class="vazio-txt centro oculto" id="sem-resultado">Nenhum kit encontrado. Tente outra categoria ou outro nome.</p>` : '<p class="vazio-txt centro">Nenhum kit disponível no momento.</p>'}
     <a class="btn contorno cheio" href="${esc(linkZap(loja.whatsapp, 'Oi! Vim pelo link de reservas e tenho uma dúvida.'))}" target="_blank" rel="noopener">Tirar dúvida no WhatsApp</a>
@@ -305,6 +305,10 @@ async function escolherData(kit) {
     const f = $('#form', p);
     f.classList.remove('oculto');
     $('#data-escolhida', p).textContent = dataLonga(escolhida);
+    const sinal = Number(opcao ? opcao.sinal : kit.sinal) || 0;
+    $('#barra-dia', p).textContent = 'Festa: ' + dataLonga(escolhida);
+    $('#barra-sinal', p).textContent = kit.preco_consultar ? 'Preço a consultar' : sinal > 0 ? `Sinal de ${reais(sinal)}` : reais(opcao ? opcao.preco : kit.preco);
+    $('#barra-res', p).classList.remove('oculto');
     const ta = $('#temas-area', p);
     if (ta) {
       ta.innerHTML = '<div class="carregando">Vendo os temas livres…</div>';
@@ -322,8 +326,8 @@ async function escolherData(kit) {
   const temas = Array.isArray(kit.temas) ? kit.temas : [];
   let tema = null, ocupadosTema = [];
   const precoHtml = () => kit.preco_consultar
-    ? `<span class="preco" style="font-family:'Fredoka',sans-serif;font-size:21px;font-weight:600;color:#4A2F73">Preço a consultar</span><span class="pequeno">Escolha a data e peça a reserva: a loja passa o valor pelo WhatsApp.</span>`
-    : `<span class="preco" style="font-family:'Fredoka',sans-serif;font-size:22px;font-weight:600">${reais(opcao ? opcao.preco : kit.preco)}</span>
+    ? `<span class="preco" style="font-family:'Plus Jakarta Sans',sans-serif;font-size:21px;font-weight:800;color:#4A2F73">Preço a consultar</span><span class="pequeno">Escolha a data e peça a reserva: a loja passa o valor pelo WhatsApp.</span>`
+    : `<span class="preco" style="font-family:'Plus Jakarta Sans',sans-serif;font-size:22px;font-weight:800">${reais(opcao ? opcao.preco : kit.preco)}</span>
       ${Number(opcao ? opcao.sinal : kit.sinal) > 0 ? `<span class="pequeno">Sinal para reservar: <b>${reais(opcao ? opcao.sinal : kit.sinal)}</b></span>` : ''}`;
   const temasHtml = () => `<div class="temas-link">${temas.map((t) => { const oc = ocupadosTema.includes(t.id); return `<button type="button" class="tema-link ${tema === t.id ? 'sel' : ''}" data-tema="${esc(t.id)}" ${oc ? 'disabled' : ''}>
       ${t.foto ? `<img src="${esc(t.foto)}" alt="">` : '<span class="tema-sem"><i class="pic pic-paleta"></i></span>'}<b>${esc(t.nome)}</b>${oc ? '<small>já reservado</small>' : ''}</button>`; }).join('')}</div>`;
@@ -331,15 +335,20 @@ async function escolherData(kit) {
     const base = Array.isArray(kit.pecas) ? kit.pecas : [];
     const extras = opcao && Array.isArray(opcao.extras) ? opcao.extras.filter(Boolean) : [];
     if (!base.length && !extras.length) return '';
-    return `<p class="pequeno" style="margin:0"><b>Inclui:</b> ${esc(base.join(', '))}${extras.length ? `${base.length ? ', ' : ''}<b style="color:#1F9D63">${esc(extras.join(', '))}</b>` : ''}</p>`;
+    return `<div class="pecas-kit"><b>O que vem no kit</b><div>${base.map((x) => `<span>${esc(x)}</span>`).join('')}${extras.map((x) => `<span class="extra">${esc(x)}</span>`).join('')}</div></div>`;
   };
   abrirPainel(kit.nome, `
-    <div id="galeria-area">${galeria(fotosDaOpcao())}</div>
-    ${PREVIA ? '' : '<div class="linha-flex entre" style="gap:8px"><span></span><button type="button" class="btn claro mini" id="compartilhar-kit">↗ Compartilhar</button></div>'}
+    <div class="kit-topo">
+      <div id="galeria-area">${galeria(fotosDaOpcao())}</div>
+      <div class="kit-botoes"><button type="button" class="bq-redondo" id="kit-voltar" aria-label="Voltar">${ESQ}</button>
+        ${PREVIA ? '' : `<button type="button" class="bq-redondo" id="compartilhar-kit" aria-label="Compartilhar"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M8 8l4-4 4 4"/><path d="M6 12v7h12v-7"/></svg></button>`}</div>
+    </div>
+    <div class="kit-folha">
+    ${kit.categoria ? `<span class="etiqueta et-categoria">${esc(kit.categoria)}</span>` : ''}
+    <div class="kit-nome-linha"><h1 class="kit-nome">${esc(kit.nome)}</h1><div id="preco-area" class="kit-preco">${precoHtml()}</div></div>
     ${vars.length ? `<h3 style="margin-bottom:0">Escolha a opção</h3>
     <div class="opcoes-kit">${vars.map((v, i) => `<button type="button" class="opcao-kit ${i ? '' : 'sel'}" data-op="${esc(v.id)}"><b>${esc(v.nome)}</b><span>${reais(v.preco)}</span></button>`).join('')}</div>` : ''}
     <div id="pecas-area">${pecasHtml()}</div>
-    <div class="linha-flex entre" id="preco-area">${precoHtml()}</div>
     <h3>Escolha a data da festa</h3>
     <div class="cartao" id="cal"></div>
     <form id="form" class="coluna oculto" novalidate>
@@ -350,8 +359,12 @@ async function escolherData(kit) {
       <div class="erro oculto" id="erro"></div>
       <button class="btn principal cheio" type="submit">Pedir reserva</button>
       <p class="dica centro">${loja.confirmar ? 'A loja confere a data e confirma pelo WhatsApp.' : 'Seu pedido segura a data até a loja confirmar o sinal.'}</p>
-    </form>`, (p) => {
+    </form>
+    </div>
+    <div class="barra-reservar oculto" id="barra-res"><div><small id="barra-dia"></small><b id="barra-sinal"></b></div><button type="button" class="btn principal" id="barra-bt">Reservar</button></div>`, (p) => {
     ligarGaleria(p);
+    $('#kit-voltar', p).onclick = () => fechar();
+    $('#barra-bt', p).onclick = () => { const f = $('#form', p); f.scrollIntoView({ behavior: 'smooth', block: 'start' }); setTimeout(() => f.nome.focus(), 400); };
     desenhar(p);
     if ($('#compartilhar-kit', p)) $('#compartilhar-kit', p).onclick = () => compartilharKit(kit);
     $$('[data-op]', p).forEach((b) => (b.onclick = () => {
@@ -391,7 +404,7 @@ async function escolherData(kit) {
         b.disabled = false; b.textContent = opcao ? `Pedir reserva: ${opcao.nome}` : 'Pedir reserva';
       }
     };
-  });
+  }, 'pn-kit');
 }
 
 function zapFormatado(n) {

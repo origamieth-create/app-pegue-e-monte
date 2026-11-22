@@ -2,8 +2,8 @@
 // App Pegue e Monte — app da dona
 // Abas: Hoje, Agenda, Kits, Mais
 // =====================================================================
-import * as dados from './dados.js?v=20261124a';
-import { abrirCheckout, planos as planosCheckout, linkCakto } from './checkout.js?v=20261124a';
+import * as dados from './dados.js?v=20261125a';
+import { abrirCheckout, planos as planosCheckout, linkCakto } from './checkout.js?v=20261125a';
 import { PERMITIR_CADASTRO, EMAIL_SUPORTE, WHATSAPP_SUPORTE, LINK_MENSAL, LINK_ANUAL, LINK_ANUAL_PROMO, DEMO_SITE, LINK_PLANOS, SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=20261121e';
 
 const { hojeISO, somaDias, cruza } = dados;
@@ -116,7 +116,7 @@ const etiqueta = (status, texto) => `<span class="etiqueta et-${status}">${esc(t
 const BANDEIRINHAS = '<svg class="bandeirinhas" viewBox="0 0 480 64" aria-hidden="true"><path d="M4 6 Q120 34 240 10 Q360 -10 476 18" fill="none" stroke="#2A1B3D" stroke-width="3" stroke-linecap="round"/><path d="M28 13 L60 19 L42 52 Z" fill="#E4505C"/><path d="M84 22 L116 25 L98 58 Z" fill="#FFC94A"/><path d="M140 25 L172 23 L156 58 Z" fill="#5B3A99"/><path d="M196 18 L228 13 L214 48 Z" fill="#E4505C"/><path d="M252 9 L284 5 L270 40 Z" fill="#FFC94A"/><path d="M308 3 L340 3 L324 38 Z" fill="#1F7A52"/><path d="M364 4 L396 7 L378 42 Z" fill="#E4505C"/><path d="M420 10 L452 15 L434 48 Z" fill="#FFC94A"/></svg>';
 
 const ICONE = {
-  hoje: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
+  hoje: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-6.5 8 6.5"/><path d="M6 9.5V19h12V9.5"/><path d="M10 19v-5h4v5"/></svg>',
   agenda: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M8 2v4M16 2v4M3 10h18"/></svg>',
   kits: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>',
   mais: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>',
@@ -156,19 +156,29 @@ let painelAberto = false;
 let fecharRecorteAberto = null;
 let voltarAtual = null;
 
-function abrirPainel(titulo, corpo, aoMontar, voltar) {
+function abrirPainelFolha(t, c, f, v) { abrirPainel(t, c, f, v, { tipo: 'folha' }); }
+function abrirPainelDet(op, t, c, f, v) { abrirPainel(t, c, f, v, op); }
+// op.tipo: 'folha' (abre por baixo, por cima da tela) ou 'detalhe' (título no meio da barra);
+// op.barra: título curto da barra; op.direita: botão do canto direito da barra
+function abrirPainel(titulo, corpo, aoMontar, voltar, op = {}) {
   const p = $('#painel');
   if (!painelAberto) { history.pushState({ painel: true }, ''); painelAberto = true; }
   voltarAtual = voltar || null;
+  const tipo = op.tipo || '';
   p.innerHTML = `
-    <div class="painel-fundo">
+    <div class="painel-fundo ${tipo ? 'pn-' + tipo : ''}">
       <div class="painel" role="dialog" aria-modal="true" aria-label="${esc(titulo)}">
-        <div class="painel-barra"><button class="btn-voltar" type="button">${ICONE.esq} Voltar</button></div>
-        <h1 class="painel-titulo">${esc(titulo)}</h1>
+        ${tipo === 'folha'
+          ? `<div class="folha-alca" aria-hidden="true"></div><div class="folha-cab"><h1 class="painel-titulo">${esc(titulo)}</h1><button class="btn-voltar folha-x" type="button" aria-label="Fechar">${ICONE.fechar}</button></div>`
+          : tipo === 'detalhe'
+            ? `<div class="painel-barra barra-det"><button class="btn-voltar bq" type="button" aria-label="Voltar">${ICONE.esq}</button><b>${esc(op.barra || titulo)}</b>${op.direita || '<span class="bq-vazio"></span>'}</div>`
+            : `<div class="painel-barra"><button class="btn-voltar" type="button">${ICONE.esq} Voltar</button></div>
+        <h1 class="painel-titulo">${esc(titulo)}</h1>`}
         ${corpo}
       </div>
     </div>`;
   $('.btn-voltar', p).onclick = voltarPainel;
+  if (tipo === 'folha') $('.painel-fundo', p).addEventListener('click', (e) => { if (e.target.classList.contains('painel-fundo')) voltarPainel(); });
   $('.painel-fundo', p).scrollTop = 0;
   document.body.style.overflow = 'hidden';
   if (aoMontar) aoMontar($('.painel', p));
@@ -1433,14 +1443,16 @@ function montarApp() {
   $('#raiz').innerHTML = `
     <header class="topo">
       <span class="marca">${ICONE.marca}<span class="marca-nome">${esc(estado.negocio.nome)}</span></span>
-      ${podeEditar() ? `<button class="btn principal mini" id="nova-res">${ICONE.mais1} Reserva</button>` : ''}
+      <h1 class="topo-titulo" id="topo-titulo"></h1>
+      <div class="topo-acao" id="topo-acao"></div>
     </header>
     <main id="tela"></main>
-    <nav class="abas" aria-label="Menu principal">
-      ${['hoje', 'agenda', 'kits', 'mais'].map((a) => `
-        <button data-aba="${a}" aria-label="${{ hoje: 'Início', agenda: 'Agenda', kits: 'Kits', mais: 'Mais' }[a]}">${ICONE[a]}<span>${{ hoje: 'Início', agenda: 'Agenda', kits: 'Kits', mais: 'Mais' }[a]}</span>${a === 'hoje' ? '<span class="contador oculto" id="cont-hoje" aria-hidden="true"></span>' : ''}</button>`).join('')}
+    <nav class="abas ${podeEditar() ? 'com-reserva' : ''}" aria-label="Menu principal">
+      ${['hoje', 'agenda', 'reserva', 'kits', 'mais'].map((a) => a === 'reserva'
+        ? (podeEditar() ? `<button class="nav-reserva" id="nova-res" aria-label="Nova reserva"><span class="fab">${ICONE.mais1}</span><span>Reserva</span></button>` : '')
+        : `<button data-aba="${a}" aria-label="${{ hoje: 'Início', agenda: 'Agenda', kits: 'Kits', mais: 'Mais' }[a]}">${ICONE[a]}<span>${{ hoje: 'Início', agenda: 'Agenda', kits: 'Kits', mais: 'Mais' }[a]}</span>${a === 'hoje' ? '<span class="contador oculto" id="cont-hoje" aria-hidden="true"></span>' : ''}</button>`).join('')}
     </nav>`;
-  $$('nav.abas button').forEach((b) => (b.onclick = () => irPara(b.dataset.aba)));
+  $$('nav.abas button[data-aba]').forEach((b) => (b.onclick = () => irPara(b.dataset.aba)));
   const nova = $('#nova-res');
   if (nova) nova.onclick = () => formReserva({});
   atualizarAoVoltar();
@@ -1493,7 +1505,12 @@ function faltaBF() {
 // ---------------------------------------------------------------------
 let pedidoInstalacao = null;
 window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); pedidoInstalacao = e; });
-window.addEventListener('appinstalled', () => { pedidoInstalacao = null; aviso('App instalado! Agora é só abrir pelo ícone'); });
+window.addEventListener('appinstalled', () => {
+  pedidoInstalacao = null;
+  try { localStorage.setItem('apm-instalado', '1'); } catch (e) { /* segue */ }
+  aviso('App instalado! Agora é só abrir pelo ícone');
+  try { if (estado.aba === 'mais') desenharAba(); } catch (e) { /* segue */ }
+});
 function appInstalado() {
   return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
 }
@@ -1654,7 +1671,17 @@ async function desenharCartaoContrato(caixa, r) {
 function irPara(aba) {
   estado.aba = aba;
   if (location.hash !== '#' + aba) history.replaceState(null, '', '#' + aba);
-  $$('nav.abas button').forEach((b) => {
+  const tt = $('#topo-titulo');
+  if (tt) tt.textContent = { hoje: 'Início', agenda: 'Agenda', kits: 'Kits', mais: 'Mais' }[aba] || '';
+  document.body.dataset.aba = aba;
+  const ta = $('#topo-acao');
+  if (ta) {
+    ta.innerHTML = aba === 'kits' && podeEditar() ? `<button class="bq" id="topo-novo-kit" aria-label="Novo kit">${ICONE.mais1}</button>`
+      : aba === 'agenda' ? `<div class="seg-vista" role="group" aria-label="Ver por"><button data-vista="semana" class="${estado.vistaAg === 'semana' ? 'on' : ''}">Semana</button><button data-vista="mes" class="${estado.vistaAg === 'semana' ? '' : 'on'}">Mês</button></div>` : '';
+    const nk = $('#topo-novo-kit', ta); if (nk) nk.onclick = () => formKit(null);
+    $$('[data-vista]', ta).forEach((b) => (b.onclick = () => { estado.vistaAg = b.dataset.vista; $$('[data-vista]', ta).forEach((x) => x.classList.toggle('on', x === b)); desenharAba(); }));
+  }
+  $$('nav.abas button[data-aba]').forEach((b) => {
     b.classList.toggle('ativa', b.dataset.aba === aba);
     if (b.dataset.aba === aba) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
   });
@@ -1675,19 +1702,22 @@ function estaAtrasada(r) {
   return (r.status === 'retirada' && r.data_devolucao < h) || (r.status === 'confirmada' && r.data_retirada < h);
 }
 
-// Um item de reserva clicável, colorido pela situação
+// Um item de reserva clicável: foto do kit, o que acontece, cliente e a situação
+function fotoMini(k) {
+  return k && k.foto_url ? `<span class="ir-foto" style="background-image:url('${esc(k.foto_url)}')"></span>` : `<span class="ir-foto vazia">${PIC('caixa')}</span>`;
+}
 function itemReserva(r, extra) {
   const k = kitDe(r.kit_id);
   const atrasada = estaAtrasada(r);
   return `
-    <button class="cartao clicavel res-${atrasada ? 'atrasada' : r.status}" data-res="${esc(r.id)}">
-      <div class="item-res">
-        <div class="info">
-          <div class="nome">${esc(nomeKitReserva(r))} · ${esc(r.cliente_nome)}</div>
-          <div class="pequeno">${extra || 'Festa ' + dataCurta(r.data_festa)}</div>
-        </div>
-        ${atrasada ? etiqueta('atrasada', 'Atrasada') : etiqueta(r.status)}
-      </div>
+    <button class="cartao clicavel item-r res-${atrasada ? 'atrasada' : r.status}" data-res="${esc(r.id)}">
+      ${fotoMini(k)}
+      <span class="ir-tx">
+        <small>${extra || 'Festa ' + dataCurta(r.data_festa)}</small>
+        <b>${esc(nomeKitReserva(r))}</b>
+        <span>${esc(r.cliente_nome)}</span>
+      </span>
+      ${atrasada ? etiqueta('atrasada', 'Atrasada') : etiqueta(r.status)}
     </button>`;
 }
 function ligarItens(el) { $$('[data-res]', el).forEach((b) => (b.onclick = () => abrirReserva(b.dataset.res))); }
@@ -1896,6 +1926,39 @@ async function mostrarMensagensAdmin() {
   }, m.imagem_url ? heroiFoto(m.imagem_url) : heroiIcone('sino'));
 }
 
+function saudacao() { const h = new Date().getHours(); return h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite'; }
+// Semana atual (domingo a sábado) com pontos nos dias de festa
+function semanaHtml(ativas, h) {
+  const d0 = paraData(h); const dom = somaDias(h, -d0.getDay());
+  let festas = 0;
+  const dias = Array.from({ length: 7 }, (_, i) => {
+    const iso = somaDias(dom, i);
+    const rs = ativas.filter((r) => r.data_festa === iso);
+    festas += rs.length;
+    const cor = rs.some((r) => r.status === 'aguardando_sinal') ? 'amarelo' : rs.length ? 'verde' : '';
+    const nome = paraData(iso).toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '').slice(0, 3);
+    return `<button class="sm-dia ${iso === h ? 'on' : ''}" data-semana="${iso}" aria-label="${esc(dataLonga(iso))}${rs.length ? `, ${rs.length} festa(s)` : ''}">${esc(nome)}<b>${paraData(iso).getDate()}</b><i class="${cor}"></i></button>`;
+  }).join('');
+  return `<section class="cartao semana"><div class="sm-cab"><b>Esta semana</b><span>${festas ? plural(festas, 'festa', 'festas') : 'nenhuma festa'}</span></div><div class="sm-dias">${dias}</div></section>`;
+}
+// Primeiros passos em uma linha só (o próximo passo com um botão)
+function passosCompactos(tipo) {
+  if (tipo === 'lista') {
+    const k = estado.kits.length, r = reservasValidas();
+    const feitos = [k >= 1, k >= 3, r >= 1].filter(Boolean).length;
+    const prox = k < 1 ? ['Cadastre seu 1º kit com foto', 'Cadastrar'] : k < 3 ? [`Cadastre o ${k + 1}º kit (${k} de 3)`, 'Cadastrar'] : ['Crie sua 1ª reserva na agenda', 'Criar'];
+    return `<section class="cartao passos-linha"><span class="anel" style="--p:${Math.round(feitos / 3 * 100)}"><span>${feitos}/3</span></span>
+      <div><b>Sua loja pronta em 3 passos</b><small>${esc(prox[0])}</small></div><button class="btn escuro mini" id="ck-prox">${prox[1]}</button></section>`;
+  }
+  const f = passosFeitos();
+  const feitos = [f.perfil, f.kit, f.reserva, f.link].filter(Boolean).length;
+  const prox = !f.perfil ? ['Coloque sua logo e o seu Instagram', 'passo-perfil'] : !f.kit ? ['Cadastre seu primeiro kit', 'passo-kit'] : !f.reserva ? ['Crie uma reserva (pode ser de teste)', 'passo-reserva'] : ['Coloque seu link no Instagram', 'passo-link'];
+  const faltam = 4 - feitos;
+  return `<section class="cartao passos-linha"><span class="anel" style="--p:${Math.round(feitos / 4 * 100)}"><span>${feitos}/4</span></span>
+    <div><b>Falta${faltam > 1 ? 'm' : ''} ${faltam} passo${faltam > 1 ? 's' : ''}</b><small>${esc(prox[0])}</small></div>
+    <button class="btn escuro mini" id="${prox[1]}">${prox[1] === 'passo-link' ? 'Copiar' : 'Fazer'}</button>
+    <button class="passos-x" id="passos-ocultar" aria-label="Não mostrar mais">${ICONE.fechar}</button></section>`;
+}
 function abaHoje(tela) {
   const h = hojeISO();
   const mes = estado.mesFin || h.slice(0, 7);
@@ -1907,6 +1970,12 @@ function abaHoje(tela) {
     const pct = Math.round(((atual.lucro - anterior.lucro) / anterior.lucro) * 100);
     comparacao = `${pct >= 0 ? '+' : ''}${pct}% em relação a ${nomeDoMes(mesAnterior(mes)).toLowerCase()}`;
   }
+  // mini gráfico: 6 meses até o mês escolhido
+  const meses = []; let mm = mes;
+  for (let i = 0; i < 6; i++) { meses.unshift(mm); mm = mesAnterior(mm); }
+  const valores = meses.map((x) => { const r = resumoDoMes(x); return Math.max(0, temGastos ? r.lucro : r.recebido); });
+  const maior = Math.max(1, ...valores);
+  const barras = valores.map((v, i) => `<i class="${i === 5 ? 'on' : ''}" style="height:${Math.max(8, Math.round(v / maior * 56))}px" title="${esc(nomeDoMes(meses[i]))}: ${reais(v)}"></i>`).join('');
 
   const ativas = estado.reservas.filter((r) => r.status !== 'cancelada');
   const pendentes = ativas.filter((r) => r.status === 'aguardando_sinal').sort((a, b) => a.data_festa.localeCompare(b.data_festa));
@@ -1915,35 +1984,51 @@ function abaHoje(tela) {
   const atrasadas = ativas.filter(estaAtrasada);
   const proximas = ativas.filter((r) => r.status === 'confirmada' && r.data_retirada > h && r.data_retirada <= somaDias(h, 7))
     .sort((a, b) => a.data_retirada.localeCompare(b.data_retirada));
+  const nAlertas = atrasadas.length + pendentes.length;
 
   const bloco = (titulo, cor, lista, extra) => `
     <section class="coluna">
       <div class="secao-titulo"><h2 class="titulo-alerta" style="--cor:${cor}">${titulo}</h2><span class="num-alerta" style="background:${cor}">${lista.length}</span></div>
       <div class="lista">${lista.map((r) => itemReserva(r, extra(r))).join('')}</div>
     </section>`;
-  const algumAlerta = atrasadas.length + pendentes.length + retiradas.length + devolucoes.length > 0;
+  const hoje = [...retiradas.map((r) => itemReserva(r, `${PIC('saida')} Retirada hoje`)), ...devolucoes.map((r) => itemReserva(r, `${PIC('entrada')} Devolução hoje`))];
 
   const comLista = mostrarChecklist();
   const comPassos = !comLista && situacaoAssinatura() !== 'teste' && mostrarPassos();
+  const n = estado.negocio;
   tela.innerHTML = `
-    ${cartaoMontagem()}
-    ${comLista ? cartaoChecklist() : ''}
-    ${comPassos ? cartaoPassos() : ''}
-    <section class="fin">
-      <div class="linha-flex entre">
-        <button class="fechar" id="fin-ant" aria-label="Mês anterior">${ICONE.esq}</button>
-        <div class="centro"><div class="fin-mes">${esc(nomeDoMes(mes))}</div><div class="pequeno">${esc(dataLonga(h))}</div></div>
-        <button class="fechar" id="fin-prox" aria-label="Próximo mês">${ICONE.dir}</button>
+    <section class="ola">
+      <div class="ola-linha">
+        <span class="ola-logo">${n.logo_url ? `<img src="${esc(n.logo_url)}" alt="">` : ICONE.marca}</span>
+        <div class="ola-tx"><small>${esc(saudacao())}! · ${esc(dataLonga(h))}</small><b>${esc(n.nome)}</b></div>
+        <button class="ola-sino" id="ir-alertas" aria-label="Avisos">${PIC('sino')}${nAlertas ? `<span>${nAlertas}</span>` : ''}</button>
       </div>
-      <div class="fin-destaque">
-        <div class="fin-rotulo">${temGastos ? 'Lucro do mês' : 'Recebido no mês'}</div>
-        <div class="fin-valor">${reais(temGastos ? atual.lucro : atual.recebido)}</div>
-        <div class="fin-sub">${comparacao ? esc(comparacao) : (temGastos ? `${atual.total} reserva(s) no mês` : 'Lance seus gastos para ver o lucro')}</div>
+      ${semanaHtml(ativas, h)}
+    </section>
+    ${cartaoMontagem()}
+    ${comLista ? passosCompactos('lista') : ''}
+    ${comPassos ? passosCompactos('passos') : ''}
+
+    <section class="coluna hoje-lista">
+      <div class="secao-titulo"><h2>Hoje</h2><button class="link-sec" id="ver-agenda">Ver agenda</button></div>
+      ${hoje.length ? `<div class="lista">${hoje.join('')}</div>` : '<div class="cartao vazio-hoje"><b>Nada para entregar ou receber hoje</b><span class="pequeno">As retiradas e devoluções do dia aparecem aqui.</span></div>'}
+    </section>
+
+    <section class="fin">
+      <div class="secao-titulo fin-cab">
+        <h2>${esc(nomeDoMes(mes))}</h2>
+        <span class="fin-nav"><button class="fechar" id="fin-ant" aria-label="Mês anterior">${ICONE.esq}</button><button class="fechar" id="fin-prox" aria-label="Próximo mês">${ICONE.dir}</button></span>
+      </div>
+      <div class="cartao fin-mes-card">
+        <div><div class="fin-rotulo">${temGastos ? 'Lucro do mês' : 'Recebido no mês'}</div>
+          <div class="fin-valor">${reais(temGastos ? atual.lucro : atual.recebido)}</div>
+          <div class="fin-sub">${comparacao ? esc(comparacao) : (temGastos ? `${plural(atual.total, 'reserva', 'reservas')} no mês` : 'Lance seus gastos para ver o lucro')}</div></div>
+        <div class="barras" aria-hidden="true">${barras}</div>
       </div>
       <div class="fin-grade">
-        <div class="fin-cartao"><div class="pequeno">Recebido</div><b>${reais(atual.recebido)}</b></div>
-        <div class="fin-cartao"><div class="pequeno">A receber</div><b>${reais(atual.aReceber)}</b></div>
-        <button class="fin-cartao clicavel-fin" id="ver-gastos"><div class="pequeno">Gastos</div><b>${reais(atual.gastos)}</b></button>
+        <div class="fin-cartao"><div class="pequeno">${PIC('entrada')} Recebido</div><b>${reais(atual.recebido)}</b></div>
+        <div class="fin-cartao"><div class="pequeno">${PIC('relogio')} A receber</div><b>${reais(atual.aReceber)}</b></div>
+        <button class="fin-cartao clicavel-fin" id="ver-gastos"><div class="pequeno">${PIC('dinheiro')} Gastos</div><b>${reais(atual.gastos)}</b></button>
       </div>
       <div class="fin-cartao coluna" style="gap:10px">
         <div class="pequeno">Pedidos do mês</div>
@@ -1957,20 +2042,21 @@ function abaHoje(tela) {
       ${podeEditar() ? `<button class="btn claro cheio" id="novo-gasto">${ICONE.mais1} Lançar gasto</button>` : ''}
     </section>
 
-    <h2 style="margin-top:6px">Alertas</h2>
+    <h2 id="alertas" style="margin-top:6px">Atenção</h2>
     ${atrasadas.length ? bloco('Atrasadas', '#B3202E', atrasadas, (r) => r.status === 'retirada'
       ? `<b style="color:#B3202E">Devolução era ${dataCurta(r.data_devolucao)}</b>`
       : `<b style="color:#B3202E">Retirada era ${dataCurta(r.data_retirada)}</b>`) : ''}
     ${pendentes.length ? bloco('Aguardando sinal', '#9A5B00', pendentes, (r) => `${r.origem === 'link' ? 'Pelo link · ' : ''}Festa ${dataCurta(r.data_festa)} · sinal ${reais(r.valor_sinal)}`) : ''}
-    ${retiradas.length ? bloco('Retiradas de hoje', '#5B3A99', retiradas, () => 'Abra para conferir as peças') : ''}
-    ${devolucoes.length ? bloco('Devoluções de hoje', '#1E5FA8', devolucoes, () => 'Abra para conferir as peças') : ''}
-    ${algumAlerta ? '' : '<div class="cartao res-concluida tudo-em-dia"><b>Tudo em dia!</b><div class="pequeno">Nenhuma pendência para hoje.</div></div>'}
+    ${nAlertas ? '' : '<div class="cartao tudo-em-dia"><b>Tudo em dia!</b><div class="pequeno">Nenhuma pendência.</div></div>'}
     ${proximas.length ? bloco('Próximos 7 dias', '#4E4459', proximas, (r) => `Retirada ${dataCurta(r.data_retirada)}`) : ''}
     ${estado.kits.length === 0 && !comPassos && !comLista ? `<div class="cartao coluna"><h3>Comece cadastrando seus kits</h3><p class="pequeno">Eles aparecem no seu link de reservas.</p><button class="btn principal" id="ir-kits">Cadastrar meu primeiro kit</button></div>` : ''}`;
   ligarItens(tela);
   ligarCartaoMontagem(tela);
   if (comPassos) ligarPassos(tela);
   if (comLista) ligarChecklist(tela);
+  $$('[data-semana]', tela).forEach((b) => (b.onclick = () => { estado.dia = b.dataset.semana; estado.mes = b.dataset.semana.slice(0, 7); irPara('agenda'); }));
+  $('#ver-agenda', tela).onclick = () => { estado.dia = h; estado.mes = h.slice(0, 7); irPara('agenda'); };
+  $('#ir-alertas', tela).onclick = () => { const a = $('#alertas', tela); if (a) a.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
   const muda = (delta) => { const [a, m] = mes.split('-').map(Number); estado.mesFin = dados.isoDe(new Date(a, m - 1 + delta, 1)).slice(0, 7); abaHoje(tela); };
   $('#fin-ant', tela).onclick = () => muda(-1);
   $('#fin-prox', tela).onclick = () => muda(1);
@@ -2048,8 +2134,11 @@ function abaAgenda(tela) {
   const inicioSemana = primeiro.getDay();
   const h = hojeISO();
   const ativas = estado.reservas.filter((r) => r.status !== 'cancelada');
-  const festasPorDia = {};
-  ativas.forEach((r) => { festasPorDia[r.data_festa] = (festasPorDia[r.data_festa] || 0) + 1; });
+  const festasPorDia = {}, corDia = {};
+  ativas.forEach((r) => {
+    festasPorDia[r.data_festa] = (festasPorDia[r.data_festa] || 0) + 1;
+    (corDia[r.data_festa] ||= []).push(r.status === 'aguardando_sinal' ? 'amarelo' : 'verde');
+  });
 
   let celulas = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'].map((d) => `<div class="dsem">${d}</div>`).join('');
   for (let i = 0; i < inicioSemana; i++) celulas += '<button class="vazio" tabindex="-1" aria-hidden="true"></button>';
@@ -2057,30 +2146,28 @@ function abaAgenda(tela) {
     const iso = `${estado.mes}-${String(d).padStart(2, '0')}`;
     const n = Math.min(3, festasPorDia[iso] || 0);
     const fech = (estado.fechados || []).some((f) => iso >= f.de && iso <= f.ate);
-    celulas += `<button data-dia="${iso}" class="${iso === h ? 'hoje' : ''} ${iso === estado.dia ? 'sel' : ''} ${fech ? 'fechado' : ''}" aria-label="${dataLonga(iso)}${n ? `, ${festasPorDia[iso]} festa(s)` : ''}">
-      ${d}<span class="pontos">${'<span class="ponto"></span>'.repeat(n)}</span></button>`;
+    celulas += `<button data-dia="${iso}" class="${iso === h ? 'hoje' : ''} ${iso === estado.dia ? 'sel' : ''} ${fech ? 'fechado' : ''} ${n ? 'ocupado' : ''}" aria-label="${dataLonga(iso)}${n ? `, ${festasPorDia[iso]} festa(s)` : ''}">
+      ${d}<span class="pontos">${(corDia[iso] || []).slice(0, 3).map((c) => `<span class="ponto ${c}"></span>`).join('')}</span></button>`;
   }
 
   const dia = estado.dia;
   const kitsVisiveis = estado.kits.filter((k) => k.ativo || ativas.some((r) => r.kit_id === k.id && cruza(r, dia, dia)));
-  const linhas = dados.ordenarKits(kitsVisiveis, estado.negocio.ordem_kits || 'az').map((k) => {
-    const rs = ativas.filter((x) => x.kit_id === k.id && cruza(x, dia, dia));
-    const qtd = Math.max(1, Number(k.quantidade) || 1);
-    const itens = rs.map((r) => {
-      let papel = 'Com a cliente';
-      if (r.data_festa === dia) papel = 'Dia da festa';
-      else if (r.data_retirada === dia) papel = 'Retirada';
-      else if (r.data_devolucao === dia) papel = 'Devolução';
-      return itemReserva(r, `${papel} · festa ${dataCurta(r.data_festa)}`);
-    }).join('');
-    const livres = qtd - rs.length;
-    if (livres <= 0) return itens;
-    return itens + `
-      <div class="cartao"><div class="item-res">
-        <div class="info"><div class="nome">${esc(k.nome)}</div><div class="pequeno">${qtd > 1 ? `${livres} de ${qtd} livre${livres > 1 ? 's' : ''}` : 'Disponível'}</div></div>
-        ${podeEditar() ? `<button class="btn claro mini" data-reservar="${esc(k.id)}">Reservar</button>` : etiqueta('livre', 'Livre')}
-      </div></div>`;
+  const ordenados = dados.ordenarKits(kitsVisiveis, estado.negocio.ordem_kits || 'az');
+  // Reservas do dia: retirada e devolução primeiro, depois festa e "com a cliente"
+  const peso = (r) => (r.data_retirada === dia ? 0 : r.data_devolucao === dia ? 1 : r.data_festa === dia ? 2 : 3);
+  const doDia = ativas.filter((x) => cruza(x, dia, dia) && kitsVisiveis.some((k) => k.id === x.kit_id)).sort((a, b) => peso(a) - peso(b));
+  const linhas = doDia.map((r) => {
+    const papel = r.data_retirada === dia ? `${PIC('saida')} Retirada` : r.data_devolucao === dia ? `${PIC('entrada')} Devolução` : r.data_festa === dia ? `${PIC('festa')} Dia da festa` : 'Com a cliente';
+    const lado = r.data_retirada === dia ? ['saida', 'retira'] : r.data_devolucao === dia ? ['entrada', 'devolve'] : r.data_festa === dia ? ['festa', 'festa'] : ['caixa', 'com ela'];
+    return `<div class="ag-item"><div class="tl-q">${PIC(lado[0])}<small>${lado[1]}</small></div>${itemReserva(r, `${papel} · festa ${dataCurta(r.data_festa)}`)}${r.cliente_whatsapp ? `<a class="ag-zap" href="${esc(linkZap(r.cliente_whatsapp, `Oi, ${String(r.cliente_nome).split(' ')[0]}!`))}" target="_blank" rel="noopener" aria-label="Chamar ${esc(r.cliente_nome)} no WhatsApp">${ICONE.zap}</a>` : ''}</div>`;
   }).join('');
+  const livresHtml = ordenados.filter((k) => k.ativo).map((k) => {
+    const qtd = Math.max(1, Number(k.quantidade) || 1);
+    const livres = qtd - ativas.filter((x) => x.kit_id === k.id && cruza(x, dia, dia)).length;
+    if (livres <= 0) return '';
+    return `<div class="lv-kit">${fotoMini(k)}<b>${esc(k.nome)}</b><small>${qtd > 1 ? `${livres} de ${qtd} livre${livres > 1 ? 's' : ''}` : 'Livre'}</small>
+      ${podeEditar() ? `<button class="lv-bt" data-reservar="${esc(k.id)}">Reservar</button>` : ''}</div>`;
+  }).filter(Boolean);
   const fechadoDia = (estado.fechados || []).find((f) => dia >= f.de && dia <= f.ate);
   const lim = estado.negocio.limite_dia;
   const noDia = ativas.filter((x) => cruza(x, dia, dia)).length;
@@ -2092,17 +2179,29 @@ function abaAgenda(tela) {
     ${lim || usoEstr.length ? `<div class="pequeno ag-uso">${lim ? `<b>Festas nesse dia: ${noDia} de ${lim}</b>${noDia >= lim ? ' · <span class="ag-no">lotado no link</span>' : ''}` : ''}${usoEstr.length ? `${lim ? ' · ' : ''}${usoEstr.join(' · ')}` : ''}</div>` : ''}`;
 
   const nomeMes = maiuscula(primeiro.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }));
+  const semana = estado.vistaAg === 'semana';
+  const domSem = somaDias(dia, -paraData(dia).getDay());
+  const celSemana = Array.from({ length: 7 }, (_, i) => {
+    const iso = somaDias(domSem, i); const d = paraData(iso);
+    return `<button data-dia="${iso}" class="sm-dia ${iso === dia ? 'on' : ''} ${iso === h ? 'hoje' : ''}" aria-label="${esc(dataLonga(iso))}">${esc(d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '').slice(0, 3))}<b>${d.getDate()}</b><span class="pontos">${(corDia[iso] || []).slice(0, 3).map((c) => `<span class="ponto ${c}"></span>`).join('')}</span></button>`;
+  }).join('');
+  const tituloSem = `${paraData(domSem).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', '')} a ${paraData(somaDias(domSem, 6)).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', '')}`;
   tela.innerHTML = `
-    <div class="linha-flex entre">
-      <button class="fechar" id="mes-ant" aria-label="Mês anterior">${ICONE.esq}</button>
-      <h1 style="font-size: 22px">${esc(nomeMes)}</h1>
-      <button class="fechar" id="mes-prox" aria-label="Próximo mês">${ICONE.dir}</button>
+    <div class="cartao cal-cartao">
+      <div class="cal-mes">
+        <button class="fechar" id="mes-ant" aria-label="${semana ? 'Semana anterior' : 'Mês anterior'}">${ICONE.esq}</button>
+        <b>${esc(semana ? tituloSem : nomeMes)}</b>
+        <button class="fechar" id="mes-prox" aria-label="${semana ? 'Próxima semana' : 'Próximo mês'}">${ICONE.dir}</button>
+      </div>
+      ${semana ? `<div class="sm-dias ag-semana">${celSemana}</div>` : `<div class="cal">${celulas}</div>`}
+      <div class="cal-leg"><span><i class="verde"></i>Confirmada</span><span><i class="amarelo"></i>Aguardando sinal</span></div>
     </div>
-    <div class="cartao"><div class="cal">${celulas}</div></div>
     <section class="coluna">
-      <div class="secao-titulo"><h2>${esc(dataLonga(dia))}</h2></div>
+      <div class="secao-titulo"><h2>${esc(dataLonga(dia))}</h2>${doDia.length ? `<span class="pequeno"><b>${plural(doDia.length, 'reserva', 'reservas')}</b></span>` : ''}</div>
       ${topoDia}
-      ${kitsVisiveis.length ? `<div class="lista">${linhas}</div>` : '<p class="vazio-txt">Cadastre seus kits na aba Kits para ver a disponibilidade.</p>'}
+      ${kitsVisiveis.length ? `${linhas ? `<div class="lista">${linhas}</div>` : '<div class="cartao vazio-hoje"><b>Nenhuma reserva nesse dia</b></div>'}
+        ${livresHtml.length ? `<div class="secao-titulo" style="margin-top:6px"><h3>Livres neste dia</h3><span class="pequeno"><b>${plural(livresHtml.length, 'kit', 'kits')}</b></span></div><div class="lv-lista">${livresHtml.join('')}</div>` : ''}`
+        : '<p class="vazio-txt">Cadastre seus kits na aba Kits para ver a disponibilidade.</p>'}
     </section>`;
 
   const mudaMes = (delta) => {
@@ -2111,8 +2210,9 @@ function abaAgenda(tela) {
     estado.dia = estado.mes === h.slice(0, 7) ? h : `${estado.mes}-01`;
     abaAgenda(tela);
   };
-  $('#mes-ant', tela).onclick = () => mudaMes(-1);
-  $('#mes-prox', tela).onclick = () => mudaMes(1);
+  const mudaSem = (delta) => { estado.dia = somaDias(dia, delta * 7); estado.mes = estado.dia.slice(0, 7); abaAgenda(tela); };
+  $('#mes-ant', tela).onclick = () => (semana ? mudaSem(-1) : mudaMes(-1));
+  $('#mes-prox', tela).onclick = () => (semana ? mudaSem(1) : mudaMes(1));
   $$('[data-dia]', tela).forEach((b) => (b.onclick = () => { estado.dia = b.dataset.dia; abaAgenda(tela); }));
   $$('[data-reservar]', tela).forEach((b) => (b.onclick = () => formReserva({ kit_id: b.dataset.reservar, data_festa: dia })));
   ligarItens(tela);
@@ -2239,11 +2339,18 @@ function mostrarLojaCompleta() {
 function abaKits(tela) {
   const n = estado.negocio;
   const ORDENS = [['az', 'A–Z'], ['numero', 'Número do kit'], ['menor', 'Menor preço'], ['maior', 'Maior preço'], ['novos', 'Mais novos']];
+  // Disponibilidade no próximo sábado (o dia mais procurado)
+  const h = hojeISO(); const dSab = somaDias(h, (6 - paraData(h).getDay() + 7) % 7);
+  const ativasK = estado.reservas.filter((r) => r.status !== 'cancelada');
+  const nomeSab = dSab === h ? 'hoje' : 'sáb';
+  const cats = [...new Set(estado.kits.map((k) => (k.categoria || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
   const cartoes = dados.ordenarKits(estado.kits, n.ordem_kits || 'az').map((k) => {
     const nv = variacoesDe(k).length;
     const qtd = Math.max(1, Number(k.quantidade) || 1), nt = (k.temas || []).length;
+    const livreSab = qtd - ativasK.filter((r) => r.kit_id === k.id && cruza(r, dSab, dSab)).length > 0;
     return `
-    <div class="kit-card-caixa">
+    <div class="kit-card-caixa" data-cat="${esc((k.categoria || '').trim())}" data-busca="${esc(String(k.nome || '').toLowerCase())}">
+    ${k.ativo ? `<span class="kit-disp ${livreSab ? 'livre' : 'alugado'}">${livreSab ? 'Livre' : 'Alugado'} ${nomeSab}</span>` : ''}
     <button class="cartao clicavel kit-card" data-kit="${esc(k.id)}">
       ${k.foto_url ? fotoCaixa(k.foto_url, '', true) : '<div class="foto-kit foto-vazia">Sem foto</div>'}
       <div class="nome">${esc(k.nome)}</div>
@@ -2258,19 +2365,34 @@ function abaKits(tela) {
   const insta = n.instagram ? `<a class="btn insta mini" href="https://instagram.com/${encodeURIComponent(n.instagram)}" target="_blank" rel="noopener"><i class="pic pic-camera"></i> @${esc(n.instagram)}</a>` : '';
   tela.innerHTML = `
     <section class="cartao vitrine-loja">
+      <div class="vitrine-capa"></div>
       ${podeEditar() ? '<button class="vitrine-editar" id="vitrine-editar"><i class="pic pic-lapis"></i> Editar</button>' : ''}
-      ${n.logo_url ? `<img class="vitrine-logo" src="${esc(n.logo_url)}" alt="Logo da loja">` : ''}
+      <span class="vitrine-logo-caixa">${n.logo_url ? `<img class="vitrine-logo" src="${esc(n.logo_url)}" alt="Logo da loja">` : ICONE.marca}</span>
       <div class="vitrine-nome">${esc(n.nome)}</div>
       <p class="vitrine-recado">${esc(n.recado_link || recadoPadrao(n.nome))}</p>
       ${insta}
-      <div class="vitrine-links"><a href="${esc(linkDona())}"><i class="pic pic-olho"></i> Ver como a cliente vê</a><button class="link-btn" id="vitrine-copiar"><i class="pic pic-link"></i> Copiar link da loja</button></div>
+      <div class="vitrine-links"><a href="${esc(linkDona())}"><i class="pic pic-olho"></i> Ver como a cliente vê</a><button class="vit-copiar" id="vitrine-copiar"><i class="pic pic-link"></i> Copiar link</button></div>
     </section>
     ${blocoTravados()}
     <div id="ia-caixa" class="coluna" style="gap:10px">${cartaoIA()}</div>
-    <div class="secao-titulo"><h1>Meus kits</h1>${podeEditar() ? `<button class="btn principal mini" id="novo-kit">${ICONE.mais1} Novo kit</button>` : ''}</div>
-    ${estado.kits.length > 1 ? `<label class="ag-ordem">Ordenar: <select id="ordem-kits">${ORDENS.map(([v, t]) => `<option value="${v}" ${(n.ordem_kits || 'az') === v ? 'selected' : ''}>${t}</option>`).join('')}</select><small class="dica">vale também no seu link</small></label>` : ''}
-    ${estado.kits.length ? `<div class="kits-grade">${cartoes}</div>` : '<p class="vazio-txt">Nenhum kit ainda. Cadastre o primeiro: foto, nome, preço e a lista de peças.</p>'}
+    <div class="secao-titulo kits-cab"><h2>Meus kits ${estado.kits.length ? `<span class="kits-n">${estado.kits.length}</span>` : ''}</h2>
+      ${estado.kits.length > 1 ? `<label class="ag-ordem">${PIC('ordem')}<select id="ordem-kits" aria-label="Ordenar kits (vale também no seu link)">${ORDENS.map(([v, t]) => `<option value="${v}" ${(n.ordem_kits || 'az') === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>` : ''}
+      ${podeEditar() && estado.kits.length <= 1 ? `<button class="btn principal mini" id="novo-kit">${ICONE.mais1} Novo kit</button>` : ''}</div>
+    ${estado.kits.length > 1 ? `<div class="chips-kit"><button class="chip chip-ic" id="abrir-busca" aria-label="Buscar kit">${PIC('lupa')}</button><button class="chip on" data-cat-f="">Todos</button>${cats.map((c) => `<button class="chip" data-cat-f="${esc(c)}">${esc(c)}</button>`).join('')}</div>
+    <label class="kits-busca oculto" id="caixa-busca">${PIC('lupa')}<input id="busca-kit" type="search" placeholder="Buscar kit pelo nome" autocomplete="off"></label>` : ''}
+    ${estado.kits.length ? `<div class="kits-grade">${cartoes}</div><p class="vazio-txt oculto" id="kits-nada">Nenhum kit encontrado.</p>` : '<p class="vazio-txt">Nenhum kit ainda. Cadastre o primeiro: foto, nome, preço e a lista de peças.</p>'}
     ${gradeTravados()}`;
+  // Busca e filtro por categoria (só na tela; não muda nada da loja)
+  let catF = '';
+  const filtrar = () => {
+    const q = (($('#busca-kit', tela) || {}).value || '').trim().toLowerCase();
+    let vis = 0;
+    $$('.kit-card-caixa', tela).forEach((c) => { const ok = (!catF || c.dataset.cat === catF) && (!q || c.dataset.busca.includes(q)); c.classList.toggle('oculto', !ok); if (ok) vis++; });
+    const nada = $('#kits-nada', tela); if (nada) nada.classList.toggle('oculto', vis > 0);
+  };
+  const bk = $('#busca-kit', tela); if (bk) bk.oninput = filtrar;
+  const ab = $('#abrir-busca', tela); if (ab) ab.onclick = () => { const c = $('#caixa-busca', tela); c.classList.toggle('oculto'); if (!c.classList.contains('oculto')) bk.focus(); else { bk.value = ''; filtrar(); } };
+  $$('[data-cat-f]', tela).forEach((b) => (b.onclick = () => { catF = b.dataset.catF; $$('[data-cat-f]', tela).forEach((x) => x.classList.toggle('on', x === b)); filtrar(); }));
   ligarTravados(tela);
   const novo = $('#novo-kit', tela);
   if (novo) novo.onclick = () => formKit(null);
@@ -2360,12 +2482,12 @@ function cartaoIA() {
       <button class="ia-bt-link" data-ia="comecar">Mandar mais material (fica pronto com cadeado até você assinar)</button></section>`;
   }
   const pago = ia.plano === 'pago';
-  return `${topo}<section class="ia-cartao">
-    <span class="ia-selo">${ia.suporte ? '<i class="pic pic-suporte"></i> Modo suporte · sem limite (não conta no teste da cliente)' : pago ? '✓ Ilimitado no seu plano' : `Teste grátis · ${ia.restante} de ${ia.limite} kits para o catálogo`}</span>
-    <p class="ia-t"><i class="pic pic-brilho"></i> ${pago && estado.kits.length ? 'Adicionar kits com IA' : 'Montar meu catálogo com IA'}</p>
-    <p class="ia-p">${pago && estado.kits.length ? 'Mande fotos, PDF ou lista de preços quantas vezes quiser. Kits novos, de temporada ou o catálogo inteiro.' : 'Mande suas fotos, PDF ou lista de preços. A IA separa os kits e você só confere e aprova.'}</p>
-    ${erro}
-    <button class="ia-bt" data-ia="comecar">Começar</button></section>`;
+  // faixa fina: o toque leva para o envio de fotos, PDF ou lista de preços
+  return `${topo}<button type="button" class="ia-fina" data-ia="comecar">
+    <span class="ia-fina-ic"><i class="pic pic-brilho"></i></span>
+    <span class="ia-fina-tx"><b>${pago && estado.kits.length ? 'Adicionar kits com IA' : 'Montar meu catálogo com IA'}</b>
+      <small>${ia.suporte ? 'Modo suporte · sem limite' : pago ? 'Ilimitado no seu plano · fotos, PDF ou lista' : `Teste grátis · ${ia.restante} de ${ia.limite} kits · fotos, PDF ou lista`}</small></span>
+    ${ICONE.dir}</button>${erro}`;
 }
 function ligarCartaoIA(raiz) {
   $$('[data-ia]', raiz).forEach((b) => (b.onclick = () => {
@@ -3471,9 +3593,9 @@ async function gerarImagemStories() {
     }
   }
   ctx.fillStyle = '#fff'; ctx.textAlign = 'center';
-  ctx.font = "700 76px Fredoka, 'Nunito Sans', sans-serif";
+  ctx.font = "800 72px 'Plus Jakarta Sans', sans-serif";
   ctx.fillText(n.nome.slice(0, 26), W / 2, y + 70, W - 120);
-  ctx.font = "600 46px 'Nunito Sans', sans-serif";
+  ctx.font = "600 46px 'Plus Jakarta Sans', sans-serif";
   ctx.fillText('Reserve seu kit pelo link 🎈', W / 2, y + 150, W - 120);
   y += 210;
   const recentes = [...estado.kits].sort((a, b) => String(b.criado_em || '').localeCompare(String(a.criado_em || '')));
@@ -3487,9 +3609,9 @@ async function gerarImagemStories() {
   }
   const ySt = Math.max(y + Math.ceil(kits.length / 2) * (lado + gap) + 40, H - 420);
   ctx.fillStyle = '#fff'; redondo(W / 2 - 330, ySt, 660, 120, 28); ctx.fill();
-  ctx.fillStyle = '#2A1B3D'; ctx.font = "700 44px 'Nunito Sans', sans-serif";
+  ctx.fillStyle = '#2A1B3D'; ctx.font = "700 44px 'Plus Jakarta Sans', sans-serif";
   ctx.fillText('🔗 cole o adesivo Link aqui', W / 2, ySt + 76);
-  ctx.fillStyle = '#fff'; ctx.font = "600 36px 'Nunito Sans', sans-serif";
+  ctx.fillStyle = '#fff'; ctx.font = "600 36px 'Plus Jakarta Sans', sans-serif";
   ctx.fillText(linkPublico(n.slug).replace(/^https?:\/\//, ''), W / 2, ySt + 200, W - 120);
   return new Promise((res) => { try { c.toBlob((b) => res(b), 'image/jpeg', 0.9); } catch (e) { res(null); } });
 }
@@ -4011,14 +4133,40 @@ function avisosLigados() {
   try { v = localStorage.getItem(`apm-avisos-loja-${estado.negocio.id}`) || ''; } catch (e) { /* segue */ }
   return !!v && avisosSuportados() && Notification.permission === 'granted';
 }
+function jaInstalou() {
+  if (appInstalado()) return true;
+  try { return localStorage.getItem('apm-instalado') === '1'; } catch (e) { return false; }
+}
+// Um botão só na aba Mais: primeiro instalar o app, depois ativar os avisos. Com os avisos ligados, some.
 function cartaoAvisosLoja() {
   if (DEMO_SITE || estado.suporte || ehComputador()) return '';
-  // Depois de ativar, o cartão some da aba Mais (volta só se os avisos forem desligados no celular).
   if (avisosLigados()) return '';
-  return `<section class="cartao coluna avisos-loja">
-    <div class="linha-flex" style="gap:12px;align-items:center"><div class="pic-g" aria-hidden="true"><i class="pic pic-sino"></i></div><div><b style="font-size:17px">Avisos de reservas no celular</b><div class="pequeno">Receba um aviso na hora em que uma cliente reservar pelo seu link, mesmo com o app fechado.</div></div></div>
-    <button class="btn principal cheio" id="avisos-ativar">Ativar avisos neste celular</button>
-  </section>`;
+  return jaInstalou()
+    ? '<button class="btn verde cheio botao-instalar" id="avisos-ativar"><i class="pic pic-sino" aria-hidden="true"></i>Ativar avisos de reserva</button>'
+    : '<button class="btn verde cheio botao-instalar" id="instalar"><i class="pic pic-celular" aria-hidden="true"></i>Instalar aplicativo</button>';
+}
+// Oferta Black Friday na aba Mais, com cronômetro (dias, horas e minutos)
+function cronoBF() {
+  const f = faltaBF(); const dd = (n) => String(n).padStart(2, '0');
+  return `<span>${dd(f.d)}<small>dias</small></span><span>${dd(f.h)}<small>horas</small></span><span>${dd(f.m)}<small>min</small></span>`;
+}
+function cartaoBF() {
+  if (!temOfertaBF()) return '';
+  return `<div class="bf-card"><div class="pic-g" aria-hidden="true"><i class="pic pic-etiqueta"></i></div>
+    <div class="t"><small>Black Friday</small><b>Plano anual por R$&nbsp;167</b><span>Equivale a <em>R$ 13,92 por mês</em> · 53% OFF</span></div>
+    <div class="bf-crono"><i>Termina em</i><div id="bf-crono">${cronoBF()}</div></div>
+    <a class="btn principal mini" id="ver-bf" href="${esc(LINK_ANUAL_PROMO)}" target="_blank" rel="noopener">Assinar o anual por R$ 167</a></div>`;
+}
+let relogioBF = null;
+function ligarCronoBF(tela) {
+  clearInterval(relogioBF);
+  if (!$('#bf-crono', tela)) return;
+  relogioBF = setInterval(() => {
+    const c = document.getElementById('bf-crono');
+    if (!c) { clearInterval(relogioBF); return; }
+    if (!temOfertaBF()) { clearInterval(relogioBF); desenharAba(); return; }
+    c.innerHTML = cronoBF();
+  }, 20000);
 }
 function chaveParaBytes(b64) {
   const p = '='.repeat((4 - (b64.length % 4)) % 4);
@@ -4032,7 +4180,7 @@ function explicarAvisosIphone() {
     <p class="centro pequeno" style="margin:0">No iPhone, os avisos só funcionam com o app instalado na tela inicial.</p>
     ${passo(1, 'Instale o app: toque em <b>Compartilhar</b> <span class="ic-compart">⇧</span> no Safari e depois em <b>"Adicionar à Tela de Início"</b>.')}
     ${passo(2, 'Abra o app <b>pelo ícone</b> na tela inicial.')}
-    ${passo(3, 'Vá em <b>Mais</b> e toque em <b>"Ativar avisos neste celular"</b>.')}
+    ${passo(3, 'Vá em <b>Mais</b> e toque em <b>"Ativar avisos de reserva"</b>.')}
     <button class="btn principal cheio" id="av-ok">Entendi</button>`, (p) => { $('#av-ok', p).onclick = () => fecharPainel(); });
 }
 async function ativarAvisosLoja(botao) {
@@ -4410,19 +4558,15 @@ function formConserto(id) {
 
 function abaMais(tela) {
   const link = linkPublico(estado.negocio.slug);
-  const mostrarInstalar = !DEMO_SITE && !appInstalado() && !ehComputador();
   tela.innerHTML = `
     <h1>Mais</h1>
+    ${cartaoAvisosLoja()}
+    ${cartaoBF()}
     <button class="cartao clicavel perfil-topo" id="meus-dados">
       <span class="perfil-logo">${estado.negocio.logo_url ? `<img src="${esc(estado.negocio.logo_url)}" alt="">` : esc((estado.negocio.nome || '?').trim().charAt(0).toUpperCase())}</span>
       <span class="perfil-txt"><b>Editar dados</b><span class="perfil-nome">${esc(estado.negocio.nome)}</span><span class="pequeno">Logo, Instagram, recado do link, WhatsApp, Pix e dias de retirada</span></span>
       <span class="perfil-seta" aria-hidden="true">›</span>
     </button>
-    ${temOfertaBF() ? `<div class="bf-card"><div class="pic-g" aria-hidden="true"><i class="pic pic-etiqueta"></i></div><div class="t"><b>Black Friday: anual por R$ 167</b><span>53% OFF · só até 29/11</span></div><a class="btn principal mini" id="ver-bf" href="${esc(LINK_ANUAL_PROMO)}" target="_blank" rel="noopener">Assinar por R$ 167</a></div>` : ''}
-    ${cartaoAvisosLoja()}
-    ${mostrarInstalar ? `<section class="cartao coluna instalar">
-      <div style="display:flex;gap:12px;align-items:center"><div class="pic-g" aria-hidden="true"><i class="pic pic-celular"></i></div><div><b style="font-size:17px">Instale o app no seu celular</b><div class="pequeno">Abra direto pela tela inicial, como um aplicativo.</div></div></div>
-      <button class="btn verde cheio" id="instalar">Instalar o app na tela inicial</button></section>` : ''}
     <section class="cartao coluna mais-link">
       <h2>Meu link de reservas</h2>
       <p class="pequeno">Coloque na bio do Instagram. A cliente escolhe o kit e uma data livre, e o pedido aparece aqui como "aguardando sinal".</p>
@@ -4453,6 +4597,7 @@ function abaMais(tela) {
           <button class="btn contorno cheio" id="demo-reset">Recomeçar a demonstração</button></section>` : ''}
     ${DEMO_SITE ? '' : '<button class="btn perigo cheio" id="sair">Sair do app</button>'}`;
   const inst = $('#instalar', tela); if (inst) inst.onclick = instalarApp;
+  ligarCronoBF(tela);
   ligarAvisosLoja(tela);
   const vv = $('#ver-video', tela); if (vv) vv.onclick = abrirVideoTutorial;
   const mc = $('#meu-contrato', tela); if (mc) mc.onclick = painelContrato;
@@ -4606,31 +4751,38 @@ function formReserva(pre, existente, rascunho) {
   const r = existente || {};
   const kit0 = kitDe(r.kit_id || pre.kit_id || kitsAtivos[0].id);
   const festa0 = r.data_festa || pre.data_festa || hojeISO();
-  abrirPainel(existente ? 'Editar reserva' : 'Nova reserva', `
-    <form class="coluna" novalidate>
+  abrirPainelFolha(existente ? 'Editar reserva' : 'Nova reserva', `
+    <form class="coluna form-reserva" novalidate>
       ${rascunho ? '' : faixaRascunho(chRasc)}
-      <label class="campo">Kit<select name="kit">${kitsAtivos.map((k) => `<option value="${esc(k.id)}" ${k.id === kit0.id ? 'selected' : ''}>${esc(k.nome)}</option>`).join('')}</select></label>
+      <div class="rf-rot"><span>1. Qual kit?</span>${kitsAtivos.length > 3 ? '<button type="button" class="link-sec" id="kit-pelo-nome">Escolher pelo nome</button>' : ''}</div>
+      <div class="kit-escolha" id="kit-escolha">${kitsAtivos.map((k) => `<button type="button" class="ke ${k.id === kit0.id ? 'on' : ''}" data-kit-esc="${esc(k.id)}">${k.foto_url ? `<span class="ke-f" style="background-image:url('${esc(k.foto_url)}')"></span>` : `<span class="ke-f vazia">${PIC('caixa')}</span>`}<span class="ke-n">${esc(k.nome)}</span></button>`).join('')}</div>
+      <label class="campo ${kitsAtivos.length > 3 ? 'oculto' : 'rf-esconde'}" id="campo-kit">Kit<select name="kit">${kitsAtivos.map((k) => `<option value="${esc(k.id)}" ${k.id === kit0.id ? 'selected' : ''}>${esc(k.nome)}</option>`).join('')}</select></label>
       <label class="campo oculto" id="campo-variacao">Opção do kit<select name="variacao"></select></label>
       <label class="campo oculto" id="campo-tema">Tema<select name="tema"></select></label>
-      <label class="campo">Data da festa<input type="date" name="festa" value="${festa0}" required></label>
-      <div class="grade-2">
+      <div class="rf-rot"><span>2. Dia da festa</span><button type="button" class="link-sec" id="outra-data">Outra data</button></div>
+      <div class="dias-festa" id="dias-festa"></div>
+      <label class="campo campo-data oculto" id="campo-festa">Data da festa<input type="date" name="festa" value="${festa0}" required></label>
+      <div class="retdev" id="retdev"></div>
+      <div class="grade-2 oculto" id="campos-retdev">
         <label class="campo">Retirada<input type="date" name="retirada" value="${r.data_retirada || somaDias(festa0, -n.dias_antes)}"></label>
         <label class="campo">Devolução<input type="date" name="devolucao" value="${r.data_devolucao || somaDias(festa0, n.dias_depois)}"></label>
       </div>
       <div id="disp"></div>
+      <div class="rf-rot"><span>3. Cliente e valores</span></div>
       <label class="campo">Nome da cliente<input name="nome" maxlength="80" value="${esc(r.cliente_nome || '')}" autocomplete="off" required></label>
       <label class="campo">WhatsApp da cliente${campoZap('zap', r.cliente_whatsapp)}</label>
       <div class="grade-2">
         <label class="campo">Valor total (R$)<input name="valor" inputmode="decimal" value="${esc(String(r.valor_total ?? kit0.preco).replace('.', ','))}"></label>
         <label class="campo">Sinal (R$)<input name="sinal" inputmode="decimal" value="${esc(String(r.valor_sinal ?? kit0.sinal).replace('.', ','))}"></label>
       </div>
-      ${existente ? '' : `<label class="check"><input type="checkbox" name="pago"> O sinal já foi pago</label>`}
+      ${existente ? '' : `<label class="check chave"><span><b>O sinal já foi pago</b><small>Marque se a cliente já pagou o sinal</small></span><input type="checkbox" name="pago"></label>`}
       <label class="campo">Observação (opcional)<textarea name="obs" maxlength="500" rows="3" placeholder="Ex.: entregar no salão às 14h, cliente pediu balões extras">${esc(r.obs || '')}</textarea></label>
       <div class="erro oculto" id="erro-res"></div>
-      <button class="btn principal cheio" type="submit">${existente ? 'Salvar alterações' : 'Criar reserva'}</button>
+      <div class="rf-salvar"><button class="btn principal cheio" type="submit">${existente ? 'Salvar alterações' : 'Salvar reserva'}</button></div>
     </form>`, (p) => {
     const form = $('form', p);
     ligarCampoZap(form.zap);
+    $('#outra-data', p).onclick = () => { const c = $('#campo-festa', p); c.classList.toggle('oculto'); if (!c.classList.contains('oculto')) form.festa.focus(); };
     // Opções (variações) do kit escolhido
     const encherVariacoes = (kitId, nomeAtual) => {
       const vs = variacoesDe(kitDe(kitId));
@@ -4694,6 +4846,34 @@ function formReserva(pre, existente, rascunho) {
       ['variacao', 'tema', 'festa', 'retirada', 'devolucao', 'nome', 'zap', 'valor', 'sinal', 'obs'].forEach((c) => { if (form[c] && rascunho[c] != null && rascunho[c] !== '') form[c].value = rascunho[c]; });
       datasManuais = true;
     }
+    // Kit pela foto, dias da festa em botões e retirada/devolução resumidas
+    const marcarKit = () => $$('[data-kit-esc]', p).forEach((b) => b.classList.toggle('on', b.dataset.kitEsc === form.kit.value));
+    $$('[data-kit-esc]', p).forEach((b) => (b.onclick = () => { form.kit.value = b.dataset.kitEsc; form.kit.onchange(); marcarKit(); desenharDias(); form.dispatchEvent(new Event('change')); }));
+    const pn = $('#kit-pelo-nome', p); if (pn) pn.onclick = () => { $('#campo-kit', p).classList.toggle('oculto'); };
+    const curto = (iso) => paraData(iso).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' }).replace('.', '');
+    const atualizarRetdev = () => {
+      if (!form.retirada.value || !form.devolucao.value) { $('#retdev', p).innerHTML = ''; return; }
+      $('#retdev', p).innerHTML = `${PIC('saida')}<span>Retira <b>${esc(curto(form.retirada.value))}</b> · devolve <b>${esc(curto(form.devolucao.value))}</b></span><button type="button" class="link-sec" id="alt-retdev">${$('#campos-retdev', p).classList.contains('oculto') ? 'Alterar' : 'Fechar'}</button>`;
+      $('#alt-retdev', p).onclick = () => { $('#campos-retdev', p).classList.toggle('oculto'); atualizarRetdev(); };
+    };
+    const desenharDias = () => {
+      const base = hojeISO();
+      const inicio = form.festa.value && form.festa.value > somaDias(base, 6) ? somaDias(form.festa.value, -3) : base;
+      const dias = Array.from({ length: 7 }, (_, i) => somaDias(inicio, i));
+      $('#dias-festa', p).innerHTML = dias.map((iso) => {
+        const ocupado = !!dados.motivoAgenda(ctxAgenda(), form.kit.value, form.tema.value || null, somaDias(iso, -n.dias_antes), somaDias(iso, n.dias_depois), r.id || null, true);
+        const d = paraData(iso);
+        return `<button type="button" class="df ${iso === form.festa.value ? 'on' : ''} ${ocupado ? 'ocupado' : ''}" data-festa-dia="${iso}" aria-label="${esc(dataLonga(iso))}${ocupado ? ' (ocupado)' : ''}">${esc(d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '').slice(0, 3))}<b>${d.getDate()}</b></button>`;
+      }).join('');
+      $$('[data-festa-dia]', p).forEach((b) => (b.onclick = () => { form.festa.value = b.dataset.festaDia; form.festa.onchange(); form.dispatchEvent(new Event('change')); }));
+    };
+    form.addEventListener('change', () => { atualizarRetdev(); });
+    form.festa.addEventListener('change', desenharDias);
+    form.tema.addEventListener('change', desenharDias);
+    form.kit.addEventListener('change', () => { marcarKit(); desenharDias(); });
+    if (datasManuais) $('#campos-retdev', p).classList.remove('oculto');
+    marcarKit(); desenharDias(); atualizarRetdev();
+    const escolhido = $('.ke.on', p); if (escolhido) setTimeout(() => { const c = escolhido.parentNode; c.scrollLeft = Math.max(0, escolhido.offsetLeft - c.offsetLeft - 16); }, 50);
     ligarFaixaRascunho(p, chRasc, (r) => formReserva(pre, existente, r));
     let tRasc = 0;
     const guardar = () => { clearTimeout(tRasc); tRasc = setTimeout(() => {
@@ -4800,17 +4980,17 @@ function abrirReserva(id) {
       botoes.push('<button class="btn contorno cheio" data-acao="naovai">Não vai dar (avisar a cliente)</button>');
     }
     if (r.status === 'confirmada') {
-      botoes.push('<button class="btn principal cheio" data-acao="retirar">Entregar kit (conferir peças)</button>');
+      botoes.push('<button class="btn principal cheio" data-acao="retirar">Entregar kit</button>');
       botoes.push(`<a class="btn contorno cheio" href="${esc(linkZap(r.cliente_whatsapp, mensagem('retirada', r)))}" target="_blank" rel="noopener">${ICONE.zap} Lembrar a retirada</a>`);
     }
     if (r.status === 'retirada') {
-      botoes.push('<button class="btn principal cheio" data-acao="devolver">Receber devolução (conferir peças)</button>');
+      botoes.push('<button class="btn principal cheio" data-acao="devolver">Receber devolução</button>');
       botoes.push(`<a class="btn contorno cheio" href="${esc(linkZap(r.cliente_whatsapp, mensagem('devolucao', r)))}" target="_blank" rel="noopener">${ICONE.zap} Lembrar a devolução</a>`);
     }
     if (['confirmada', 'retirada', 'concluida'].includes(r.status) && restante > 0) {
       botoes.push(`<label class="check ${r.restante_recebido ? 'marcado' : ''}"><input type="checkbox" data-acao="restante" ${r.restante_recebido ? 'checked' : ''}> Restante recebido (${reais(restante)})</label>`);
     }
-    if (r.status !== 'concluida') botoes.push('<button class="btn contorno cheio" data-acao="editar">Editar reserva</button>');
+    // Editar fica no canto de cima (lápis)
     if (['aguardando_sinal', 'confirmada'].includes(r.status)) botoes.push('<button class="btn perigo cheio" data-acao="cancelar">Cancelar reserva</button>');
   }
 
@@ -4820,18 +5000,21 @@ function abrirReserva(id) {
     return `<div class="pequeno"><b>${titulo}:</b> ${faltam.length ? `faltou ${esc(faltam.join(', '))}` : 'todas as peças conferidas'}</div>`;
   };
 
-  abrirPainel(nomeKitReserva(r), `
-    <div class="linha-flex entre">${estaAtrasada(r) ? etiqueta('atrasada', 'Atrasada') : r.status === 'aguardando_sinal' && r.origem === 'link' ? '<span class="etiqueta et-aguardando_sinal">Pré-reserva · aguardando você</span>' : etiqueta(r.status)}${r.origem === 'link' ? '<span class="pequeno">Pedido pelo link</span>' : ''}</div>
-    <div class="cartao coluna">
-      <div class="linha-flex entre"><div><div style="font-weight:800">${esc(r.cliente_nome)}</div>
-        <div class="pequeno">${esc(zapFormatado(r.cliente_whatsapp))}</div></div>
-        <a class="btn claro mini" href="${esc(linkZap(r.cliente_whatsapp, `Oi, ${r.cliente_nome.split(' ')[0]}!`))}" target="_blank" rel="noopener">${ICONE.zap} Chamar</a></div>
-      <div class="grade-2">
-        <div><div class="pequeno">Festa</div><b>${dataCurta(r.data_festa)}</b></div>
-        <div><div class="pequeno">Retirada → devolução</div><b>${dataCurta(r.data_retirada)} → ${dataCurta(r.data_devolucao)}</b>${ed && r.status !== 'concluida' ? ' <button type="button" class="btn claro mini" data-acao="datas" style="min-height:30px;padding:0 10px"><i class="pic pic-lapis"></i> Alterar</button>' : ''}</div>
-        <div><div class="pequeno">Valor total</div><b>${r.valor_a_combinar && !Number(r.valor_total) ? '<span class="etiqueta et-aguardando_sinal">combinar valor</span>' : reais(r.valor_total)}</b></div>
-        <div><div class="pequeno">Sinal</div><b>${reais(r.valor_sinal)}</b> ${r.sinal_recebido ? '<span class="etiqueta et-concluida">pago</span>' : ''}</div>
-      </div>
+  const pillDet = estaAtrasada(r) ? etiqueta('atrasada', 'Atrasada') : r.status === 'aguardando_sinal' && r.origem === 'link' ? '<span class="etiqueta et-aguardando_sinal">Pré-reserva · aguardando você</span>' : etiqueta(r.status);
+  const linhaInfo = (pic, rot, valor, lado = '') => `<div class="det-linha"><span class="det-ic">${PIC(pic)}</span><div class="det-tx"><small>${rot}</small><b>${valor}</b></div>${lado ? `<div class="det-lado">${lado}</div>` : ''}</div>`;
+  const principal = botoes.length && /class="btn (principal|verde)/.test(botoes[0]) ? botoes.shift() : '';
+  const opDet = { tipo: 'detalhe', barra: 'Reserva', direita: ed && r.status !== 'concluida' && r.status !== 'cancelada' ? `<button class="bq" type="button" data-acao="editar" aria-label="Editar reserva">${PIC('lapis')}</button>` : '' };
+  abrirPainelDet(opDet, nomeKitReserva(r), `
+    <div class="det-heroi ${k.foto_url ? '' : 'sem-foto'}">${k.foto_url ? fotoCaixa(k.foto_url, k.nome) : `<span class="det-sem">${PIC('caixa')}</span>`}<span class="det-pill">${pillDet}</span></div>
+    <h1 class="det-titulo">${esc(nomeKitReserva(r))}</h1>
+    <div class="det-cli">
+      <div><b>${esc(r.cliente_nome)}</b><span class="pequeno">${esc(zapFormatado(r.cliente_whatsapp))}${r.origem === 'link' ? ' · pedido pelo link' : ''}</span></div>
+    </div>
+    <div class="cartao det-infos">
+      ${linhaInfo('festa', 'Festa', esc(dataLonga(r.data_festa)))}
+      ${linhaInfo('saida', 'Retirada → devolução', `${dataCurta(r.data_retirada)} → ${dataCurta(r.data_devolucao)}`, ed && r.status !== 'concluida' ? '<button type="button" class="det-alt" data-acao="datas">Alterar</button>' : '')}
+      ${linhaInfo('dinheiro', 'Valor total', r.valor_a_combinar && !Number(r.valor_total) ? '<span class="etiqueta et-aguardando_sinal">combinar valor</span>' : reais(r.valor_total),
+        `<span class="etiqueta ${r.sinal_recebido ? 'et-livre' : 'et-aguardando_sinal'}">Sinal ${reais(r.valor_sinal)} ${r.sinal_recebido ? 'pago' : 'a receber'}</span>`)}
       ${['retirada', 'concluida'].includes(r.status) ? resumoChecklist('Retirada', r.checklist_retirada) : ''}
       ${r.status === 'concluida' ? resumoChecklist('Devolução', r.checklist_devolucao) : ''}
       ${r.avaria_obs || Number(r.avaria_valor) > 0 ? `<div class="pequeno" style="color: var(--destaque-escuro)"><b>Avaria:</b> ${esc(r.avaria_obs || '')} ${Number(r.avaria_valor) > 0 ? `(${reais(r.avaria_valor)})` : ''}</div>` : ''}
@@ -4843,7 +5026,11 @@ function abrirReserva(id) {
       </label>
       ${ed ? '<button class="btn claro mini oculto" id="salvar-obs" style="align-self:flex-end">Salvar observação</button>' : ''}
     </div>
-    <div class="coluna">${botoes.join('')}</div>`, (p) => {
+    ${botoes.length ? `<div class="coluna det-mais">${botoes.join('')}</div>` : ''}
+    <div class="det-acoes ${principal ? '' : 'so-chamar'}">
+      <a class="btn contorno" href="${esc(linkZap(r.cliente_whatsapp, `Oi, ${r.cliente_nome.split(' ')[0]}!`))}" target="_blank" rel="noopener">${ICONE.zap} Chamar</a>
+      ${principal}
+    </div>`, (p) => {
     desenharCartaoContrato($('#ct-reserva', p), r);
     const obs = $('#obs-reserva', p), salvarObs = $('#salvar-obs', p);
     if (salvarObs) {

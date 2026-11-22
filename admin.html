@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="icone-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito+Sans:wght@400;600;700;800&display=swap">
-<link rel="stylesheet" href="estilo.css?v=20261124a">
+<link rel="stylesheet" href="estilo.css?v=20261125a">
 <style>
   body { padding-bottom: calc(32px + env(safe-area-inset-bottom)); }
   .topo { position: sticky; top: 0; z-index: 20; background: var(--tinta); color: #fff; padding: calc(8px + env(safe-area-inset-top)) 10px 0; }
@@ -394,6 +394,22 @@
   .st-cancelado { color: var(--texto2); }
   .pg-ab { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 14px; padding: 14px 0; border-bottom: 1px solid var(--linha); align-items: center; }
   .pg-ab:last-child { border: 0; }
+  .ia-passos { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-top: 8px; }
+  .ia-p { position: relative; background: var(--cartao2); border-radius: 12px; padding: 10px 12px 14px; overflow: hidden; display: flex; flex-direction: column; gap: 2px; }
+  .ia-p b { font-size: 22px; color: var(--tinta); }
+  .ia-p span { font-size: 13px; color: var(--texto2); font-weight: 700; }
+  .ia-p small { font-size: 12px; color: var(--acc); font-weight: 800; }
+  .ia-p i { position: absolute; left: 0; bottom: 0; height: 4px; background: var(--acc); border-radius: 0 4px 0 0; }
+  .ia-grupo { display: flex; flex-direction: column; margin-top: 6px; }
+  .ia-gl { display: grid; grid-template-columns: minmax(0, 1fr) 70px 80px 46px; gap: 8px; align-items: center; padding: 10px 2px; border-bottom: 1px solid var(--linha); font-size: 14px; }
+  .ia-gl:last-child { border-bottom: 0; }
+  .ia-gl.tot { font-weight: 800; }
+  .ia-gl b { font-size: 18px; color: var(--tinta); display: flex; flex-direction: column; line-height: 1.1; }
+  .ia-gl b small { font-size: 11px; color: var(--texto2); font-weight: 700; }
+  .ia-gl b.ok { color: var(--pos); }
+  .ia-gl em { font-style: normal; font-weight: 800; color: var(--acc); text-align: right; }
+  .ia-mais summary { cursor: pointer; font-weight: 800; color: var(--tinta); }
+  .ia-mais h3 { font-size: 14px; margin: 14px 0 6px; color: var(--texto2); }
   .aprovar-lc { background: rgba(240, 180, 60, .08); border: 1px solid rgba(240, 180, 60, .45); border-radius: 14px; padding: 12px 14px; margin: 0 0 12px; }
   .aprovar-lc > b { color: #F3C05E; }
   .aprovar-lc .pg-ab .ld { display: flex; flex-direction: row; align-items: center; gap: 8px; }
@@ -430,6 +446,6 @@
 <body>
 <div id="raiz"><div class="carregando">Carregando…</div></div>
 <div id="toast" class="toast oculto" role="status" aria-live="polite"></div>
-<script type="module" src="admin.js?v=20261124a"></script>
+<script type="module" src="admin.js?v=20261125a"></script>
 </body>
 </html>
