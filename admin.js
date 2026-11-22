@@ -3,7 +3,7 @@
 // Só abre para e-mails cadastrados na tabela "administradores".
 // Quem confere é o banco de dados: esta página só mostra o resultado.
 // =====================================================================
-import * as dados from './dados.js?v=20261122a';
+import * as dados from './dados.js?v=20261123a';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=20261121e';
 
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -650,17 +650,21 @@ function abaEstudo(tela) {
 // ---------------------------------------------------------------------
 // Oferta conforme o uso: quem viu o anual ou o mensal em destaque e se comprou
 // Loja pronta pelo Instagram (página /loja-pronta): prévias, e-mails deixados, quem foi pagar e quem pagou
+const reaisAdm = (v) => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 async function desenharLojaPronta(caixa, dias) {
   if (!caixa) return;
   let d = null;
   try {
     if (dados.MODO_DEMO) {
       const h = (m) => new Date(Date.now() - m * 6e4).toISOString();
-      d = { total: 42, prontas: 37, com_email: 19, publicar: 8, pagaram: 3, convertidas: 2, ultimas: [
-        { criado_em: h(30), instagram: 'festasdamaria', status: 'pronta', modo: 'instagram', email: 'maria@exemplo.com', publicar_em: h(25), convertida_em: null, kits: 8, campanha: 'cadastro-lp' },
-        { criado_em: h(120), instagram: 'ludecora', status: 'pronta', modo: 'galeria', email: null, publicar_em: null, convertida_em: null, kits: 3, campanha: null }] };
+      d = { total: 42, prontas: 37, com_email: 19, publicar: 8, pagaram: 3, convertidas: 2, no_app: 11, completas: 2, custo: 38.4, aprovar: [{ id: 'demo-1', instagram: 'festasdabia', custo: 3.96, faltam: 214, estimativa: 4.5, liberados: 27, pedido_em: h(40) }], ultimas: [
+        { criado_em: h(30), instagram: 'festasdamaria', status: 'pronta', modo: 'instagram', email: 'maria@exemplo.com', publicar_em: h(25), convertida_em: null, kits: 8, campanha: 'cadastro-lp', onde: 'pagina', custo: 0.62, completa: null },
+        { criado_em: h(70), instagram: 'kitsdaju', status: 'pronta', modo: 'instagram', email: 'ju@exemplo.com', publicar_em: null, convertida_em: h(60), kits: 31, campanha: null, onde: 'app', custo: 3.84, completa: 'pronta' },
+        { criado_em: h(120), instagram: 'ludecora', status: 'pronta', modo: 'galeria', email: null, publicar_em: null, convertida_em: null, kits: 3, campanha: null, onde: 'pagina', custo: 0.05, completa: null }] };
     } else d = await rpcAdmin('admin_previas', { p_dias: dias || 3650 });
   } catch (e) { d = null; }
+  let lanc = null;
+  try { lanc = dados.MODO_DEMO ? { publico: 64, enviados: 52, abertos: 31, clicados: 12, montaram: 7 } : await rpcAdmin('admin_lancamento_ig', {}); } catch (e) { lanc = null; }
   if (!caixa.isConnected || !d) { if (caixa.isConnected) caixa.innerHTML = ''; return; }
   const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
   const dh = (q) => { const x = new Date(q); return `${x.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} ${x.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`; };
@@ -672,9 +676,27 @@ async function desenharLojaPronta(caixa, dias) {
       <div class="kpi"><small>Foram pagar</small><b>${d.publicar}</b><i class="p">${pct(d.publicar, d.prontas)}% de quem viu</i></div>
       <div class="kpi"><small>Pagaram</small><b>${d.pagaram}</b><i class="p">${pct(d.pagaram, d.prontas)}% · ${d.convertidas} lojas criadas</i></div>
     </div>
+    ${lanc ? `<p class="pequeno" style="margin:0 0 6px"><b>Lançamento (pop-up + e-mail)</b> para lojas sem kits ou só com os do teste: ${lanc.publico} ainda no público · ${lanc.enviados} e-mails enviados · ${lanc.abertos} abriram · ${lanc.clicados} clicaram · ${lanc.montaram} montaram pelo Instagram</p>` : ''}
+    ${(d.aprovar || []).length ? `<div class="aprovar-lc"><b>Passaram de R$ 4 na loja completa (${d.aprovar.length})</b>
+      <p class="pequeno" style="margin:2px 0 8px">A loja já recebeu os kits que couberam no limite. Aprovar continua a busca nos posts que faltaram; recusar deixa como está.</p>
+      ${d.aprovar.map((x) => `<div class="pg-ab"><div style="min-width:0"><b class="t">@${esc(x.instagram)}</b>
+        <small>${x.liberados || 0} kits já entraram · gasto ${reaisAdm(x.custo)} · faltam ${x.faltam} posts · mais ${reaisAdm(x.estimativa)} para continuar</small></div>
+        <div class="ld"><button class="btn mini verde" data-lc-sim="${esc(x.id)}">Aprovar</button><button class="btn mini contorno" data-lc-nao="${esc(x.id)}">Recusar</button></div></div>`).join('')}</div>` : ''}
+    <p class="pequeno" style="margin:0 0 10px">Montadas no cadastro do teste grátis: <b>${d.no_app || 0}</b> · Lojas completas (assinantes): <b>${d.completas || 0}</b> · Gasto com Apify + IA: <b>${reaisAdm(d.custo)}</b>${d.total ? ` (média ${reaisAdm((Number(d.custo) || 0) / d.total)} por @)` : ''}</p>
     ${(d.ultimas || []).length ? `<div class="pg-lista">${d.ultimas.slice(0, 100).map((x) => { const [t, c] = situ(x); return `<div class="pg-ab"><div style="min-width:0"><b class="t">${x.instagram && x.instagram !== '-' ? '@' + esc(x.instagram) : 'Sem Instagram'}</b>
-      <small>${esc(dh(x.criado_em))} · ${x.kits} ${Number(x.kits) === 1 ? 'kit' : 'kits'} · ${{ instagram: 'pelo Instagram', galeria: 'fotos do celular', desenhos: 'desenhos de exemplo' }[x.modo] || ''}${x.email ? ' · ' + esc(x.email) : ''}${x.campanha ? ' · ' + esc(x.campanha) : ''}</small></div>
+      <small>${esc(dh(x.criado_em))} · ${x.onde === 'app' ? 'no cadastro do app · ' : ''}${x.kits} ${Number(x.kits) === 1 ? 'kit' : 'kits'}${x.completa ? ` · loja completa: ${x.completa === 'pronta' ? 'pronta' : 'montando'}` : ''} · gasto ${reaisAdm(x.custo)} · ${{ instagram: 'pelo Instagram', galeria: 'fotos do celular', desenhos: 'desenhos de exemplo' }[x.modo] || ''}${x.email ? ' · ' + esc(x.email) : ''}${x.campanha ? ' · ' + esc(x.campanha) : ''}</small></div>
       <div class="ld"><span class="st ${c}">${t}</span></div></div>`; }).join('')}</div>` : '<p class="pequeno">Ainda ninguém usou a página.</p>'}</section>`;
+  const decidir = async (b, sim) => {
+    $$('[data-lc-sim],[data-lc-nao]', caixa).forEach((x) => { x.disabled = true; });
+    try {
+      const r = dados.MODO_DEMO ? { ok: true } : await rpcAdmin('admin_completa_decidir', { p_id: b.dataset.lcSim || b.dataset.lcNao, p_aprovar: sim });
+      aviso(r && r.ok ? (sim ? 'Aprovado: a IA continua a loja dessa cliente nos próximos minutos.' : 'Recusado: a loja fica com os kits que já entraram.') : ((r && r.mensagem) || 'Não deu certo. Tente de novo.'));
+    } catch (e) { aviso('Não deu certo. Tente de novo.'); }
+    if (dados.MODO_DEMO) { b.closest('.pg-ab').remove(); return; }
+    desenharLojaPronta(caixa, dias);
+  };
+  $$('[data-lc-sim]', caixa).forEach((b) => { b.onclick = () => decidir(b, true); });
+  $$('[data-lc-nao]', caixa).forEach((b) => { b.onclick = () => decidir(b, false); });
 }
 async function desenharOfertasUso(caixa, dias) {
   if (!caixa) return;

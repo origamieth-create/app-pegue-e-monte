@@ -302,15 +302,87 @@ export async function previaMinha(id, token) {
   if (error) return null;
   return data || null;
 }
-export async function previaImportar(id, token) {
+export async function previaImportar(id, token, somar = false) {
   if (MODO_DEMO) {
     const pv = await previaMinha(); if (!pv) return { ok: true, kits: 0, ids: [] };
-    const ids = (pv.kits || []).map((k) => { const novo = { id: uid(), negocio_id: 'n1', nome: k.nome, preco: 0, sinal: 0, foto_url: k.foto_url, fotos: k.foto_url ? [k.foto_url] : [], categoria: k.categoria || null, preco_consultar: true, ativo: true, pecas: [], variacoes: [], temas: [], estruturas: [], quantidade: 1 }; D().kits.push(novo); return { previa: k.id, kit: novo.id }; });
+    const pago = (D().assinatura || {}).status === 'ativa', max = pago ? 40 : 10;
+    const nomes = new Set(D().kits.map((k) => String(k.nome).trim().toLowerCase()));
+    const ids = (pv.kits || []).filter((k) => !somar || !nomes.has(String(k.nome).trim().toLowerCase())).slice(0, max).map((k) => { const novo = { id: uid(), negocio_id: 'n1', nome: k.nome, preco: 0, sinal: 0, foto_url: k.foto_url, fotos: k.foto_url ? [k.foto_url] : [], categoria: k.categoria || null, preco_consultar: true, ativo: true, pecas: [], variacoes: [], temas: [], estruturas: [], quantidade: 1 }; D().kits.push(novo); return { previa: k.id, kit: novo.id }; });
+    const resto = (pv.kits || []).slice(max);
+    D().previaSit = { pago, instagram: pv.instagram, bloqueados: resto.length, fotos: resto.slice(0, 12).map((k) => ({ foto: k.foto_url })), resto, posts_total: 120, completa: pago ? { fase: 'fila' } : null };
     demoSalvar(); try { localStorage.removeItem('apm-previa-demo'); } catch (e) { /* segue */ }
-    return { ok: true, kits: ids.length, ids };
+    return { ok: true, kits: ids.length, ids, limitado: resto.length > 0, bloqueados: resto.length };
   }
   const s = await cliente();
-  return ok(s.rpc('previa_importar', { p_id: id, p_token: token || null }));
+  return ok(s.rpc('previa_importar', { p_id: id, p_token: token || null, p_somar: !!somar }));
+}
+// Lançamento "Monte sua loja com o seu Instagram": loja sem kits ou só com os kits do teste
+export async function lancamentoIgMostrar() {
+  if (MODO_DEMO) { const d = D(); return !d.previaSit && (d.kits || []).length === 0; }
+  const s = await cliente();
+  const { data, error } = await s.rpc('lancamento_ig_mostrar');
+  return !error && data === true;
+}
+// Loja que veio do Instagram: kits com cadeado (teste grátis) e andamento da loja completa (assinatura paga)
+export async function previaSituacao() {
+  if (MODO_DEMO) {
+    const x = D().previaSit; if (!x) return null;
+    const pago = (D().assinatura || {}).status === 'ativa';
+    if (pago && !x.completa) { x.completa = { fase: 'fila' }; demoSalvar(); }
+    return { ...x, pago, resto: undefined };
+  }
+  const s = await cliente();
+  const { data, error } = await s.rpc('previa_situacao');
+  if (error) return null;
+  return data || null;
+}
+// Função "loja-pronta" com a sessão da conta (puxar a loja no cadastro; passos da loja completa)
+async function lojaPronta(corpo) {
+  if (MODO_DEMO) return demoLojaPronta(corpo);
+  const s = await cliente();
+  const { data } = await s.auth.getSession();
+  const tk = data.session && data.session.access_token;
+  let r;
+  try {
+    r = await fetch(`${SUPABASE_URL}/functions/v1/loja-pronta`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${tk || SUPABASE_ANON_KEY}` },
+      body: JSON.stringify(corpo),
+    });
+  } catch (e) { throw new Error('Sem conexão. Confira a internet e tente de novo.'); }
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || d.erro) { const e = new Error(d.mensagem || 'Não deu certo agora. Tente de novo em instantes.'); e.codigo = d.erro || 'erro'; throw e; }
+  return d;
+}
+export function puxarInstagram(instagram, aparelho) { return lojaPronta({ acao: 'conta', instagram, aparelho }); }
+export function montarPuxada(id, token) { return lojaPronta({ acao: 'montar', id, token }); }
+export function lojaCompletaPasso() { return lojaPronta({ acao: 'completa' }); }
+function demoLojaPronta(c) {
+  const nomes = ['Kit Jardim Encantado', 'Kit Safári', 'Kit Circo', 'Kit Princesa', 'Kit Fundo do Mar', 'Kit Unicórnio', 'Kit Futebol', 'Kit Borboletas', 'Kit Astronauta', 'Kit Fazendinha', 'Kit Chá Revelação', 'Kit Dinossauro', 'Kit Arco-íris', 'Kit Batizado', 'Kit Bailarina', 'Kit Super-heróis', 'Kit Tropical', 'Kit Boho', 'Kit Floresta', 'Kit Sereia', 'Kit Copa', 'Kit Minnie', 'Kit Realeza'];
+  const foto = (i) => `loja-pronta/exemplos/${(i % 4) + 1}.jpg`;
+  if (c.acao === 'conta') {
+    if (!/^[a-z0-9._]{1,30}$/.test(String(c.instagram || ''))) { const e = new Error('Confira o @: só letras, números, ponto e _.'); e.codigo = 'arroba'; return Promise.reject(e); }
+    const pv = { id: 'demo-previa', instagram: c.instagram, perfil: { nome: 'SKA Festa', foto: null, bio: 'Pegue & Monte · Decorações · Orçamentos pelo WhatsApp', whatsapp: '51982316117' },
+      kits: nomes.map((n, i) => ({ id: `k${i + 1}`, nome: n, categoria: i % 3 === 0 ? 'Menina' : i % 3 === 1 ? 'Menino' : null, foto_url: foto(i), pecas: i < 6 ? ['mesa', 'arco'] : [] })),
+      grupo: { frase: 'a mesma mesa e o mesmo arco', curto: 'mesa e arco', nome: 'Mesa e arco', kits: ['k1', 'k2', 'k3', 'k4', 'k5', 'k6'] }, modo: 'instagram' };
+    try { localStorage.setItem('apm-previa-demo', JSON.stringify(pv)); } catch (e) { /* segue */ }
+    return new Promise((ok) => setTimeout(() => ok({ id: pv.id, token: 'demo', perfil: { nome: pv.perfil.nome, posts_total: 120 } }), 600));
+  }
+  if (c.acao === 'montar') return new Promise((ok) => setTimeout(() => ok({ ok: true, kits: nomes.length, modo: 'instagram' }), 1500));
+  if (c.acao === 'completa') {
+    const x = D().previaSit; if (!x || !x.completa) return Promise.resolve({ fase: null });
+    const ordem = ['fila', 'buscando', 'analisando', 'analisando2', 'importando', 'pronta'];
+    const i = Math.min(ordem.length - 1, ordem.indexOf(x.completa.fase) + 1);
+    const fase = ordem[i];
+    x.completa = { fase, alvo: 100, vistos: [0, 0, 0, 30, 60, 100][i], novos: [0, 0, 0, 2, 4, 4][i], liberados: fase === 'pronta' ? x.bloqueados + 4 : 0, agenda: fase === 'pronta' ? 3 : 0 };
+    if (fase === 'pronta') {
+      (x.resto || []).concat(nomes.slice(0, 4).map((n, j) => ({ nome: n + ' 2', foto_url: foto(j) }))).forEach((k) => D().kits.push({ id: uid(), negocio_id: 'n1', nome: k.nome, preco: 0, sinal: 0, foto_url: k.foto_url, fotos: [k.foto_url], categoria: null, preco_consultar: true, ativo: true, pecas: [], variacoes: [], temas: [], estruturas: [], quantidade: 1 }));
+      x.bloqueados = 0; x.fotos = []; x.resto = [];
+    }
+    demoSalvar();
+    return new Promise((ok) => setTimeout(() => ok({ ...x.completa, fase: fase === 'analisando2' ? 'analisando' : fase }), 300));
+  }
+  return Promise.resolve({});
 }
 export async function linkDisponivel(slug) {
   if (MODO_DEMO) return true;

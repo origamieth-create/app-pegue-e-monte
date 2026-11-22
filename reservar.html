@@ -9,7 +9,7 @@
 <link rel="apple-touch-icon" href="icone-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito+Sans:wght@400;600;700;800&display=swap">
-<link rel="stylesheet" href="estilo.css?v=20261122a">
+<link rel="stylesheet" href="estilo.css?v=20261123a">
 <style>
   main { max-width: 720px; margin: 0 auto; padding: 24px 18px 48px; display: flex; flex-direction: column; gap: 20px; }
   .cabeca { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; padding-top: 8px; }
@@ -21,6 +21,26 @@
   .barra-previa .btn { flex: 1; text-align: center; text-decoration: none; }
   .barra-previa .btn.principal { flex: 1.4; }
   body.com-barra-previa main { padding-bottom: 150px; }
+  .nota-trava { display: flex; gap: 10px; align-items: center; background: #fff; border: 1.5px solid var(--linha); border-radius: 16px; padding: 11px 13px; margin: 0 0 12px; font-size: 14px; line-height: 1.4; }
+  .nota-trava .pic { width: 22px; height: 22px; flex: none; background: var(--destaque); }
+  .kit-trava .trava-foto { position: relative; display: block; border-radius: 14px; overflow: hidden; aspect-ratio: 1 / 1; background: var(--lilas); }
+  .kit-trava .trava-foto img { width: 100%; height: 100%; object-fit: cover; filter: blur(10px) saturate(.7); transform: scale(1.15); display: block; }
+  .kit-trava .trava-foto::after { content: ""; position: absolute; inset: 0; background: rgba(255,251,247,.45); }
+  .trava-selo { position: absolute; inset: 0; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
+  .trava-circ { width: 50px; height: 50px; border-radius: 50%; background: #fff; box-shadow: 0 4px 14px rgba(42,27,61,.12); display: flex; align-items: center; justify-content: center; }
+  .trava-circ .pic { width: 24px; height: 24px; }
+  .trava-selo b { background: #fff; border-radius: 99px; padding: 5px 12px; font-size: 13.5px; }
+  .trava-linha { display: block; height: 13px; border-radius: 7px; background: var(--linha); width: 60%; }
+  .trava-linha.curta { width: 40%; }
+  .trava-fundo { position: fixed; inset: 0; z-index: 60; background: rgba(30,26,34,.45); display: flex; align-items: flex-end; justify-content: center; }
+  .trava-folha { background: #fff; width: 100%; max-width: 560px; border-radius: 26px 26px 0 0; padding: 24px 20px calc(22px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 10px; }
+  .trava-folha h2 { margin: 0; font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 21px; }
+  .trava-folha p { margin: 0; }
+  .trava-fotos { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 6px 0; }
+  .trava-fotos span { aspect-ratio: 1; border-radius: 10px; overflow: hidden; position: relative; background: var(--lilas); display: block; }
+  .trava-fotos img { width: 100%; height: 100%; object-fit: cover; filter: blur(5px); transform: scale(1.2); }
+  .trava-fotos .pic { position: absolute; inset: 0; margin: auto; width: 22px; height: 22px; background: var(--destaque); }
+  .trava-folha .link-btn { align-self: center; }
   .grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); gap: 14px; }
   .cartao.kit { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
   .kit .nome { font-weight: 800; font-size: 17px; line-height: 1.2; }
@@ -35,6 +55,6 @@
 <main id="raiz"><div class="carregando">Carregando…</div></main>
 <div id="painel"></div>
 <div id="toast" class="toast oculto" role="status" aria-live="polite"></div>
-<script type="module" src="reservar.js?v=20261122a"></script>
+<script type="module" src="reservar.js?v=20261123a"></script>
 </body>
 </html>

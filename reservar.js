@@ -2,7 +2,7 @@
 // App Pegue e Monte — link público de reservas (a cliente final usa)
 // Endereço: reservar.html?l=<link-do-negocio>
 // =====================================================================
-import * as dados from './dados.js?v=20261122a';
+import * as dados from './dados.js?v=20261123a';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=20261121e';
 
 // Demonstração do site: botões de WhatsApp mostram um aviso em vez de abrir conversa.
@@ -81,10 +81,28 @@ function moldurasPrevia() {
   const b = document.createElement('div');
   b.className = 'barra-previa';
   const lp = `loja-pronta/?p=${encodeURIComponent(PREVIA.id)}&t=${encodeURIComponent(PREVIA.t)}`;
-  b.innerHTML = `<p>${loja.modo === 'desenhos' ? 'Troque os desenhos pelas fotos dos seus kits depois de publicar.' : 'Gostou? Publique e comece a receber reservas hoje.'}</p>
+  const travados = (loja.kits || []).filter((k) => k.bloqueado).length;
+  b.innerHTML = `<p>${loja.modo === 'desenhos' ? 'Troque os desenhos pelas fotos dos seus kits depois de publicar.' : travados ? `Gostou? Publique e desbloqueie os ${loja.kits.length} kits.` : 'Gostou? Publique e comece a receber reservas hoje.'}</p>
     <div><a class="btn contorno" href="${lp}&email=1">Receber por e-mail</a><a class="btn principal" href="${lp}&publicar=1">Publicar minha loja</a></div>`;
   document.body.appendChild(b);
   document.body.classList.add('com-barra-previa');
+}
+
+// Kit com cadeado na prévia: mostra quantos kits esperam e leva para publicar
+function abrirTravados() {
+  const travados = loja.kits.filter((k) => k.bloqueado);
+  const lp = `loja-pronta/?p=${encodeURIComponent(PREVIA.id)}&t=${encodeURIComponent(PREVIA.t)}`;
+  const f = document.createElement('div');
+  f.className = 'trava-fundo';
+  f.innerHTML = `<div class="trava-folha" role="dialog" aria-modal="true" aria-label="Kits com cadeado">
+    <h2>Mais ${travados.length} ${travados.length === 1 ? 'kit esperando' : 'kits esperando'} você</h2>
+    <p class="pequeno">Eles já estão montados com as fotos do seu Instagram. Publique a loja e todos aparecem para as suas clientes.</p>
+    <div class="trava-fotos">${travados.slice(0, 4).map((k) => `<span>${k.foto_url ? `<img src="${esc(k.foto_url)}" alt="">` : ''}<i class="pic pic-cadeado"></i></span>`).join('')}</div>
+    <a class="btn principal cheio" href="${lp}&publicar=1">Publicar minha loja</a>
+    <button type="button" class="link-btn" data-fechar>Agora não</button></div>`;
+  const fechar = () => f.remove();
+  f.onclick = (e) => { if (e.target === f || e.target.hasAttribute('data-fechar')) fechar(); };
+  document.body.appendChild(f);
 }
 
 function aviso(msg) {
@@ -151,8 +169,11 @@ async function iniciar() {
   if (PREVIA) moldurasPrevia();
   document.title = `Reservas · ${loja.nome}`;
   loja.kits = dados.ordenarKits(loja.kits, loja.ordem_kits || 'az');
+  // prévia: os kits com cadeado ficam sempre depois dos liberados
+  if (PREVIA) loja.kits = [...loja.kits.filter((k) => !k.bloqueado), ...loja.kits.filter((k) => k.bloqueado)];
+  const travados = loja.kits.filter((k) => k.bloqueado).length;
   const fechadoAgora = (loja.fechado || []).find((f) => f.ate >= hojeISO() && f.de <= dados.somaDias(hojeISO(), 30));
-  const categorias = [...new Set(loja.kits.map((k) => (k.categoria || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  const categorias = [...new Set(loja.kits.filter((k) => !k.bloqueado).map((k) => (k.categoria || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
   raiz.innerHTML = `
     <header class="cabeca">
       ${loja.logo_url ? `<img src="${esc(loja.logo_url)}" alt="Logo de ${esc(loja.nome)}" onload="var r=this.naturalWidth/this.naturalHeight;if(r>0.9&&r<1.1)this.classList.add('logo-quadrada')">` : ''}
@@ -170,7 +191,13 @@ async function iniciar() {
       <input type="search" id="busca" placeholder="Buscar kit pelo nome" aria-label="Buscar kit pelo nome">
       <div class="filtros-cat" role="tablist">${['Todos', ...categorias].map((c, i) => `<button type="button" class="filtro-cat ${i ? '' : 'ativo'}" data-cat="${i ? esc(c) : ''}">${esc(c)}</button>`).join('')}</div>
     </div>` : loja.kits.length > 6 ? `<div class="busca-kits"><input type="search" id="busca" placeholder="Buscar kit pelo nome" aria-label="Buscar kit pelo nome"></div>` : ''}
-    ${loja.kits.length ? `<div class="grade">${loja.kits.map((k) => `
+    ${travados ? `<div class="nota-trava"><i class="pic pic-cadeado"></i><span><b>Encontramos ${loja.kits.length} kits no seu Instagram.</b> ${loja.kits.length - travados} já ${loja.kits.length - travados === 1 ? 'aparece' : 'aparecem'} aqui; ${travados === 1 ? 'o outro será desbloqueado' : `os outros ${travados} serão desbloqueados`} ao publicar.</span></div>` : ''}
+    ${loja.kits.length ? `<div class="grade">${loja.kits.map((k) => k.bloqueado ? `
+      <button class="cartao clicavel kit kit-trava" data-trava="1" data-categoria="" data-nome="">
+        <span class="trava-foto">${k.foto_url ? `<img src="${esc(k.foto_url)}" alt="" loading="lazy">` : ''}<span class="trava-selo"><span class="trava-circ"><i class="pic pic-cadeado"></i></span><b>Desbloqueado ao publicar</b></span></span>
+        <span class="trava-linha"></span><span class="trava-linha curta"></span>
+        <span class="btn contorno mini">Ver como desbloquear</span>
+      </button>` : `
       <button class="cartao clicavel kit" data-kit="${esc(k.id)}" data-categoria="${esc(k.categoria || '')}" data-nome="${esc(String(k.nome).toLowerCase())}">
         <span style="position:relative; display:block">${k.foto_url ? fotoCaixa(k.foto_url, '', true) : '<div class="foto-kit foto-vazia">Sem foto</div>'}
         ${fotosDe(k).length > 1 ? `<span class="contador-fotos"><i class="pic pic-camera"></i> ${fotosDe(k).length}</span>` : ''}</span>
@@ -183,12 +210,13 @@ async function iniciar() {
     <a class="btn contorno cheio" href="${esc(linkZap(loja.whatsapp, 'Oi! Vim pelo link de reservas e tenho uma dúvida.'))}" target="_blank" rel="noopener">Tirar dúvida no WhatsApp</a>
     <p class="rodape"><img src="icone.svg" alt="">Reservas por App Pegue e Monte</p>`;
   $$('[data-kit]').forEach((b) => (b.onclick = () => escolherData(loja.kits.find((k) => k.id === b.dataset.kit))));
+  $$('[data-trava]').forEach((b) => (b.onclick = abrirTravados));
   // Filtro por categoria e busca pelo nome
   let catAtual = '';
   const filtrar = () => {
     const termo = ($('#busca') ? $('#busca').value : '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     let visiveis = 0;
-    $$('[data-kit]').forEach((b) => {
+    $$('[data-kit], [data-trava]').forEach((b) => {
       const nome = b.dataset.nome.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
       const ok = (!catAtual || b.dataset.categoria === catAtual) && (!termo || nome.includes(termo));
       b.classList.toggle('oculto', !ok); if (ok) visiveis++;
@@ -201,7 +229,7 @@ async function iniciar() {
   if ($('#busca')) $('#busca').oninput = filtrar;
   // Link de um kit específico (…?kit=ID): já abre nele
   const kitDoLink = new URLSearchParams(location.search).get('kit');
-  const k0 = kitDoLink && loja.kits.find((k) => k.id === kitDoLink);
+  const k0 = kitDoLink && loja.kits.find((k) => k.id === kitDoLink && !k.bloqueado);
   if (k0) escolherData(k0);
 }
 

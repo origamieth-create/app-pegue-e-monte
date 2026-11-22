@@ -695,3 +695,84 @@ button.cartao.perfil-topo { display: flex; flex-direction: row; align-items: cen
 .preco-rapido img, .preco-rapido .pr-sem { width: 46px; height: 46px; border-radius: 10px; object-fit: cover; flex: none; background: var(--linha); }
 .preco-rapido b { flex: 1; font-size: 14.5px; line-height: 1.25; }
 .preco-rapido input { width: 104px; border: 2px solid var(--linha); border-radius: 12px; padding: 9px 10px; font: inherit; font-size: 15px; }
+
+/* Loja puxada do Instagram (cadastro), kits com cadeado e loja completa */
+.puxar h1 { font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 27px; line-height: 1.12; margin: 0; }
+.puxar .pequeno { margin: 0; }
+.puxar-topo { display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid var(--linha); font-family: 'Fredoka', sans-serif; font-size: 18px; }
+.puxar-campo > span, .puxar-campo > input { min-height: 56px; font-size: 18px; }
+.puxar-lista { display: flex; flex-direction: column; gap: 10px; }
+.puxar-lista div { display: flex; gap: 11px; align-items: center; font-size: 14px; font-weight: 600; }
+.puxar-lista .pic { width: 36px; height: 36px; flex: none; border: 1.5px solid var(--linha); border-radius: 11px; background-color: var(--destaque); -webkit-mask: none; mask: none; position: relative; }
+.puxar-lista .pic { background: #fff; }
+.puxar-lista .pic::before { content: ""; position: absolute; inset: 8px; background: var(--destaque); -webkit-mask: var(--i) center / contain no-repeat; mask: var(--i) center / contain no-repeat; }
+.puxar-anel { width: 76px; height: 76px; border-radius: 50%; border: 5px solid var(--linha); border-top-color: var(--destaque); margin: 10px auto 4px; animation: guiaGira 1s linear infinite; }
+.puxar-passos { display: flex; flex-direction: column; gap: 12px; margin-top: 8px; text-align: left; }
+.puxar-passos div { display: flex; gap: 10px; align-items: center; font-size: 14.5px; font-weight: 600; }
+.puxar-passos span { width: 22px; height: 22px; border-radius: 50%; border: 2.5px solid var(--linha); border-top-color: var(--destaque); flex: none; animation: guiaGira 1s linear infinite; }
+.puxar-passos .ok span { animation: none; border: 0; background: var(--verde) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 12.5l4 4 8-9'/%3E%3C/svg%3E") center / 13px no-repeat; }
+.puxar-passos .off { color: #A79FAD; }
+.puxar-passos .off span { animation: none; border-top-color: var(--linha); }
+.trava-aviso { border: 1.5px solid var(--destaque); display: flex; flex-direction: column; gap: 8px; }
+.trava-aviso.andando { border-color: var(--linha); }
+.trava-aviso .pequeno { margin: 0; }
+.trava-t { display: flex; gap: 9px; align-items: center; font-weight: 800; font-size: 16px; }
+.trava-t .pic { width: 20px; height: 20px; }
+[data-completa-painel] .mini-anel { display: none; }
+[data-completa-painel] .trava-t { justify-content: center; }
+.mini-anel { width: 18px; height: 18px; border-radius: 50%; border: 2.5px solid var(--linha); border-top-color: var(--destaque); flex: none; animation: guiaGira 1s linear infinite; }
+.barra-prog { height: 10px; border-radius: 99px; background: var(--linha); overflow: hidden; }
+.barra-prog div { height: 100%; background: var(--destaque); border-radius: 99px; transition: width .6s ease; }
+.trava-sep { font-size: 12px; font-weight: 800; letter-spacing: 1px; color: var(--texto2); margin: 18px 2px 8px; }
+.trava-lista { display: flex; flex-direction: column; gap: 8px; }
+.trava-kit { display: flex; gap: 11px; align-items: center; padding: 8px; text-align: left; width: 100%; }
+.trava-kit b { display: block; color: #A79FAD; font-size: 14px; }
+.trava-kit small { display: block; font-size: 12px; color: var(--texto2); }
+.trava-ft { width: 58px; height: 58px; border-radius: 11px; overflow: hidden; position: relative; flex: none; background: var(--lilas); display: block; }
+.trava-ft img { width: 100%; height: 100%; object-fit: cover; filter: blur(5px); transform: scale(1.2); display: block; }
+.trava-ft .pic { position: absolute; inset: 0; margin: auto; width: 22px; height: 22px; }
+.trava-ft::after { content: ""; position: absolute; inset: 0; background: rgba(255,255,255,.35); }
+.trava-ft .pic { z-index: 1; }
+
+/* Pop-ups com imagem no topo (mesmo visual dos e-mails) */
+.popup.novo { padding: 0; gap: 0; position: relative; overflow-x: hidden; background: #fff; }
+.pop-cx { padding: 18px 20px 20px; display: flex; flex-direction: column; gap: 12px; }
+.pop-cx .pop-eye + .pop-t { margin-top: -8px; }
+.pop-eye { font-size: 11.5px; font-weight: 800; letter-spacing: 1.3px; color: var(--destaque); text-transform: uppercase; }
+.pop-t { font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 25px; line-height: 1.12; margin: 0; color: var(--tinta); text-align: left; }
+.pop-t em { font-style: normal; color: var(--destaque); }
+.pop-tx { margin: 0; font-size: 15px; line-height: 1.5; color: var(--texto2); }
+.pop-x { position: absolute; top: 12px; right: 12px; z-index: 5; width: 34px; height: 34px; border-radius: 50%; border: 0; background: rgba(255,255,255,.94); color: var(--tinta); font-size: 22px; line-height: 1; cursor: pointer; box-shadow: 0 2px 8px rgba(42,27,61,.12); }
+.pop-heroi { position: relative; height: 190px; background: #F6EEE6; overflow: hidden; flex: none; }
+.pop-heroi.tres .pf { position: absolute; top: 30px; width: 34%; height: 140px; object-fit: cover; border-radius: 16px; border: 4px solid #fff; box-shadow: 0 8px 20px rgba(42,27,61,.18); background: #fff; }
+.pop-heroi.tres .pf0 { left: 5%; transform: rotate(-6deg); }
+.pop-heroi.tres .pf1 { left: 33%; top: 20px; z-index: 2; }
+.pop-heroi.tres .pf2 { left: 61%; transform: rotate(6deg); }
+.pop-heroi.um .pu { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pop-heroi.um::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 55%, rgba(42,27,61,.35)); }
+.pop-heroi.ic, .pop-heroi.ia { display: flex; align-items: center; justify-content: center; gap: 18px; }
+.pop-heroi.ia img { width: 90px; height: 104px; object-fit: cover; border-radius: 14px; border: 4px solid #fff; box-shadow: 0 8px 20px rgba(42,27,61,.18); }
+.pop-heroi.ia img:first-child { transform: rotate(-5deg); } .pop-heroi.ia img:last-child { transform: rotate(5deg); }
+.pop-bola { width: 96px; height: 96px; border-radius: 50%; background: #fff; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 24px rgba(42,27,61,.12); position: relative; z-index: 2; }
+.pop-bola .pic { width: 46px; height: 46px; }
+.pop-bola.pequena { width: 64px; height: 64px; } .pop-bola.pequena .pic { width: 30px; height: 30px; }
+.pop-selo { position: absolute; z-index: 3; left: 50%; bottom: 12px; transform: translateX(-50%); background: var(--tinta); color: #fff; font-weight: 800; font-size: 12.5px; border-radius: 99px; padding: 7px 14px; white-space: nowrap; max-width: calc(100% - 24px); overflow: hidden; text-overflow: ellipsis; display: flex; gap: 6px; align-items: center; }
+.pop-selo .pic { width: 15px; height: 15px; background-color: #fff; }
+.pop-conf { position: absolute; z-index: 2; width: 10px; height: 16px; border-radius: 3px; }
+.pop-cel { width: 92px; height: 150px; border-radius: 18px; border: 4px solid var(--tinta); background: #fff; display: flex; flex-direction: column; align-items: center; padding-top: 22px; gap: 8px; position: relative; z-index: 2; }
+.pop-cel img { width: 42px; height: 42px; border-radius: 11px; }
+.pop-cel i { display: block; width: 50px; height: 6px; border-radius: 3px; background: var(--linha); }
+.pop-cel i + i { width: 36px; }
+.pop-chip { position: absolute; z-index: 3; left: 50%; margin-left: 26px; top: 70px; background: #fff; border-radius: 99px; padding: 6px 12px; font-size: 12px; font-weight: 800; box-shadow: 0 6px 16px rgba(42,27,61,.15); white-space: nowrap; }
+.pop-heroi .pix-qr { width: 150px; background: #fff; border-radius: 14px; padding: 8px; box-shadow: 0 8px 20px rgba(42,27,61,.15); margin-bottom: 18px; }
+.pop-heroi .pix-qr svg { display: block; width: 100%; height: auto; }
+.popup.novo .resumo-teste { display: none; }
+.popup.novo .planos { margin-top: 6px; }
+.popup.novo .nota-amarela, .popup.novo .novidade { text-align: left; }
+.ig-card { border-color: var(--linha); }
+/* Selo do desconto em cima de todo anual */
+.com-off { position: relative; flex-direction: column; gap: 0; padding-top: 8px; }
+.off-selo { display: inline-block; background: #1F7A52; color: #fff; font-size: 11.5px; font-weight: 900; border-radius: 999px; padding: 3px 10px; }
+.btn.com-off .off-selo { position: absolute; top: -11px; right: 14px; }
+.pop-heroi.qr { height: 236px; align-items: flex-start; padding-top: 16px; }
+.pop-heroi.qr .pix-qr { margin-bottom: 0; }

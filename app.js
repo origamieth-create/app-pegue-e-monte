@@ -2,8 +2,8 @@
 // App Pegue e Monte — app da dona
 // Abas: Hoje, Agenda, Kits, Mais
 // =====================================================================
-import * as dados from './dados.js?v=20261122a';
-import { abrirCheckout, planos as planosCheckout, linkCakto } from './checkout.js?v=20261122a';
+import * as dados from './dados.js?v=20261123a';
+import { abrirCheckout, planos as planosCheckout, linkCakto } from './checkout.js?v=20261123a';
 import { PERMITIR_CADASTRO, EMAIL_SUPORTE, WHATSAPP_SUPORTE, LINK_MENSAL, LINK_ANUAL, LINK_ANUAL_PROMO, DEMO_SITE, LINK_PLANOS, SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=20261121e';
 
 const { hojeISO, somaDias, cruza } = dados;
@@ -236,6 +236,8 @@ function abrirPagamento(plano, linkReserva, popup) {
   });
 }
 // Textos dos planos seguem os preços do checkout próprio quando ele está ligado
+// Desconto atual do anual (para o selo em cima de todo anual)
+function descontoAnual() { const c = precoAnualCheckout(); return c && c.de ? Math.round((1 - c.valor / c.de) * 100) : 53; }
 function precoAnualCheckout() {
   const c = estado.checkout;
   if (!checkoutProprio() || !c.planos) return null;
@@ -244,15 +246,42 @@ function precoAnualCheckout() {
 }
 const reaisC = (c) => (c / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-function abrirPopup(corpo, aoMontar) {
+function abrirPopup(corpo, aoMontar, heroi) {
   const p = $('#painel');
   if (!painelAberto) { history.pushState({ painel: true }, ''); painelAberto = true; }
   voltarAtual = null;
-  p.innerHTML = `<div class="popup-fundo"><div class="popup" role="dialog" aria-modal="true">${corpo}</div></div>`;
+  p.innerHTML = heroi
+    ? `<div class="popup-fundo"><div class="popup novo" role="dialog" aria-modal="true">${heroi}<button type="button" class="pop-x" aria-label="Fechar">&times;</button><div class="pop-cx">${corpo}</div></div></div>`
+    : `<div class="popup-fundo"><div class="popup" role="dialog" aria-modal="true">${corpo}</div></div>`;
   document.body.style.overflow = 'hidden';
   $('.popup-fundo', p).onclick = (e) => { if (e.target.classList.contains('popup-fundo')) fecharPainel(); };
+  const x = $('.pop-x', p);
+  // o X faz o mesmo que o "Fechar"/"Agora não" do pop-up (que também marca o que a dona fez)
+  if (x) x.onclick = () => { const l = [...$$('.pop-cx .link-btn', p)].pop(); if (l) l.click(); else fecharPainel(); };
   if (aoMontar) aoMontar($('.popup', p));
 }
+// Pop-ups com imagem no topo (mesmo visual dos e-mails)
+const tituloPop = (t) => `<h2 class="pop-t">${esc(t).replace(/\[\[(.+?)\]\]/g, '<em>$1</em>')}</h2>`;
+const etiquetaPop = (t) => `<span class="pop-eye">${esc(t)}</span>`;
+const seloPop = (t, pic) => t ? `<span class="pop-selo">${pic ? PIC(pic) : ''}${esc(t)}</span>` : '';
+function fotosDaLoja(n = 3) {
+  const daLoja = (estado.kits || []).map((k) => k.foto_url).filter(Boolean);
+  const ex = [1, 2, 3, 4].map((i) => `loja-pronta/exemplos/${i}.jpg`);
+  return [...daLoja, ...ex].slice(0, n);
+}
+function heroiFotos(selo, pic, fotos) {
+  const f = fotos || fotosDaLoja(3);
+  return `<div class="pop-heroi tres">${f.map((u, i) => `<img class="pf pf${i}" src="${esc(u)}" alt="">`).join('')}${seloPop(selo, pic)}</div>`;
+}
+function heroiFoto(url, selo, pic, confete) {
+  const cores = ['#C73B48', '#FFC94A', '#5B3A99', '#1F7A52'];
+  const conf = confete ? [[8, 14, 20], [22, 70, -30], [80, 12, 45], [70, 66, -10], [40, 8, 60], [88, 76, -40], [14, 78, 10]]
+    .map(([x, y, g], i) => `<i class="pop-conf" style="left:${x}%;top:${y}%;background:${cores[i % 4]};transform:rotate(${g}deg)"></i>`).join('') : '';
+  return `<div class="pop-heroi um">${url ? `<img class="pu" src="${esc(url)}" alt="">` : ''}${conf}${seloPop(selo, pic)}</div>`;
+}
+const heroiIcone = (pic, selo, piSelo) => `<div class="pop-heroi ic"><span class="pop-bola">${PIC(pic)}</span>${seloPop(selo, piSelo)}</div>`;
+const heroiIA = () => { const f = fotosDaLoja(2); return `<div class="pop-heroi ia"><img src="${esc(f[0])}" alt=""><span class="pop-bola pequena">${PIC('brilho')}</span><img src="${esc(f[1])}" alt=""></div>`; };
+const heroiCelular = () => `<div class="pop-heroi ic"><span class="pop-cel"><img src="icone-192.png" alt=""><i></i><i></i></span><span class="pop-chip">1 toque para abrir</span></div>`;
 
 // ---------------------------------------------------------------------
 // Novidades: aparece uma vez por atualização, na primeira vez que a
@@ -296,9 +325,8 @@ function mostrarNovidades() {
   if (criado && String(criado) >= NOVIDADES.desde) { marcar(); return; }
   function marcar() { try { localStorage.setItem(chave, NOVIDADES.versao); } catch (e) { /* ignora */ } }
   abrirPopup(`
-    ${BANDEIRINHAS}
-    <h2 class="centro" style="font-size:26px">Novidades no app <i class="pic pic-festa"></i></h2>
-    <p class="centro pequeno">Acabamos de atualizar o App Pegue e Monte. Veja o que chegou:</p>
+    ${etiquetaPop('Novidades no app')}
+    ${tituloPop('Chegou o que você [[pediu]]')}
     <div class="coluna" style="gap:10px">
       ${NOVIDADES.itens.map(([ic, t, d]) => `
         <div class="novidade"><span class="novidade-ic">${ic}</span><div><b>${esc(t)}</b><p class="pequeno">${esc(d)}</p></div></div>`).join('')}
@@ -310,7 +338,7 @@ function mostrarNovidades() {
     $('#nov-ok', p).onclick = () => fecharPainel();
     $('#nov-msg', p).onclick = () => { fecharPainel(); irPara('kits'); setTimeout(iaEnviar, 300); };
     temVideoIA().then((ok) => { const b = $('#nov-video', p); if (ok && b) { b.classList.remove('oculto'); b.onclick = () => verVideoIA(); } });
-  });
+  }, heroiFotos('Atualização de novembro', 'brilho'));
 }
 
 function voltarPainel() {
@@ -420,6 +448,8 @@ async function carregarTudo() {
   }
   [estado.kits, estado.reservas, estado.gastos, estado.montagem, estado.ia, estado.estruturas, estado.fechados] = await Promise.all([dados.listarKits(), dados.listarReservas(), dados.listarGastos().catch(() => []), estado.suporte ? null : dados.minhaMontagem().catch(() => null), dados.iaSituacao().catch(() => null), dados.listarEstruturas().catch(() => []), dados.listarFechados().catch(() => [])]);
   estado.carregadoEm = Date.now();
+  [estado.previaSit, estado.lancIg] = estado.suporte || DEMO_SITE ? [null, false]
+    : await Promise.all([dados.previaSituacao().catch(() => null), dados.lancamentoIgMostrar().catch(() => false)]);
   if (!estado.suporte && !DEMO_SITE) carregarCheckout();
   montarApp();
 }
@@ -482,11 +512,10 @@ function popupPagamento() {
     return;
   }
   const corpo = temPix ? `
-    <h2 class="centro" style="font-size:24px">Renove com Pix</h2>
-    <p class="centro pequeno">A cobrança da sua assinatura já está pronta. Pague aqui mesmo, sem sair do app:</p>
-    <div class="pix-qr" id="pix-qr" aria-label="QR Code do Pix"></div>
+    ${etiquetaPop('Pagamento pendente')}
+    ${tituloPop('Falta só o [[Pix]] para continuar')}
+    <p class="pop-tx">Seus kits e reservas estão guardados. A cobrança já está pronta: pague aqui mesmo, sem sair do app.</p>
     <button class="btn principal cheio" id="pix-copiar">Copiar código Pix</button>
-    <p class="centro pequeno"><b>Vale até ${esc(dataHora(a.pix_vence))}</b></p>
     <ol class="passos-pix pequeno">
       <li>Toque em <b>Copiar código Pix</b>.</li>
       <li>Abra o app do seu banco e escolha <b>Pix Copia e Cola</b>.</li>
@@ -494,13 +523,15 @@ function popupPagamento() {
     </ol>
     <button class="btn verde cheio" id="pix-paguei">Já paguei, verificar</button>
     ${botaoZapSuporte(ZAP_PAGAMENTO)}` : `
-    <h2 class="centro" style="font-size:24px">Pagamento pendente</h2>
-    <p class="centro">Para continuar usando o app, pague a <b>cobrança da sua assinatura</b> que a Cakto enviou para o seu e-mail:</p>
+    ${etiquetaPop('Pagamento pendente')}
+    ${tituloPop('Falta só o [[pagamento]] para continuar')}
+    <p class="pop-tx">Para continuar usando o app, pague a <b>cobrança da sua assinatura</b> que a Cakto enviou para o seu e-mail:</p>
     <p class="centro email-destaque">${esc(a.email || '')}</p>
     <p class="centro pequeno">Não achou? Procure por <b>"Cakto"</b> e confira também a caixa de <b>spam</b> e de <b>promoções</b>.</p>
     <div class="nota-amarela pequeno">Não é preciso fazer uma compra nova: é só pagar a cobrança que já foi enviada.</div>
     <button class="btn verde cheio" id="pix-paguei">Já paguei, verificar</button>
     ${botaoZapSuporte(ZAP_PAGAMENTO)}`;
+  const heroiPix = temPix ? `<div class="pop-heroi ic qr"><div class="pix-qr" id="pix-qr" aria-label="QR Code do Pix"></div>${seloPop('Vale até ' + dataHora(a.pix_vence))}</div>` : heroiIcone('cartao', 'Cobrança enviada para o seu e-mail');
   abrirPopup(corpo + '<button class="link-btn" id="pix-fechar">Fechar</button>', async (p) => {
     $('#pix-fechar', p).onclick = () => fecharPainel();
     $('#pix-paguei', p).onclick = (e) => acao(e.currentTarget, async () => {
@@ -519,7 +550,7 @@ function popupPagamento() {
       const q = qrcode(0, 'M'); q.addData(a.pix_codigo); q.make();
       $('#pix-qr', p).innerHTML = q.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
     } catch (e) { $('#pix-qr', p).remove(); }
-  });
+  }, heroiPix);
 }
 
 // ---------------------------------------------------------------------
@@ -534,6 +565,13 @@ function resumoDoTeste() {
     total: res.reduce((t, r) => t + (Number(r.valor_total) || 0), 0),
     peloLink: res.filter((r) => r.origem === 'link').length,
   };
+}
+function seloResumo(padrao) {
+  const x = resumoDoTeste();
+  const partes = [];
+  if (x.kits) partes.push(`${x.kits} ${x.kits === 1 ? 'kit' : 'kits'}`);
+  if (x.reservas) partes.push(`${x.reservas} ${x.reservas === 1 ? 'reserva' : 'reservas'}`);
+  return partes.length ? 'Sua loja: ' + partes.join(' · ') : padrao;
 }
 function textoResumoTeste() {
   const x = resumoDoTeste();
@@ -576,7 +614,7 @@ function planosHtml(destaque = 'anual') {
   const promo = promoAnualLiberada();
   const montagem = false; // oferta "a equipe monta sua loja" saiu (a IA faz isso agora)
   const anual = promo
-    ? `<div class="plano anual"><span class="fita">${agoraServidor() < fim - HORAS_OFERTA_FIM * 3600e3 ? 'PROMOÇÃO DO TESTE GRÁTIS' : 'OFERTA DE FIM DE TESTE'}</span><span class="desc">53% OFF</span>
+    ? `<div class="plano anual"><span class="fita">${agoraServidor() < fim - HORAS_OFERTA_FIM * 3600e3 ? 'PROMOÇÃO DO TESTE' : 'FIM DO TESTE'}</span><span class="desc">${descontoAnual()}% OFF</span>
         <div class="nome">Plano anual</div>
         <div class="de">De R$ 358,80</div>
         <div class="por">R$ 167 <small>por 12 meses</small></div>
@@ -593,7 +631,7 @@ function planosHtml(destaque = 'anual') {
         ${estado.ia && estado.ia.disponivel ? '<div class="ia-plano-item"><i class="pic pic-brilho"></i> IA monta seu catálogo: ilimitado</div>' : ''}
         <a class="btn verde cheio" style="min-height:52px;font-size:17px" href="${esc(LINK_ANUAL)}" target="_blank" rel="noopener">Assinar o anual</a>
       </div>`
-    : `<div class="plano anual"><span class="desc">53% OFF</span><div class="nome">Plano anual</div>
+    : `<div class="plano anual"><span class="desc">${descontoAnual()}% OFF</span><div class="nome">Plano anual</div>
         <div class="de">De R$ 358,80</div>
         <div class="por">R$ 167 <small>por 12 meses</small></div>
         <div class="mes">Sai por R$ 13,92 por mês · ou parcele no cartão</div>
@@ -640,34 +678,32 @@ function blocoResumoTeste(titulo) {
 function popupPlanosTeste(origem = 'assinar_agora') {
   const a = estado.assinatura || {};
   abrirPopup(`
-    ${BANDEIRINHAS}
-    <h2 class="centro" style="font-size:24px;margin:0">Garanta seu acesso</h2>
-    ${blocoResumoTeste('O que você já montou no app')}
-    <p class="centro pequeno" style="margin:0">A cobrança começa no dia em que você assina. Tudo o que você cadastrou continua aqui.</p>
+    ${etiquetaPop('Garanta seu acesso')}
+    ${tituloPop('Continue com a sua loja [[no ar]]')}
+    <p class="pop-tx">A cobrança começa no dia em que você assina. Tudo o que você cadastrou continua aqui.</p>
     ${planosHtml()}
     <div class="nota-amarela pequeno">Assine com o <b>mesmo e-mail do teste</b> (<b>${esc(a.email || '')}</b>) para não perder nada do que já cadastrou.</div>
     <button class="link-btn" id="planos-fechar">Agora não</button>`, (p) => {
     $('#planos-fechar', p).onclick = () => fecharPainel();
     ligarRelogioOferta(p);
     popupMedido(origem);
-  });
+  }, heroiFotos(seloResumo('Sua loja no app')));
 }
 // Fim do 1º mês (oferta de R$ 14,90): planos conforme o uso
 function popupPlanosMes1() {
   const a = estado.assinatura || {};
   const oferta = ofertaPorUso();
   abrirPopup(`
-    <div class="pic-g">${PIC('coracao')}</div>
-    <h2 class="centro" style="font-size:24px;margin:0">Continue com o app</h2>
-    ${blocoResumoTeste('O que você já montou no app')}
-    <p class="centro pequeno" style="margin:0">Escolha seu plano. Seus kits, fotos e reservas continuam do jeitinho que estão.</p>
+    ${etiquetaPop('Continue com o app')}
+    ${tituloPop('Seus kits e reservas [[continuam aqui]]')}
+    <p class="pop-tx">Escolha seu plano. Seus kits, fotos e reservas continuam do jeitinho que estão.</p>
     ${planosHtml(oferta)}
     <div class="nota-amarela pequeno">Assine com o <b>mesmo e-mail</b> (<b>${esc(a.email || '')}</b>) para não perder nada do que já cadastrou.</div>
     ${botaoZapSuporte('Oi! Meu 1º mês do App Pegue e Monte está acabando e tenho uma dúvida sobre os planos.')}
     <button class="link-btn" id="mes1-fechar">Agora não</button>`, (p) => {
     $('#mes1-fechar', p).onclick = () => fecharPainel();
     popupMedido('fim_mes1', 'oferta_' + oferta);
-  });
+  }, heroiFotos(seloResumo('Seu 1º mês está acabando')));
 }
 // 2º dia do teste: mostra a promoção do anual uma vez. Depois ela fica no "Assinar agora".
 function mostrarPromoDoTeste() {
@@ -677,10 +713,9 @@ function mostrarPromoDoTeste() {
   const a = estado.assinatura || {};
   const oferta = ofertaPorUso();
   abrirPopup(`
-    <div class="pic-g">${PIC(oferta === 'anual' ? 'brilho' : 'coracao')}</div>
-    <h2 class="centro" style="font-size:24px;margin:0">${oferta === 'anual' ? 'Sua loja já está pronta' : 'Continue com o app'}</h2>
-    ${blocoResumoTeste('O que você já montou no app')}
-    <p class="centro pequeno" style="margin:0">${oferta === 'anual' ? 'Liberamos o plano anual com <b>53% de desconto</b> para quem está testando.' : 'Comece pelo mensal e passe para o anual quando quiser.'} A cobrança começa no dia em que você assina.</p>
+    ${etiquetaPop(oferta === 'anual' ? 'Sua loja já está pronta' : 'Continue com o app')}
+    ${tituloPop(oferta === 'anual' ? 'Anual com [[53% de desconto]]' : 'Comece pelo [[mensal]]')}
+    <p class="pop-tx">${oferta === 'anual' ? 'Liberamos o plano anual com desconto para quem está testando.' : 'Comece pelo mensal e passe para o anual quando quiser.'} A cobrança começa no dia em que você assina.</p>
     ${planosHtml(oferta)}
     <div class="nota-amarela pequeno">Assine com o <b>mesmo e-mail do teste</b> (<b>${esc(a.email || '')}</b>) para não perder nada do que já cadastrou.</div>
     <p class="centro pequeno" style="margin:0">Os planos ficam no botão <b>"Assinar agora"</b>, no topo do app.</p>
@@ -688,7 +723,7 @@ function mostrarPromoDoTeste() {
     $('#promo-fechar', p).onclick = () => fecharPainel();
     ligarRelogioOferta(p);
     popupMedido('promo_dia2', 'oferta_' + oferta);
-  });
+  }, heroiFotos(oferta === 'anual' ? 'Oferta só para quem está testando' : seloResumo('Sua loja no app')));
 }
 
 // Primeira reserva feita pela cliente no link: comemora uma vez.
@@ -709,11 +744,9 @@ function comemorarReservaPeloLink() {
   try { localStorage.setItem(chave, '1'); } catch (e) { /* segue */ }
   const emTeste = situacaoAssinatura() === 'teste';
   abrirPopup(`
-    ${BANDEIRINHAS}
-    <div class="pic-g" aria-hidden="true"><i class="pic pic-festa"></i></div>
-    <h2 class="centro" style="font-size:24px;margin:0">Uma cliente reservou sozinha pelo seu link!</h2>
-    <p class="centro" style="margin:0"><b>${esc(r.cliente_nome || 'Uma cliente')}</b> escolheu o kit <b>${esc(nomeKitReserva(r))}</b> para ${esc(dataLonga(r.data_festa))}.</p>
-    <p class="centro pequeno" style="margin:0">É isso que o app faz por você todo dia: a cliente escolhe o kit e a data livre, e o pedido chega pronto.</p>
+    ${etiquetaPop('Parabéns')}
+    ${tituloPop('Uma cliente reservou [[sozinha]]')}
+    <p class="pop-tx"><b>${esc(r.cliente_nome || 'Uma cliente')}</b> escolheu o kit <b>${esc(nomeKitReserva(r))}</b> para ${esc(dataLonga(r.data_festa))}. O pedido chegou pronto: a cliente escolheu o kit e a data livre sozinha.</p>
     <button class="btn principal cheio" id="cl-ver">Ver a reserva</button>
     ${emTeste ? '<button class="btn verde cheio" id="cl-planos">Garantir meu acesso</button>' : ''}
     <button class="link-btn" id="cl-ok">Fechar</button>`, (p) => {
@@ -721,7 +754,7 @@ function comemorarReservaPeloLink() {
     $('#cl-ver', p).onclick = () => abrirReserva(r.id);
     const pl = $('#cl-planos', p); if (pl) pl.onclick = () => { rastrear('comemoracao_link', 'clicou'); popupFoiCheckout = true; popupPlanosTeste('comemoracao_link'); };
     popupMedido('comemoracao_link');
-  });
+  }, heroiFoto(kitDe(r.kit_id).foto_url || fotosDaLoja(1)[0], 'Reserva nova pelo seu link', null, true));
 }
 
 // Fim do teste grátis: escolhe o plano ou continua só olhando (sem criar nem alterar). Os dados ficam guardados.
@@ -911,7 +944,7 @@ function telaSemAssinatura() {
       <p class="centro">Não encontramos uma assinatura para <b>${esc(email)}</b>.</p>
       <p class="centro pequeno">Se você já comprou, confira se entrou com o <b>mesmo e-mail usado na compra</b>. A confirmação do pagamento pode levar alguns minutos.</p>
       <button class="btn verde cheio" id="verificar">Já paguei, verificar de novo</button>
-      <a class="btn principal cheio" href="${esc(LINK_ANUAL)}" target="_blank" rel="noopener">${precoAnualCheckout() ? `Assinar o anual: ${reaisC(precoAnualCheckout().valor)}` : 'Assinar o anual: R$ 167'}</a>
+      <a class="btn principal cheio com-off" href="${esc(LINK_ANUAL)}" target="_blank" rel="noopener"><span class="off-selo">${descontoAnual()}% OFF</span>${precoAnualCheckout() ? `Assinar o anual: ${reaisC(precoAnualCheckout().valor)}` : 'Assinar o anual: R$ 167'}</a>
       <a class="btn contorno cheio" href="${esc(LINK_MENSAL)}" target="_blank" rel="noopener">Assinar o mensal: R$ 29,90</a>
       <button type="button" class="link-btn" id="trocar">Entrar com outro e-mail</button>
     </div></div>`;
@@ -1178,9 +1211,94 @@ async function slugLivre(base) {
   }
   return b;
 }
+// Teste grátis: 1ª tela do cadastro da loja. A IA puxa nome, logo, WhatsApp e kits do Instagram.
+function aparelhoId() {
+  try { let a = localStorage.getItem('apm-aparelho'); if (!a) { a = (crypto.randomUUID && crypto.randomUUID()) || String(Math.random()).slice(2); localStorage.setItem('apm-aparelho', a); } return a; } catch (e) { return null; }
+}
+function telaPuxarInstagram(msgErro) {
+  $('#raiz').innerHTML = `
+    <div class="entrada"><form class="caixa puxar" novalidate>
+      <div class="puxar-topo"><b>${estado.negocio ? esc(estado.negocio.nome) : 'Criar minha loja'}</b></div>
+      <h1>Monte sua loja com o seu Instagram</h1>
+      <p class="pequeno">Digite o @ da sua loja. Seu nome, logo, WhatsApp e até 5 kits entram com as suas fotos. Você só confere.</p>
+      <div class="campo-pre puxar-campo"><span>@</span><input name="ig" maxlength="60" placeholder="sualoja" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" aria-label="@ do Instagram da loja"></div>
+      <div class="erro ${msgErro ? '' : 'oculto'}" id="erro-ig">${esc(msgErro || '')}</div>
+      <button class="btn principal cheio" type="submit">Montar minha loja</button>
+      <div class="puxar-lista">
+        <div><i class="pic pic-insta"></i>Só o que já é público no seu perfil</div>
+        <div><i class="pic pic-relogio"></i>Leva cerca de 1 minuto</div>
+        <div><i class="pic pic-lapis"></i>Depois você muda o que quiser</div>
+      </div>
+      ${estado.negocio ? '<button type="button" class="link-btn" id="voltar-app">Voltar para o app</button>' : `<button type="button" class="link-btn" id="do-zero">Não tenho Instagram, cadastrar do zero</button>
+      <button type="button" class="link-btn" id="sair" style="min-height:32px">Sair</button>`}
+    </form></div>`;
+  const form = $('form');
+  form.ig.oninput = () => { form.ig.value = form.ig.value.replace(/^@+/, '').replace(/\s/g, ''); };
+  if (estado.negocio) $('#voltar-app').onclick = () => montarApp();
+  else {
+    $('#do-zero').onclick = () => { estado.pulouInstagram = true; telaConfiguracaoInicial(); };
+    $('#sair').onclick = async () => { await dados.sair(); telaLogin('entrar'); };
+  }
+  form.onsubmit = (e) => {
+    e.preventDefault();
+    const ig = limparInstagram(form.ig.value);
+    if (!/^[a-z0-9._]{1,30}$/.test(ig)) { $('#erro-ig').textContent = 'Confira o @: só letras, números, ponto e _.'; $('#erro-ig').classList.remove('oculto'); return; }
+    puxarInstagram(ig);
+  };
+}
+async function puxarInstagram(ig) {
+  const passos = ['Abrindo seu perfil', 'Separando as fotos dos kits', 'Dando nome aos kits', 'Montando sua loja'];
+  $('#raiz').innerHTML = `<div class="entrada"><div class="caixa puxar centro">
+      <div class="puxar-anel" aria-hidden="true"></div>
+      <h1 class="centro" style="font-size:24px">Montando sua loja</h1>
+      <p class="pequeno centro">Olhando o @${esc(ig)}. Leva cerca de 1 minuto: pode deixar esta tela aberta.</p>
+      <div class="puxar-passos">${passos.map((t, i) => `<div class="${i ? 'off' : ''}" data-p="${i}"><span></span>${t}</div>`).join('')}</div>
+    </div></div>`;
+  const marcar = (n) => $$('[data-p]').forEach((el) => { const i = Number(el.dataset.p); el.className = i < n ? 'ok' : i === n ? '' : 'off'; });
+  let t = 0; const rel = setInterval(() => { t++; marcar(Math.min(3, 1 + Math.floor(t / 12))); }, 1000);
+  try {
+    const b = await dados.puxarInstagram(ig, aparelhoId());
+    marcar(1);
+    let r = null;
+    for (let i = 0; i < 40; i++) {
+      r = await dados.montarPuxada(b.id, b.token).catch((e) => { if (i < 2) return { aguarde: true }; throw e; });
+      if (!r.aguarde) break;
+      await new Promise((ok) => setTimeout(ok, 4000));
+    }
+    clearInterval(rel);
+    if ((!r || !r.ok) && estado.negocio) { aviso('Não encontramos fotos de kits no seu perfil público. Tente com a IA usando as fotos do celular.'); return montarApp(); }
+    if (!r || !r.ok) {
+      // perfil privado ou sem fotos de kits: segue o cadastro com o nome
+      estado.pulouInstagram = true;
+      estado.nomeDoInstagram = (b.perfil && b.perfil.nome) || '';
+      aviso('Não achamos fotos de kits no seu perfil público. Vamos cadastrar do zero.');
+      return telaConfiguracaoInicial();
+    }
+    if (estado.negocio) {
+      // loja que já existe: os kits novos são somados (nada do que ela cadastrou muda)
+      const imp = await dados.previaImportar(b.id, b.token, true);
+      estado.lancIg = false;
+      await carregarTudo();
+      aviso(imp && imp.kits ? `${plural(imp.kits, 'kit novo entrou', 'kits novos entraram')} na sua loja!` : 'Seus kits já estavam na loja.');
+      if (imp && imp.kits) setTimeout(() => irPara('kits'), 200);
+      return;
+    }
+    try { localStorage.setItem('apm-previa', JSON.stringify({ id: b.id, t: b.token })); } catch (e) { /* segue */ }
+    estado.previa = await dados.previaMinha(b.id, b.token).catch(() => null);
+    if (estado.previa) estado.previa.token = b.token; else estado.pulouInstagram = true;
+    return telaConfiguracaoInicial();
+  } catch (e) {
+    clearInterval(rel);
+    if (e.codigo === 'ja' || e.codigo === 'limite') { aviso(e.message); if (estado.negocio) return montarApp(); estado.pulouInstagram = true; return telaConfiguracaoInicial(); }
+    return telaPuxarInstagram(e.message);
+  }
+}
 async function telaConfiguracaoInicial() {
+  if (!estado.previa && !estado.pulouInstagram && !DEMO_SITE) return telaPuxarInstagram();
   const pv = estado.previa;
-  let inicial = { whatsapp: soDigitos(guardado('apm-teste-whatsapp') || '') || null };
+  const pagoAgora = !!(estado.assinatura && (estado.assinatura.status === 'ativa' || estado.assinatura.cortesia));
+  const nKits = pv ? (pv.kits || []).length : 0;
+  let inicial = { whatsapp: soDigitos(guardado('apm-teste-whatsapp') || '') || null, nome: estado.nomeDoInstagram || '' };
   if (pv) {
     const ig = pv.instagram && pv.instagram !== '-' ? pv.instagram : null;
     inicial = { nome: (pv.perfil && pv.perfil.nome) || '', slug: await slugLivre(ig || (pv.perfil && pv.perfil.nome) || ''),
@@ -1190,7 +1308,7 @@ async function telaConfiguracaoInicial() {
     <div class="entrada"><form class="caixa" novalidate>
       ${BANDEIRINHAS}<div class="logo-app">${ICONE.logo}</div>
       <h1 class="centro">${pv ? 'Sua loja está quase no ar' : 'Vamos começar'}</h1>
-      <p class="centro pequeno">${pv ? `Confira os dados. Seus ${(pv.kits || []).length} kits já estão prontos para entrar. O WhatsApp é onde suas clientes vão falar com você.` : 'Quatro informações e seu app está pronto.'}</p>
+      <p class="centro pequeno">${pv ? `Confira os dados. ${!pagoAgora && nKits > 10 ? `Encontramos ${nKits} kits: 10 entram agora e os outros ${nKits - 10} serão desbloqueados quando você assinar.` : `Seus ${nKits} kits já estão prontos para entrar.`} O WhatsApp é onde suas clientes vão falar com você.` : 'Quatro informações e seu app está pronto.'}</p>
       ${camposNegocio(inicial, true)}
       <div class="erro oculto" id="erro-cfg"></div>
       <button class="btn principal cheio" type="submit">Pronto, abrir meu app</button>
@@ -1330,10 +1448,11 @@ function montarApp() {
   irPara(['hoje', 'agenda', 'kits', 'mais'].includes(deHash) ? deHash : 'hoje');
   if (abrirPeloAviso()) return;
   if (estado.suporte) return; // no modo suporte não aparece nenhum aviso da dona
-  if (estado.mostrarAssistente) { estado.mostrarAssistente = false; setTimeout(() => assistenteAgenda(() => { if (estado.precosDepois) { estado.precosDepois = false; setTimeout(painelPrecosRapidos, 450); } else if (!estado.kits.length) montarLojaGuiado(); }), 400); return; }
+  if (estado.mostrarAssistente) { estado.mostrarAssistente = false; setTimeout(() => assistenteAgenda(() => { if (estado.precosDepois) { estado.precosDepois = false; setTimeout(painelPrecosRapidos, 450); } else if (!estado.kits.length) montarLojaGuiado(); if (completaAndando()) acompanharCompleta(); }), 400); return; }
+  if (completaAndando() && podeEditar()) { setTimeout(() => { if (!mostrarLojaCompleta()) acompanharCompleta(); }, 500); return; }
+  if (estado.lancIg && podeEditar() && (new URLSearchParams(location.search).get('instagram') === '1' || !(() => { try { return localStorage.getItem(`apm-lanc-ig-${estado.negocio.id}`); } catch (e) { return '1'; } })())) { setTimeout(mostrarLancamentoIg, 600); return; }
   if (!estado.kits.length && podeEditar() && !DEMO_SITE && !(() => { try { return sessionStorage.getItem('apm-guia-sessao'); } catch (e) { return '1'; } })()) { setTimeout(montarLojaGuiado, 500); return; }
   setTimeout(mostrarNovidades, 600);
-  setTimeout(mostrarBlackFriday, 1200);
   setTimeout(comemorarReservaPeloLink, 1800);
   setTimeout(mostrarPromoDoTeste, 2400);
   setTimeout(mostrarMensagensAdmin, 3200);
@@ -1368,34 +1487,6 @@ function faltaBF() {
   const ms = Math.max(0, new Date(estado.assinatura.oferta_bf_ate).getTime() - agoraServidor());
   return { d: Math.floor(ms / 864e5), h: Math.floor((ms % 864e5) / 36e5), m: Math.floor((ms % 36e5) / 6e4) };
 }
-function popupBlackFriday() {
-  const a = estado.assinatura || {};
-  const f = faltaBF();
-  const dois = (n) => String(n).padStart(2, '0');
-  abrirPopup(`
-    <div class="bf-pop coluna" style="gap:14px">
-      <span class="bf-tag">BLACK FRIDAY</span>
-      <h2 class="centro" style="font-size:25px;margin:0">Troque o mensal pelo anual com 53% OFF</h2>
-      <div class="bf-preco"><span class="de">De R$ 358,80 por ano no mensal</span><span class="por">R$ 167 <small>por 12 meses</small></span><span class="mes">Sai por R$ 13,92 por mês</span></div>
-      <div class="relogio" aria-label="Tempo até o fim da oferta"><div><b>${dois(f.d)}</b><span>DIAS</span></div><div><b>${dois(f.h)}</b><span>HORAS</span></div><div><b>${dois(f.m)}</b><span>MIN</span></div></div>
-      <a class="btn verde cheio" style="min-height:54px;font-size:17px" href="${esc(LINK_ANUAL_PROMO)}" target="_blank" rel="noopener">Quero o anual por R$ 167</a>
-      <div class="bf-nota">Use o <b>mesmo e-mail do app</b> (${esc(a.email || '')}). Seus kits, fotos e reservas continuam iguais, e o mensal no Pix não é mais cobrado: é só não pagar o próximo Pix. Oferta só para quem assina o mensal, até <b>29/11</b>.</div>
-      <button class="link-btn" id="bf-fechar" style="color:#bcb3c7">Agora não</button>
-    </div>`, (p) => {
-    p.classList.add('bf-fundo');
-    $('#bf-fechar', p).onclick = () => fecharPainel();
-    popupMedido('black_friday');
-  });
-}
-function mostrarBlackFriday() {
-  if (!temOfertaBF() || painelAberto || $('#bloqueio')) return;
-  const hoje = hojeISO();
-  let visto = '';
-  try { visto = localStorage.getItem('apm-bf-visto') || ''; } catch (e) { /* segue */ }
-  if (visto === hoje) return;
-  try { localStorage.setItem('apm-bf-visto', hoje); } catch (e) { /* segue */ }
-  popupBlackFriday();
-}
 
 // ---------------------------------------------------------------------
 // Instalar o app na tela inicial
@@ -1417,14 +1508,14 @@ function ehComputador() {
 function convidarInstalacao() {
   if (appInstalado()) { aviso('O app já está instalado neste celular'); return; }
   abrirPopup(`
-    <div class="pic-g" aria-hidden="true"><i class="pic pic-celular"></i></div>
-    <h2 class="centro" style="font-size:23px;margin:0">Coloque o app na sua tela inicial</h2>
-    <p class="centro pequeno" style="margin:0">Fica com um ícone igual a um aplicativo: é só tocar para abrir sua agenda de kits.</p>
+    ${etiquetaPop('Dica')}
+    ${tituloPop('Seu app na [[tela inicial]]')}
+    <p class="pop-tx">Fica com um ícone igual a um aplicativo: é só tocar para abrir sua agenda de kits.</p>
     <button class="btn principal cheio" id="conv-instalar">Instalar agora</button>
     <button class="link-btn" id="conv-depois">Agora não</button>`, (p) => {
     $('#conv-depois', p).onclick = () => fecharPainel();
     $('#conv-instalar', p).onclick = () => { fecharPainel(); setTimeout(instalarApp, 200); };
-  });
+  }, heroiCelular());
 }
 async function instalarApp() {
   if (pedidoInstalacao) {
@@ -1739,15 +1830,14 @@ function ligarPassos(tela) {
 }
 function popupParabens() {
   abrirPopup(`
-    <div class="pic-g" aria-hidden="true"><i class="pic pic-festa"></i></div>
-    <h2 class="centro" style="font-size:25px">Seu app está pronto!</h2>
-    <p class="centro">Você cadastrou seu kit, criou uma reserva e já tem seu link. Agora é só deixar suas clientes reservarem sozinhas.</p>
-    <div class="nota-amarela pequeno"><b>Dica:</b> coloque o link na bio do Instagram e na mensagem automática do WhatsApp Business.</div>
+    ${etiquetaPop('Tudo pronto')}
+    ${tituloPop('Agora suas clientes [[reservam sozinhas]]')}
+    <p class="pop-tx">Você cadastrou seu kit, criou uma reserva e já tem seu link. Coloque na bio do Instagram e na mensagem automática do WhatsApp Business.</p>
     <button class="btn principal cheio" id="parabens-copiar">Copiar meu link de reservas</button>
     <button class="link-btn" id="parabens-fechar">Fechar</button>`, (p) => {
     $('#parabens-copiar', p).onclick = () => copiarMeuLink();
     $('#parabens-fechar', p).onclick = () => fecharPainel();
-  });
+  }, heroiFoto(fotosDaLoja(1)[0], linkPublico(estado.negocio.slug).replace(/^https?:\/\//, ''), 'link', true));
 }
 
 // Assinou o anual com a montagem: cartão fixo até ela pedir a montagem no WhatsApp.
@@ -1785,9 +1875,9 @@ async function mostrarMensagensAdmin() {
   const destino = String(m.botao_destino || '');
   const ehLink = /^https?:\/\//i.test(destino);
   abrirPopup(`
-    ${m.imagem_url ? `<img src="${esc(m.imagem_url)}" alt="" style="width:100%;border-radius:16px;max-height:260px;object-fit:cover">` : ''}
-    <h2 style="font-size:23px;margin:0">${esc(m.titulo)}</h2>
-    <p style="margin:0;white-space:pre-line;line-height:1.5">${esc(m.texto)}</p>
+    ${etiquetaPop('Recado da equipe')}
+    ${tituloPop(m.titulo)}
+    <p class="pop-tx" style="white-space:pre-line">${esc(m.texto)}</p>
     ${m.botao_texto ? (ehLink || destino === 'zap'
       ? `<a class="btn principal cheio" id="msg-botao" href="${esc(destino === 'zap' ? linkZap(WHATSAPP_SUPORTE, 'Oi! Vi a mensagem no app e quero saber mais.') : destino)}" target="_blank" rel="noopener">${esc(m.botao_texto)}</a>`
       : `<button class="btn principal cheio" id="msg-botao">${esc(m.botao_texto)}</button>`) : ''}
@@ -1803,7 +1893,7 @@ async function mostrarMensagensAdmin() {
       if (['hoje', 'agenda', 'kits', 'mais'].includes(aba)) irPara(aba);
       if (destino === 'video') abrirVideoTutorial();
     });
-  });
+  }, m.imagem_url ? heroiFoto(m.imagem_url) : heroiIcone('sino'));
 }
 
 function abaHoje(tela) {
@@ -2031,6 +2121,121 @@ function abaAgenda(tela) {
 // ---------------------------------------------------------------------
 // KITS
 // ---------------------------------------------------------------------
+// ---------------------------------------------------------------------
+// Loja puxada do Instagram: kits com cadeado (teste grátis) e loja completa (assinou)
+// ---------------------------------------------------------------------
+function travadosVisiveis() { const x = estado.previaSit; return x && !x.pago && x.bloqueados > 0 ? x : null; }
+function completaAndando() { const x = estado.previaSit; return x && x.pago && x.completa && x.completa.fase && x.completa.fase !== 'pronta' ? x.completa : null; }
+function blocoTravados() {
+  if (estado.lancIg && podeEditar()) return `<section class="cartao trava-aviso ig-card">
+      <div class="trava-t"><i class="pic pic-insta"></i>Monte sua loja com o seu Instagram</div>
+      <p class="pequeno">Digite o seu @ e a IA cria os kits com nome, foto e categoria em cerca de 1 minuto. Os kits que você já tem continuam iguais.</p>
+      <button class="btn principal cheio" data-montar-ig>Montar com meu Instagram</button></section>`;
+  const x = travadosVisiveis();
+  if (x) return `<section class="cartao trava-aviso">
+      <div class="trava-t"><i class="pic pic-cadeado"></i>${plural(x.bloqueados, 'kit encontrado', 'kits encontrados')} no seu Instagram</div>
+      <p class="pequeno">No teste grátis, ${plural(estado.kits.length, 'kit já está', 'kits já estão')} na sua loja. ${x.bloqueados === 1 ? 'O outro será desbloqueado' : 'Os demais serão desbloqueados'} quando você assinar.</p>
+      <button class="btn principal cheio" data-liberar>Desbloquear meus kits</button></section>`;
+  const c = completaAndando();
+  return c ? `<section class="cartao trava-aviso andando" data-completa>${conteudoCompleta(c)}</section>` : '';
+}
+function conteudoCompleta(c) {
+  const pct = c.alvo && c.vistos ? Math.min(96, Math.round((c.vistos / c.alvo) * 100)) : ({ fila: 4, buscando: 10, importando: 96 }[c.fase] || 12);
+  return `<div class="trava-t"><span class="mini-anel" aria-hidden="true"></span>Preparando sua loja completa</div>
+      <p class="pequeno">Estamos desbloqueando seus kits e trazendo os que ainda faltam do seu Instagram. Pode fechar o app: avisamos quando terminar.</p>
+      <div class="barra-prog"><div style="width:${pct}%"></div></div>
+      <p class="pequeno centro" style="margin:0">${c.fase === 'importando' ? 'Organizando a agenda' : c.alvo && c.vistos ? `${c.vistos} de ${c.alvo} posts` : 'Buscando seus posts'}${c.novos ? ` · ${plural(c.novos, 'kit novo', 'kits novos')}` : ''}</p>`;
+}
+function gradeTravados() {
+  const x = travadosVisiveis();
+  if (!x) return '';
+  const fotos = (x.fotos || []).map((f) => f && f.foto).slice(0, 12);
+  const sobra = x.bloqueados - fotos.length;
+  return `<p class="trava-sep">DESBLOQUEADOS AO ASSINAR</p>
+    <div class="trava-lista">${fotos.map((f) => `<button class="cartao clicavel trava-kit" data-liberar>
+      <span class="trava-ft">${f ? `<img src="${esc(f)}" alt="" loading="lazy">` : ''}<i class="pic pic-cadeado"></i></span>
+      <span><b>Kit bloqueado</b><small>Desbloqueado quando você assinar</small></span></button>`).join('')}
+    ${sobra > 0 ? `<p class="pequeno centro" style="margin:4px 0 0">E mais ${plural(sobra, 'kit', 'kits')} com cadeado.</p>` : ''}</div>`;
+}
+function ligarTravados(tela) {
+  $$('[data-liberar]', tela).forEach((b) => (b.onclick = () => popupPlanosTeste('loja_completa')));
+  $$('[data-montar-ig]', tela).forEach((b) => (b.onclick = () => telaPuxarInstagram()));
+  if (completaAndando()) acompanharCompleta();
+}
+// Assinou: a loja completa vai sendo montada em passos curtos (o servidor também continua sozinho)
+async function acompanharCompleta() {
+  if (estado.completaRodando || !completaAndando()) return;
+  estado.completaRodando = true;
+  try {
+    for (let i = 0; i < 200; i++) {
+      let c = null;
+      try { c = await dados.lojaCompletaPasso(); } catch (e) { c = null; }
+      if (c && c.fase) {
+        estado.previaSit.completa = c;
+        $$('[data-completa]').forEach((el) => { el.innerHTML = c.fase === 'pronta' ? '' : conteudoCompleta(c); });
+        if (c.fase === 'pronta') {
+          estado.kits = await dados.listarKits();
+          estado.previaSit = await dados.previaSituacao().catch(() => estado.previaSit);
+          const painelAberto = $('[data-completa-painel]');
+          if (painelAberto) painelAberto.innerHTML = fimCompleta(c);
+          else aviso(c.liberados ? `${plural(c.liberados, 'kit novo entrou', 'kits novos entraram')} na sua loja!` : 'Sua loja completa está pronta!');
+          if (estado.aba === 'kits') desenharAba();
+          const vk = $('#completa-ver'); if (vk) vk.onclick = () => { fecharPainel(); irPara('kits'); };
+          return;
+        }
+      }
+      await new Promise((ok) => setTimeout(ok, c && c.fase === 'buscando' ? 6000 : 3000));
+      if (document.hidden) await new Promise((ok) => setTimeout(ok, 15000));
+    }
+  } finally { estado.completaRodando = false; }
+}
+function fimCompleta(c) {
+  return `<div class="coluna ag-centro" style="gap:12px">
+      <div class="pic-g" aria-hidden="true"><i class="pic pic-ok"></i></div>
+      <h2 class="ag-titulo">Sua loja completa está pronta</h2>
+      <div class="puxar-passos" style="text-align:left">
+        <div class="ok"><span></span>${plural(c.liberados || 0, 'kit liberado', 'kits liberados')}</div>
+        ${c.novos ? `<div class="ok"><span></span>${plural(c.novos, 'kit novo encontrado', 'kits novos encontrados')}</div>` : ''}
+        <div class="ok"><span></span>Agenda organizada${c.agenda ? `: ${plural(c.agenda, 'kit novo usa', 'kits novos usam')} as mesmas peças` : ''}</div>
+      </div>
+      <p class="pequeno" style="margin:0">Os kits novos entram com preço a consultar. Toque em cada um para colocar o preço quando quiser.</p>
+      <button class="btn principal cheio" id="completa-ver">Ver meus kits</button></div>`;
+}
+// Lançamento: lojas sem kits ou só com os kits do teste (uma vez; o link do e-mail abre direto)
+function mostrarLancamentoIg() {
+  if (!estado.lancIg || !podeEditar() || painelAberto) return false;
+  if (new URLSearchParams(location.search).get('instagram') === '1') {
+    history.replaceState(null, '', location.pathname + location.hash);
+    telaPuxarInstagram(); return true;
+  }
+  const chave = `apm-lanc-ig-${estado.negocio.id}`;
+  try { if (localStorage.getItem(chave)) return false; localStorage.setItem(chave, '1'); } catch (e) { return false; }
+  abrirPopup(`
+    ${etiquetaPop('Novidade')}
+    ${tituloPop('Sua loja montada com as fotos do [[seu Instagram]]')}
+    <p class="pop-tx">Digite o seu @ e a IA cria os kits com nome, foto e categoria em cerca de 1 minuto. Você só confere.</p>
+    <button class="btn principal cheio" id="lig-ok">Montar com meu Instagram</button>
+    <button class="link-btn" id="lig-nao">Agora não</button>`, (p) => {
+    $('#lig-nao', p).onclick = () => { rastrear('lancamento_ig', 'fechou'); fecharPainel(); };
+    $('#lig-ok', p).onclick = () => { rastrear('lancamento_ig', 'clicou'); fecharPainel(); setTimeout(() => telaPuxarInstagram(), 120); };
+    rastrear('lancamento_ig', 'viu');
+  }, heroiFotos('@sualoja → sua loja pronta', 'insta', [1, 3, 2].map((i) => `loja-pronta/exemplos/${i}.jpg`)));
+  return true;
+}
+// Logo depois de assinar: tela cheia acompanhando a loja completa (uma vez por sessão)
+function mostrarLojaCompleta() {
+  const c = completaAndando();
+  if (!c) return false;
+  try { if (sessionStorage.getItem('apm-completa-tela')) { acompanharCompleta(); return false; } sessionStorage.setItem('apm-completa-tela', '1'); } catch (e) { /* segue */ }
+  abrirPainel('Sua loja completa', `<div data-completa-painel>
+      <div class="coluna ag-centro" style="gap:12px">
+        <div class="puxar-anel" aria-hidden="true"></div>
+        <div class="coluna" data-completa style="gap:10px">${conteudoCompleta(c)}</div>
+      </div></div>`);
+  acompanharCompleta();
+  return true;
+}
+
 function abaKits(tela) {
   const n = estado.negocio;
   const ORDENS = [['az', 'A–Z'], ['numero', 'Número do kit'], ['menor', 'Menor preço'], ['maior', 'Maior preço'], ['novos', 'Mais novos']];
@@ -2060,10 +2265,13 @@ function abaKits(tela) {
       ${insta}
       <div class="vitrine-links"><a href="${esc(linkDona())}"><i class="pic pic-olho"></i> Ver como a cliente vê</a><button class="link-btn" id="vitrine-copiar"><i class="pic pic-link"></i> Copiar link da loja</button></div>
     </section>
+    ${blocoTravados()}
     <div id="ia-caixa" class="coluna" style="gap:10px">${cartaoIA()}</div>
     <div class="secao-titulo"><h1>Meus kits</h1>${podeEditar() ? `<button class="btn principal mini" id="novo-kit">${ICONE.mais1} Novo kit</button>` : ''}</div>
     ${estado.kits.length > 1 ? `<label class="ag-ordem">Ordenar: <select id="ordem-kits">${ORDENS.map(([v, t]) => `<option value="${v}" ${(n.ordem_kits || 'az') === v ? 'selected' : ''}>${t}</option>`).join('')}</select><small class="dica">vale também no seu link</small></label>` : ''}
-    ${estado.kits.length ? `<div class="kits-grade">${cartoes}</div>` : '<p class="vazio-txt">Nenhum kit ainda. Cadastre o primeiro: foto, nome, preço e a lista de peças.</p>'}`;
+    ${estado.kits.length ? `<div class="kits-grade">${cartoes}</div>` : '<p class="vazio-txt">Nenhum kit ainda. Cadastre o primeiro: foto, nome, preço e a lista de peças.</p>'}
+    ${gradeTravados()}`;
+  ligarTravados(tela);
   const novo = $('#novo-kit', tela);
   if (novo) novo.onclick = () => formKit(null);
   const ed = $('#vitrine-editar', tela);
@@ -2403,8 +2611,8 @@ function guiaPrimeiraVezIA(seguir) {
   marcarGuiaIA();
   const passo = (n, t, s) => `<div class="guia-passo"><span class="n">${n}</span><div style="flex:1"><b>${t}</b><small>${s}</small></div></div>`;
   abrirPopup(`
-    <div class="pic-g">${PIC('brilho')}</div>
-    <h2 class="centro" style="font-size:23px;margin:0">Primeira vez com a IA? É assim:</h2>
+    ${etiquetaPop('Primeira vez com a IA')}
+    ${tituloPop('Suas fotos viram [[kits prontos]]')}
     <div class="coluna" style="gap:10px">
       ${passo(1, 'Mande as fotos dos kits', 'foto do celular, print do Instagram ou do WhatsApp, ou o PDF do catálogo')}
       ${passo(2, 'A IA separa os kits', 'nome, peças e preço (se estiver na foto ou na legenda). Leva de 1 a 3 minutos')}
@@ -2417,7 +2625,7 @@ function guiaPrimeiraVezIA(seguir) {
     $('#gp-manual', p).onclick = () => { fecharPainel(); irPara('kits'); setTimeout(() => formKit(null), 300); };
     const v = $('#gp-video', p);
     temVideoIA().then((ok) => { if (ok && document.body.contains(v)) { v.classList.remove('oculto'); v.onclick = () => verVideoIA(() => guiaPrimeiraVezIA(seguir)); } });
-  });
+  }, heroiIA());
 }
 
 // ----- 2. Enviar o material: passo a passo guiado (uma pergunta por tela) -----
@@ -3927,7 +4135,7 @@ function painelPrecosRapidos() {
   abrirPainel('Seus preços', `<div class="coluna">
       <p class="ia-perg" style="margin:0">Quer colocar os preços agora?</p>
       <p class="pequeno" style="margin:-4px 0 6px">Pode deixar "a consultar": a cliente pede a data e você passa o valor no WhatsApp.</p>
-      ${estado.previaLimitada ? '<p class="nota-amarela pequeno" style="margin:0">No teste grátis entram 5 kits. Assinando, você coloca todos.</p>' : ''}
+      ${estado.previaLimitada ? '<p class="nota-amarela pequeno" style="margin:0">No teste grátis entram 5 kits. Os demais serão desbloqueados quando você assinar.</p>' : ''}
       ${ks.map((k) => `<div class="preco-rapido">${k.foto_url ? `<img src="${esc(k.foto_url)}" alt="">` : '<span class="pr-sem"></span>'}<b>${esc(k.nome)}</b>
         <input data-preco="${esc(k.id)}" inputmode="decimal" placeholder="R$ 0,00" aria-label="Preço do ${esc(k.nome)}"></div>`).join('')}
       <button class="btn principal cheio" id="pr-salvar">Salvar e copiar meu link</button>
@@ -4210,7 +4418,7 @@ function abaMais(tela) {
       <span class="perfil-txt"><b>Editar dados</b><span class="perfil-nome">${esc(estado.negocio.nome)}</span><span class="pequeno">Logo, Instagram, recado do link, WhatsApp, Pix e dias de retirada</span></span>
       <span class="perfil-seta" aria-hidden="true">›</span>
     </button>
-    ${temOfertaBF() ? `<div class="bf-card"><div class="pic-g" aria-hidden="true"><i class="pic pic-etiqueta"></i></div><div class="t"><b>Black Friday: anual por R$ 167</b><span>53% OFF · só até 29/11</span></div><button class="btn principal mini" id="ver-bf">Ver oferta</button></div>` : ''}
+    ${temOfertaBF() ? `<div class="bf-card"><div class="pic-g" aria-hidden="true"><i class="pic pic-etiqueta"></i></div><div class="t"><b>Black Friday: anual por R$ 167</b><span>53% OFF · só até 29/11</span></div><a class="btn principal mini" id="ver-bf" href="${esc(LINK_ANUAL_PROMO)}" target="_blank" rel="noopener">Assinar por R$ 167</a></div>` : ''}
     ${cartaoAvisosLoja()}
     ${mostrarInstalar ? `<section class="cartao coluna instalar">
       <div style="display:flex;gap:12px;align-items:center"><div class="pic-g" aria-hidden="true"><i class="pic pic-celular"></i></div><div><b style="font-size:17px">Instale o app no seu celular</b><div class="pequeno">Abra direto pela tela inicial, como um aplicativo.</div></div></div>
@@ -4247,7 +4455,6 @@ function abaMais(tela) {
   const inst = $('#instalar', tela); if (inst) inst.onclick = instalarApp;
   ligarAvisosLoja(tela);
   const vv = $('#ver-video', tela); if (vv) vv.onclick = abrirVideoTutorial;
-  const vbf = $('#ver-bf', tela); if (vbf) vbf.onclick = popupBlackFriday;
   const mc = $('#meu-contrato', tela); if (mc) mc.onclick = painelContrato;
   $('#copiar', tela).onclick = () => copiarMeuLink();
   $('#meus-dados', tela).onclick = painelNegocio;

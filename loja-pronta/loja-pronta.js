@@ -285,7 +285,7 @@ async function telaPublicar(p) {
       <button class="btn r" type="submit">Pagar e publicar minha loja</button>
     </form>
     <div class="gar"><img src="../icones/escudo-vermelho.png" alt="">7 dias de garantia: não gostou, devolvemos</div>
-    <button class="link" id="anual" type="button">Prefere o anual? R$ 167 por 12 meses</button>`;
+    <button class="link anual-off" id="anual" type="button"><span class="off-selo">53% OFF</span>Prefere o anual? R$ 167 por 12 meses</button>`;
   $('#volta').onclick = () => abrirPrevia(p);
   const ir = async (plano, b) => {
     const err = $('#err'); err.classList.add('oculto');

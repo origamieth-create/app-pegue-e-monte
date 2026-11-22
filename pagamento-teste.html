@@ -25,8 +25,8 @@
   <button data-plano="anual" data-contexto="venda" class="claro">Como na página de vendas</button>
 </main>
 <script type="module">
-import { abrirCheckout, planos } from './checkout.js?v=20261122a';
-import * as dados from './dados.js?v=20261122a';
+import { abrirCheckout, planos } from './checkout.js?v=20261123a';
+import * as dados from './dados.js?v=20261123a';
 const s = document.getElementById('situacao');
 const sessao = await dados.sessaoAtual().catch(() => null);
 const p = await planos().catch((e) => ({ erro: e.message }));
