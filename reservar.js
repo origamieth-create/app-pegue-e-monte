@@ -180,18 +180,23 @@ async function iniciar() {
       ${loja.logo_url ? `<img src="${esc(loja.logo_url)}" alt="Logo de ${esc(loja.nome)}" onload="var r=this.naturalWidth/this.naturalHeight;if(r>0.9&&r<1.1)this.classList.add('logo-quadrada')">` : ''}
       <h1>${esc(loja.nome)}</h1>
       <p class="recado-loja">${esc(loja.recado || recadoPadrao(loja.nome))}</p>
-      <div class="info-loja"><span>${loja.kits.length} ${loja.kits.length === 1 ? 'kit' : 'kits'}</span><span>${loja.confirmar ? 'Confirmação pelo WhatsApp' : 'Reserva com sinal'}</span></div>
       ${fechadoAgora ? `<p class="nota-amarela pequeno" style="margin:6px 0 0"><i class="pic pic-cadeado"></i> ${esc(fechadoAgora.recado || 'A loja não vai atender')} (${esc(dataCurta2(fechadoAgora.de))}${fechadoAgora.ate !== fechadoAgora.de ? ' a ' + esc(dataCurta2(fechadoAgora.ate)) : ''})</p>` : ''}
       <div class="botoes-loja">
         <a class="btn verde mini" href="${esc(linkZap(loja.whatsapp, 'Oi! Vim pelo link de reservas e tenho uma dúvida.'))}" target="_blank" rel="noopener">Dúvidas? Fale no WhatsApp</a>
         ${loja.instagram ? `<a class="btn insta mini" href="https://instagram.com/${encodeURIComponent(loja.instagram)}" target="_blank" rel="noopener">${ICONE_INSTA} Instagram</a>` : ''}
       </div>
     </header>
-    ${categorias.length > 1 ? `
+    ${loja.kits.length > 1 ? `
     <div class="busca-kits">
-      <input type="search" id="busca" placeholder="Buscar kit pelo nome" aria-label="Buscar kit pelo nome">
-      <div class="filtros-cat" role="tablist">${['Todos', ...categorias].map((c, i) => `<button type="button" class="filtro-cat ${i ? '' : 'ativo'}" data-cat="${i ? esc(c) : ''}">${esc(c)}</button>`).join('')}</div>
-    </div>` : loja.kits.length > 6 ? `<div class="busca-kits"><input type="search" id="busca" placeholder="Buscar kit pelo nome" aria-label="Buscar kit pelo nome"></div>` : ''}
+      <div class="linha-busca">
+        ${categorias.length > 1 || loja.kits.length > 6 ? '<input type="search" id="busca" placeholder="Buscar kit pelo nome" aria-label="Buscar kit pelo nome">' : '<span class="busca-espaco"></span>'}
+        <div class="sel-col" role="group" aria-label="Ver kits em 1 ou 2 colunas">
+          <button type="button" data-col="1" aria-label="1 coluna"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="7" rx="2"/><rect x="4" y="13" width="16" height="7" rx="2"/></svg></button>
+          <button type="button" data-col="2" aria-label="2 colunas"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></svg></button>
+        </div>
+      </div>
+      ${categorias.length > 1 ? `<div class="filtros-cat" role="tablist">${['Todos', ...categorias].map((c, i) => `<button type="button" class="filtro-cat ${i ? '' : 'ativo'}" data-cat="${i ? esc(c) : ''}">${esc(c)}</button>`).join('')}</div>` : ''}
+    </div>` : ''}
     ${travados ? `<div class="nota-trava"><i class="pic pic-cadeado"></i><span><b>Encontramos ${loja.kits.length} kits no seu Instagram.</b> ${loja.kits.length - travados} já ${loja.kits.length - travados === 1 ? 'aparece' : 'aparecem'} aqui; ${travados === 1 ? 'o outro será desbloqueado' : `os outros ${travados} serão desbloqueados`} ao publicar.</span></div>` : ''}
     ${loja.kits.length ? `<div class="grade">${loja.kits.map((k) => k.bloqueado ? `
       <button class="cartao clicavel kit kit-trava" data-trava="1" data-categoria="" data-nome="">
@@ -227,6 +232,15 @@ async function iniciar() {
     catAtual = b.dataset.cat; $$('.filtro-cat').forEach((x) => x.classList.toggle('ativo', x === b)); filtrar();
   }));
   if ($('#busca')) $('#busca').oninput = filtrar;
+  // 1 ou 2 colunas (2 é o padrão); o celular da cliente guarda a escolha
+  const colunas = (n) => {
+    const g = $('.grade'); if (g) g.classList.toggle('uma-col', n === '1');
+    $$('[data-col]').forEach((x) => x.classList.toggle('ativo', x.dataset.col === n));
+  };
+  let colSalva = '2';
+  try { colSalva = localStorage.getItem('apm-colunas') === '1' ? '1' : '2'; } catch (e) { /* segue */ }
+  colunas(colSalva);
+  $$('[data-col]').forEach((b) => (b.onclick = () => { colunas(b.dataset.col); try { localStorage.setItem('apm-colunas', b.dataset.col); } catch (e) { /* segue */ } }));
   // Link de um kit específico (…?kit=ID): já abre nele
   const kitDoLink = new URLSearchParams(location.search).get('kit');
   const k0 = kitDoLink && loja.kits.find((k) => k.id === kitDoLink && !k.bloqueado);

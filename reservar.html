@@ -103,12 +103,20 @@
   .barra-reservar b { font-size: 16px; }
   .barra-reservar .btn { flex: none; padding: 0 26px; min-height: 50px; background: linear-gradient(145deg, var(--coral), var(--destaque)); }
   @media (min-width: 720px) { .barra-reservar { max-width: 600px; margin: 0 auto; } }
+  .linha-busca { display: flex; gap: 8px; align-items: center; }
+  .linha-busca input { flex: 1; min-width: 0; }
+  .busca-espaco { flex: 1; }
+  .sel-col { display: flex; flex: none; background: #fff; border-radius: 14px; padding: 4px; box-shadow: var(--sombra-leve); }
+  .sel-col button { border: 0; border-radius: 10px; width: 40px; height: 40px; display: grid; place-items: center; background: none; color: #9A90A3; cursor: pointer; }
+  .sel-col button svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.9; }
+  .sel-col button.ativo { background: var(--destaque); color: #fff; }
+  .grade.uma-col { grid-template-columns: minmax(0, 1fr); }
 </style>
 </head>
 <body>
 <main id="raiz"><div class="carregando">Carregando…</div></main>
 <div id="painel"></div>
 <div id="toast" class="toast oculto" role="status" aria-live="polite"></div>
-<script type="module" src="reservar.js?v=20261125a"></script>
+<script type="module" src="reservar.js?v=20261125b"></script>
 </body>
 </html>
