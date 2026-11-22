@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Reservas</title>
+<meta name="theme-color" content="#FFFBF7">
+<link rel="icon" href="icone.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icone-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap">
+<link rel="stylesheet" href="estilo.css?v=20261125a">
+<style>
+  main { max-width: 720px; margin: 0 auto; padding: 24px 18px 48px; display: flex; flex-direction: column; gap: 20px; }
+  .cabeca { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; padding-top: 8px; }
+  .cabeca img { width: 96px; height: 96px; border-radius: 999px; object-fit: contain; background: #fff; padding: 6px; border: 3px solid #fff; box-shadow: 0 6px 18px rgba(42,27,61,.12); }
+  .cabeca img.logo-quadrada { width: 120px; height: 120px; object-fit: cover; padding: 0; }
+  .barra-previa { position: fixed; left: 0; right: 0; bottom: 0; z-index: 45; background: #fff; border-top: 1px solid var(--linha); padding: 10px 14px calc(14px + env(safe-area-inset-bottom)); box-shadow: 0 -10px 24px rgba(42,27,61,.08); }
+  .barra-previa p { margin: 0 auto 8px; max-width: 520px; text-align: center; font-size: 13px; color: var(--texto2); }
+  .barra-previa div { display: flex; gap: 8px; max-width: 520px; margin: 0 auto; }
+  .barra-previa .btn { flex: 1; text-align: center; text-decoration: none; }
+  .barra-previa .btn.principal { flex: 1.4; }
+  body.com-barra-previa main { padding-bottom: 150px; }
+  .nota-trava { display: flex; gap: 10px; align-items: center; background: #fff; border: 1.5px solid var(--linha); border-radius: 16px; padding: 11px 13px; margin: 0 0 12px; font-size: 14px; line-height: 1.4; }
+  .nota-trava .pic { width: 22px; height: 22px; flex: none; background: var(--destaque); }
+  .kit-trava .trava-foto { position: relative; display: block; border-radius: 14px; overflow: hidden; aspect-ratio: 1 / 1; background: var(--lilas); }
+  .kit-trava .trava-foto img { width: 100%; height: 100%; object-fit: cover; filter: blur(10px) saturate(.7); transform: scale(1.15); display: block; }
+  .kit-trava .trava-foto::after { content: ""; position: absolute; inset: 0; background: rgba(255,251,247,.45); }
+  .trava-selo { position: absolute; inset: 0; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
+  .trava-circ { width: 50px; height: 50px; border-radius: 50%; background: #fff; box-shadow: 0 4px 14px rgba(42,27,61,.12); display: flex; align-items: center; justify-content: center; }
+  .trava-circ .pic { width: 24px; height: 24px; }
+  .trava-selo b { background: #fff; border-radius: 99px; padding: 5px 12px; font-size: 13.5px; }
+  .trava-linha { display: block; height: 13px; border-radius: 7px; background: var(--linha); width: 60%; }
+  .trava-linha.curta { width: 40%; }
+  .trava-fundo { position: fixed; inset: 0; z-index: 60; background: rgba(30,26,34,.45); display: flex; align-items: flex-end; justify-content: center; }
+  .trava-folha { background: #fff; width: 100%; max-width: 560px; border-radius: 26px 26px 0 0; padding: 24px 20px calc(22px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 10px; }
+  .trava-folha h2 { margin: 0; font-family: var(--fonte); font-weight: 800; font-size: 21px; }
+  .trava-folha p { margin: 0; }
+  .trava-fotos { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 6px 0; }
+  .trava-fotos span { aspect-ratio: 1; border-radius: 10px; overflow: hidden; position: relative; background: var(--lilas); display: block; }
+  .trava-fotos img { width: 100%; height: 100%; object-fit: cover; filter: blur(5px); transform: scale(1.2); }
+  .trava-fotos .pic { position: absolute; inset: 0; margin: auto; width: 22px; height: 22px; background: var(--destaque); }
+  .trava-folha .link-btn { align-self: center; }
+  .grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); gap: 14px; }
+  .cartao.kit { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+  .kit .nome { font-weight: 800; font-size: 17px; line-height: 1.2; }
+  .preco { font-family: var(--fonte); font-weight: 800; font-size: 20px; }
+  .cal button.passado:disabled { text-decoration: none; color: #CFC7D8; }
+  .rodape img { width: 20px; height: 20px; display: inline-block; vertical-align: -5px; margin-right: 6px; }
+  .rodape { text-align: center; font-size: 13px; color: var(--texto2); padding-top: 12px; }
+  .pix { word-break: break-all; font-weight: 800; background: var(--lilas); padding: 12px 14px; border-radius: 14px; }
+  /* Design 2026: capa colorida, logo em destaque, kits em 2 colunas */
+  main { position: relative; }
+  .capa-loja { position: absolute; left: 0; right: 0; top: 0; height: 150px; background: linear-gradient(130deg, #F7C9CD 0%, #F3ECFC 55%, #FFE9B8 100%); border-radius: 0 0 28px 28px; z-index: -1; }
+  .capa-loja::after { content: ''; position: absolute; inset: 0; border-radius: inherit; background: radial-gradient(circle at 20% 30%, rgba(255,255,255,.55) 0 3px, transparent 4px) 0 0/38px 38px, radial-gradient(circle at 70% 60%, rgba(199,59,72,.16) 0 2.5px, transparent 3.5px) 0 0/46px 46px; }
+  body { isolation: isolate; }
+  .cabeca { padding-top: 48px; gap: 8px; }
+  .cabeca h1 { font-size: 25px; letter-spacing: -.02em; }
+  .cabeca .recado-loja { margin: 0; font-size: 14px; color: var(--texto2); white-space: pre-line; }
+  .botoes-loja { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; max-width: 420px; margin-top: 6px; }
+  .botoes-loja .btn { min-height: 46px; border-radius: 15px; }
+  .botoes-loja .btn:only-child { grid-column: 1 / -1; }
+  .busca-kits input { border-radius: 15px; border: 0; box-shadow: var(--sombra-leve); }
+  .filtro-cat { border: 0 !important; box-shadow: var(--sombra-leve); border-radius: 14px !important; }
+  .filtro-cat.ativo { background: var(--tinta) !important; color: #fff !important; }
+  .grade { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  @media (min-width: 720px) { .grade { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  .cartao.kit { padding: 8px; gap: 6px; }
+  .cartao.kit .foto-caixa { border-radius: 15px; }
+  .cartao.kit .et-categoria { align-self: flex-start; }
+  .kit .nome { font-size: 14.5px; margin: 0 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .kit-rodape { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin: 0 2px 2px; }
+  .kit-rodape .preco { font-size: 14px; font-weight: 800; }
+  .ver-datas { font-size: 12px; font-weight: 900; color: var(--destaque); white-space: nowrap; }
+  .pecas-kit b { display: block; font-size: 13px; color: var(--texto2); margin-bottom: 6px; }
+  .pecas-kit div { display: flex; flex-wrap: wrap; gap: 6px; }
+  .pecas-kit span { font-size: 12.5px; font-weight: 700; background: #fff; border: 1px solid var(--linha); padding: 5px 10px; border-radius: 11px; }
+  .pecas-kit span.extra { border-color: #BFE3CE; background: var(--verde-claro); color: var(--verde); }
+  #cal .cal button:not(:disabled):not(.sel):not(.vazio) { background: #E9F6EF; color: var(--verde); }
+  #cal .cal button:disabled:not(.passado) { background: #F3EDE7; color: #B9AFA6; }
+  .rodape { display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .info-loja { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+  .info-loja span { font-size: 12px; font-weight: 800; background: #fff; padding: 6px 11px; border-radius: 12px; box-shadow: var(--sombra-leve); }
+  .cat-foto { position: absolute; left: 8px; top: 8px; z-index: 2; background: rgba(255,255,255,.95) !important; color: var(--lilas-texto) !important; }
+  /* página do kit: foto grande, folha por cima e barra para reservar */
+  .pn-kit .painel { padding-top: 0; }
+  .pn-kit .painel-barra, .pn-kit .painel > .painel-titulo { display: none; }
+  .kit-topo { position: relative; margin: 0 -18px; }
+  .kit-topo .foto-caixa { border-radius: 0; aspect-ratio: 1 / .92; }
+  .kit-topo .galeria .foto-caixa { border-radius: 0; }
+  .kit-topo .pontos-galeria { position: absolute; left: 0; right: 0; bottom: 34px; z-index: 2; }
+  .kit-botoes { position: absolute; left: 16px; right: 16px; top: calc(14px + env(safe-area-inset-top)); display: flex; justify-content: space-between; z-index: 3; }
+  .bq-redondo { width: 44px; height: 44px; border-radius: 14px; border: 0; background: rgba(255,255,255,.95); box-shadow: 0 2px 10px rgba(42,27,61,.15); display: grid; place-items: center; color: var(--tinta); cursor: pointer; }
+  .kit-folha { position: relative; margin: -26px -18px 0; padding: 20px 18px 120px; background: var(--fundo); border-radius: 28px 28px 0 0; display: flex; flex-direction: column; gap: 14px; }
+  .kit-folha .et-categoria { align-self: flex-start; }
+  .kit-nome-linha { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-top: -6px; }
+  .kit-nome { font-size: 25px; letter-spacing: -.02em; }
+  .kit-preco { display: flex; flex-direction: column; align-items: flex-end; text-align: right; gap: 2px; flex: none; max-width: 48%; }
+  .kit-preco .pequeno { font-size: 12px; }
+  .barra-reservar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 55; background: #fff; border-radius: 24px 24px 0 0; box-shadow: 0 -8px 24px rgba(42,27,61,.1); padding: 14px 18px calc(16px + env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 12px; }
+  .barra-reservar > div { min-width: 0; flex: 1; }
+  .barra-reservar small { display: block; font-size: 12px; color: var(--texto2); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .barra-reservar b { font-size: 16px; }
+  .barra-reservar .btn { flex: none; padding: 0 26px; min-height: 50px; background: linear-gradient(145deg, var(--coral), var(--destaque)); }
+  @media (min-width: 720px) { .barra-reservar { max-width: 600px; margin: 0 auto; } }
+</style>
+</head>
+<body>
+<main id="raiz"><div class="carregando">Carregando…</div></main>
+<div id="painel"></div>
+<div id="toast" class="toast oculto" role="status" aria-live="polite"></div>
+<script type="module" src="reservar.js?v=20261125a"></script>
+</body>
+</html>
