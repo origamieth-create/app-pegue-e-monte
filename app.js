@@ -2,8 +2,8 @@
 // App Pegue e Monte — app da dona
 // Abas: Hoje, Agenda, Kits, Mais
 // =====================================================================
-import * as dados from './dados.js?v=20261125a';
-import { abrirCheckout, planos as planosCheckout, linkCakto } from './checkout.js?v=20261125a';
+import * as dados from './dados.js?v=20261125c';
+import { abrirCheckout, planos as planosCheckout, linkCakto } from './checkout.js?v=20261125c';
 import { PERMITIR_CADASTRO, EMAIL_SUPORTE, WHATSAPP_SUPORTE, LINK_MENSAL, LINK_ANUAL, LINK_ANUAL_PROMO, DEMO_SITE, LINK_PLANOS, SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=20261121e';
 
 const { hojeISO, somaDias, cruza } = dados;
@@ -409,6 +409,8 @@ async function iniciar() {
   await dados.aoMudarLogin((evento) => {
     if (evento === 'PASSWORD_RECOVERY') { recuperandoSenha = true; telaNovaSenha(); }
   });
+  const tokenSenha = new URLSearchParams(location.search).get('senha');
+  if (tokenSenha) return telaLinkSenha(tokenSenha);
   try {
     const sessao = await dados.sessaoAtual();
     if (recuperandoSenha && sessao) return telaNovaSenha();
@@ -1133,30 +1135,120 @@ function telaLogin(modo) {
   };
 }
 
+const ICONE_CADEADO = '<svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="#C73B48" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2.5"/><path d="M8 10V7.5a4 4 0 018 0V10"/><circle cx="12" cy="15" r="1.2"/></svg>';
+function camposSenhaNova() {
+  return `<label class="campo">Nova senha<input type="password" name="senha" minlength="6" autocomplete="new-password" required></label>
+      <label class="campo">Repita a nova senha<input type="password" name="senha2" minlength="6" autocomplete="new-password" required></label>
+      <p class="pequeno" style="margin:-4px 0 0">Pelo menos 6 letras ou números.</p>`;
+}
+function conferirSenhaNova(form) {
+  if (form.senha.value.length < 6) throw new Error('A senha precisa ter pelo menos 6 letras ou números.');
+  if (form.senha.value !== form.senha2.value) throw new Error('As duas senhas não estão iguais. Digite de novo.');
+}
+// Nova senha pelo link do e-mail "Esqueci minha senha"
 function telaNovaSenha() {
   fecharPainel();
   $('#raiz').innerHTML = `
-    <div class="entrada"><form class="caixa">
-      ${BANDEIRINHAS}<div class="logo-app">${ICONE.logo}</div>
+    <div class="entrada"><form class="caixa" novalidate>
+      <div class="icone-senha">${ICONE_CADEADO}</div>
       <h1 class="centro">Nova senha</h1>
-      <label class="campo">Nova senha<input type="password" name="senha" minlength="6" autocomplete="new-password" required></label>
+      <p class="centro pequeno">Escolha a senha que você vai usar para entrar no app.</p>
+      ${camposSenhaNova()}
       <div class="erro oculto" id="erro-senha"></div>
       <button class="btn principal cheio" type="submit">Salvar senha</button>
     </form></div>`;
   const form = $('form');
   form.onsubmit = async (e) => {
     e.preventDefault();
+    const bt = form.querySelector('button[type=submit]');
     try {
-      if (form.senha.value.length < 6) throw new Error('A senha precisa ter pelo menos 6 caracteres.');
+      conferirSenhaNova(form);
+      bt.disabled = true;
       await dados.trocarSenha(form.senha.value);
       history.replaceState(null, '', location.pathname);
       aviso('Senha alterada!');
       await carregarTudo();
     } catch (err) {
+      bt.disabled = false;
       $('#erro-senha').textContent = err.message;
       $('#erro-senha').classList.remove('oculto');
     }
   };
+}
+// Link "criar senha" que o administrador manda (?senha=CÓDIGO)
+async function telaLinkSenha(token) {
+  fecharPainel();
+  const tirarDoEndereco = () => { try { history.replaceState(null, '', location.pathname); } catch (e) { /* segue */ } };
+  $('#raiz').innerHTML = '<div class="entrada"><div class="caixa"><p class="centro pequeno">Abrindo…</p></div></div>';
+  let info;
+  try { info = await dados.linkSenhaVer(token); } catch (e) { info = { ok: false, mensagem: e.message }; }
+  if (!info || !info.ok) {
+    $('#raiz').innerHTML = `
+      <div class="entrada"><div class="caixa">
+        <div class="icone-senha">${ICONE_CADEADO}</div>
+        <h1 class="centro">Link sem validade</h1>
+        <p class="centro pequeno">${esc((info && info.mensagem) || 'Este link venceu ou já foi usado. Peça um link novo no suporte.')}</p>
+        <button class="btn principal cheio" id="ir-entrar">Ir para entrar</button>
+        ${WHATSAPP_SUPORTE ? `<a class="btn verde cheio" href="${esc(linkZap(WHATSAPP_SUPORTE, 'Oi! Meu link para criar a senha do App Pegue e Monte venceu. Pode me mandar outro?'))}" target="_blank" rel="noopener">${ICONE.zap} Pedir link novo no WhatsApp</a>` : ''}
+      </div></div>`;
+    $('#ir-entrar').onclick = () => { tirarDoEndereco(); telaLogin('entrar'); };
+    return;
+  }
+  $('#raiz').innerHTML = `
+    <div class="entrada"><form class="caixa" novalidate>
+      <div class="icone-senha">${ICONE_CADEADO}</div>
+      <h1 class="centro">Crie sua nova senha</h1>
+      <p class="centro pequeno">Conta: <b>${esc(info.email)}</b><br>Escolha a senha que você vai usar para entrar no app.</p>
+      ${camposSenhaNova()}
+      <div class="erro oculto" id="erro-senha"></div>
+      <button class="btn principal cheio" type="submit">Salvar e entrar</button>
+    </form></div>`;
+  const form = $('form');
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const bt = form.querySelector('button[type=submit]');
+    try {
+      conferirSenhaNova(form);
+      bt.disabled = true; bt.textContent = 'Salvando…';
+      const r = await dados.linkSenhaTrocar(token, form.senha.value);
+      if (!r || !r.ok) throw new Error((r && r.mensagem) || 'Não deu certo. Tente de novo.');
+      await dados.sair().catch(() => {});
+      await dados.entrar(r.email, form.senha.value);
+      tirarDoEndereco();
+      aviso('Senha criada! Bem-vinda de volta.');
+      await carregarTudo();
+    } catch (err) {
+      bt.disabled = false; bt.textContent = 'Salvar e entrar';
+      $('#erro-senha').textContent = err.message;
+      $('#erro-senha').classList.remove('oculto');
+    }
+  };
+}
+// Mais › Trocar senha
+function painelTrocarSenha() {
+  abrirPainel('Trocar senha', `
+    <form class="coluna" id="form-senha" novalidate>
+      <p class="pequeno">Escolha uma nova senha para entrar no app. Ela vale a partir de agora, em todos os aparelhos.</p>
+      ${camposSenhaNova()}
+      <div class="erro oculto" id="erro-senha"></div>
+      <button class="btn principal cheio" type="submit">Salvar nova senha</button>
+    </form>`, (corpo) => {
+    const form = $('#form-senha', corpo);
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const bt = form.querySelector('button[type=submit]');
+      try {
+        conferirSenhaNova(form);
+        bt.disabled = true;
+        await dados.trocarSenha(form.senha.value);
+        fecharPainel();
+        aviso('Senha alterada!');
+      } catch (err) {
+        bt.disabled = false;
+        const er = $('#erro-senha', corpo); er.textContent = err.message; er.classList.remove('oculto');
+      }
+    };
+  });
 }
 
 // =====================================================================
@@ -4580,6 +4672,7 @@ function abaMais(tela) {
       <button class="cartao clicavel" id="organizacao"><div style="font-weight:800">Organização da agenda</div><div class="pequeno">Festas por dia, confirmação dos pedidos e dias fechados</div></button>
       <button class="cartao clicavel" id="mensagens"><div style="font-weight:800">Mensagens do WhatsApp</div><div class="pequeno">Escreva seus textos de sinal, confirmação, retirada e devolução</div></button>
       ${DEMO_SITE ? '' : '<button class="cartao clicavel" id="meu-contrato"><div style="font-weight:800">Meu contrato</div><div class="pequeno">Seu modelo de contrato para enviar em cada reserva</div></button>'}
+      ${DEMO_SITE || estado.suporte ? '' : '<button class="cartao clicavel" id="trocar-senha"><div style="font-weight:800">Trocar senha</div><div class="pequeno">Escolha uma nova senha para entrar no app</div></button>'}
       ${estado.assinatura && estado.assinatura.admin ? '<a class="cartao clicavel" style="text-decoration:none; background: var(--tinta); color: #fff; border-color: var(--tinta)" href="admin.html"><div style="font-weight:800">Painel do administrador</div><div class="pequeno" style="color:#D9CFE6">Clientes, renovações, leads e acessos</div></a>' : ''}
     </section>
     <section class="cartao coluna mais-ajuda">
@@ -4601,6 +4694,7 @@ function abaMais(tela) {
   ligarAvisosLoja(tela);
   const vv = $('#ver-video', tela); if (vv) vv.onclick = abrirVideoTutorial;
   const mc = $('#meu-contrato', tela); if (mc) mc.onclick = painelContrato;
+  const ts = $('#trocar-senha', tela); if (ts) ts.onclick = painelTrocarSenha;
   $('#copiar', tela).onclick = () => copiarMeuLink();
   $('#meus-dados', tela).onclick = painelNegocio;
   $('#mensagens', tela).onclick = painelMensagens;

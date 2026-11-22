@@ -232,6 +232,21 @@ export async function trocarSenha(nova) {
   const s = await cliente();
   await ok(s.auth.updateUser({ password: nova }));
 }
+// Link para criar senha nova (gerado pelo administrador)
+export async function linkSenhaVer(token) {
+  if (MODO_DEMO) return { ok: true, email: 'maria@x.com' };
+  const s = await cliente();
+  const { data, error } = await s.rpc('link_senha_ver', { p_token: token });
+  if (error) throw new Error('Não deu para abrir o link agora. Confira a internet e tente de novo.');
+  return data;
+}
+export async function linkSenhaTrocar(token, senha) {
+  if (MODO_DEMO) return { ok: true, email: 'maria@x.com' };
+  const s = await cliente();
+  const { data, error } = await s.rpc('link_senha_trocar', { p_token: token, p_senha: senha });
+  if (error) throw new Error('Não deu para salvar agora. Confira a internet e tente de novo.');
+  return data;
+}
 export async function sair() {
   if (MODO_DEMO) { D().logado = false; demoSalvar(); return; }
   const s = await cliente();

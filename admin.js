@@ -3,7 +3,7 @@
 // Só abre para e-mails cadastrados na tabela "administradores".
 // Quem confere é o banco de dados: esta página só mostra o resultado.
 // =====================================================================
-import * as dados from './dados.js?v=20261125a';
+import * as dados from './dados.js?v=20261125c';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=20261121e';
 
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -1151,6 +1151,7 @@ function cartaoPessoa(c) {
       ${tel ? `<a class="btn mini verde" href="${esc(linkZap(tel, msg))}" target="_blank" rel="noopener">WhatsApp</a>` : ''}
       <a class="btn mini contorno" href="mailto:${esc(c.email)}">E-mail</a>
       ${c.tem_conta || c.teste_inicio || c.plano ? '<button class="btn mini contorno" data-editar="1">Editar dados</button>' : ''}
+      ${c.tem_conta ? '<button class="btn mini contorno" data-senha="1">Link para criar senha</button>' : ''}
       ${c.slug ? `<a class="btn mini contorno" href="reservar.html?l=${encodeURIComponent(c.slug)}" target="_blank" rel="noopener">Ver link</a>` : ''}
       ${liberada
         ? `<button class="btn mini perigo" data-acao="bloquear">Bloquear acesso</button>`
@@ -1274,6 +1275,30 @@ function desenharLista() {
         aviso(e.message || 'Não deu para entrar na loja.');
         b.disabled = false; b.textContent = 'Entrar na loja para ajudar';
       }
+    };
+  });
+  $$('[data-senha]', lista).forEach((b) => {
+    b.onclick = async () => {
+      const art = b.closest('[data-email]'); const email = art.dataset.email;
+      b.disabled = true; b.textContent = 'Criando…';
+      try {
+        const r = dados.MODO_DEMO ? { ok: true, token: '8f3a91c2e7b44d0a9c1e5b7d2f6a8c30' } : await rpcAdmin('admin_link_senha', { p_email: email });
+        if (!r) throw new Error('Rode antes o passo do Supabase desta atualização.');
+        if (!r.ok) throw new Error(r.mensagem || 'Não deu certo. Tente de novo.');
+        const link = `${location.origin}/?senha=${r.token}`;
+        const c = (estado.clientes || []).find((x) => x.email === email) || {};
+        const tel = c.telefone || c.whatsapp;
+        const nome = String(c.nome || '').trim().split(' ')[0];
+        const texto = `Oi${nome ? ', ' + nome : ''}! Aqui está o link para você criar uma senha nova no App Pegue e Monte:\n${link}\n\nÉ só abrir, escolher a senha e você já entra na sua conta. O link vale por 48 horas.`;
+        const velho = art.querySelector('.senha-prov'); if (velho) velho.remove();
+        const caixa = document.createElement('div'); caixa.className = 'senha-prov';
+        caixa.innerHTML = `<div style="flex:1;min-width:260px"><b>Link criado (vale 48 horas, uma vez só)</b><div class="pequeno" style="word-break:break-all">${esc(link)}</div></div>
+          ${tel ? `<a class="btn mini verde" href="${esc(linkZap(tel, texto))}" target="_blank" rel="noopener">Enviar no WhatsApp</a>` : ''}
+          <button class="btn mini contorno" type="button">Copiar mensagem</button>`;
+        b.closest('.acoes').after(caixa);
+        caixa.querySelector('button').onclick = async () => { try { await navigator.clipboard.writeText(texto); aviso('Mensagem copiada.'); } catch (e) { aviso('Não deu para copiar. Link: ' + link); } };
+      } catch (e) { aviso(e.message || 'Não deu certo. Tente de novo.'); }
+      b.disabled = false; b.textContent = 'Link para criar senha';
     };
   });
   $$('[data-leitura]', lista).forEach((b) => {

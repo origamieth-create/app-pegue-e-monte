@@ -4,7 +4,7 @@
 //      abrirCheckout({ plano: 'anual', contexto: 'app' | 'venda', linkReserva: 'https://pay.cakto...' })
 // O cartão vira "token" direto na Appmax (Appmax JS) ou na Pagar.me; o número nunca passa pelo nosso servidor.
 // =====================================================================
-import * as dados from './dados.js?v=20261125a';
+import * as dados from './dados.js?v=20261125c';
 import { PAGARME_PK } from './config.js?v=20261121e';
 
 const PASSOS = ['Sua conta', 'Pagamento', 'Acesso'];

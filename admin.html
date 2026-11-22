@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="icone-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito+Sans:wght@400;600;700;800&display=swap">
-<link rel="stylesheet" href="estilo.css?v=20261125a">
+<link rel="stylesheet" href="estilo.css?v=20261125c">
 <style>
   body { padding-bottom: calc(32px + env(safe-area-inset-bottom)); }
   .topo { position: sticky; top: 0; z-index: 20; background: var(--tinta); color: #fff; padding: calc(8px + env(safe-area-inset-top)) 10px 0; }
@@ -394,6 +394,9 @@
   .st-cancelado { color: var(--texto2); }
   .pg-ab { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 14px; padding: 14px 0; border-bottom: 1px solid var(--linha); align-items: center; }
   .pg-ab:last-child { border: 0; }
+  .senha-prov { margin-top: 10px; background: #FFF7E3; color: #2A1B3D; border-radius: 14px; padding: 12px 14px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .senha-prov .pequeno { color: #6B5E78; }
+  .senha-prov .btn.contorno { color: #2A1B3D; border-color: #2A1B3D; }
   .ia-passos { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-top: 8px; }
   .ia-p { position: relative; background: var(--cartao2); border-radius: 12px; padding: 10px 12px 14px; overflow: hidden; display: flex; flex-direction: column; gap: 2px; }
   .ia-p b { font-size: 22px; color: var(--tinta); }
@@ -446,6 +449,6 @@
 <body>
 <div id="raiz"><div class="carregando">Carregando…</div></div>
 <div id="toast" class="toast oculto" role="status" aria-live="polite"></div>
-<script type="module" src="admin.js?v=20261125a"></script>
+<script type="module" src="admin.js?v=20261125c"></script>
 </body>
 </html>
