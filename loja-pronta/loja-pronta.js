@@ -29,7 +29,7 @@ function pixel() {
 function evento(nome, d) { try { if (window.fbq) window.fbq('track', nome, d || {}); } catch (e) { /* segue */ } }
 
 // ---------------- Origem (UTMs do anúncio) ----------------
-const CAMPOS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'fbclid'];
+const CAMPOS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'fbclid', 'src'];
 function origem() {
   const o = {};
   CAMPOS.forEach((c) => { const v = params.get(c); if (v && !v.includes('{{')) o[c] = v.slice(0, 200); });
@@ -59,7 +59,8 @@ const abrirPrevia = (p) => { location.href = `../reservar.html?previa=${encodeUR
 
 // ---------------- Tela 1: o @ ----------------
 function telaEntrada(msgErro) {
-  m.innerHTML = `${MARCA}
+  const doQuiz = (origem() || {}).src === 'quiz';
+  m.innerHTML = `${doQuiz ? '<div class="faixa-quiz">Diagnóstico concluído. Agora veja sua loja pronta</div>' : ''}${MARCA}
     <div class="eye">PARA QUEM ALUGA E MONTA FESTAS</div>
     <h1>Veja sua loja pronta em 1 minuto</h1>
     <p class="sub">Digite o @ do seu Instagram. A gente monta sua loja com os seus kits.</p>
@@ -295,7 +296,7 @@ async function telaPublicar(p) {
       await chamar({ acao: 'publicar', id: p.id, token: p.t, email, whatsapp: zap });
       try { localStorage.setItem('apm-previa-email', email); } catch (e) { /* segue */ }
       // origem para a Utmify: anúncio + de onde veio (loja-pronta)
-      try { const o = origem() || {}; localStorage.setItem('apm-origem', JSON.stringify({ ...o, src: 'loja-pronta' })); } catch (e) { /* segue */ }
+      try { const o = origem() || {}; localStorage.setItem('apm-origem', JSON.stringify({ ...o, src: o.src === 'quiz' ? 'quiz-loja' : 'loja-pronta' })); } catch (e) { /* segue */ }
       location.href = `../assinar/?plano=${plano}&abrir=1`;
     } catch (e) { err.textContent = e.message; err.classList.remove('oculto'); b.disabled = false; b.textContent = textoAntes; }
   };
