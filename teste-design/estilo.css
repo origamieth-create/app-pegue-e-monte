@@ -822,7 +822,8 @@ body { -webkit-font-smoothing: antialiased; }
 .vazio-hoje { display: flex; flex-direction: column; gap: 2px; padding: 14px 16px; }
 .vazio-hoje b { font-size: 14.5px; }
 /* INÍCIO: topo coral com a semana */
-.ola { position: relative; margin: calc(-4px - env(safe-area-inset-top)) -18px 0; padding: calc(16px + env(safe-area-inset-top)) 18px 0; }
+.ola { position: relative; margin: calc(-4px - env(safe-area-inset-top)) -18px 0; padding: calc(16px + env(safe-area-inset-top)) 18px 0; overflow-x: clip; }
+@supports not (overflow-x: clip) { .ola::after { display: none; } }
 .ola::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: calc(100% - 58px); background: linear-gradient(160deg, #E4505C 0%, #C73B48 55%, #A32D3A 100%); border-radius: 0 0 32px 32px; z-index: -1; }
 .ola::after { content: ''; position: absolute; right: -60px; top: -80px; width: 220px; height: 220px; border-radius: 50%; background: rgba(255,255,255,.08); z-index: -1; pointer-events: none; }
 .ola-linha { display: flex; align-items: center; gap: 12px; color: #fff; }
