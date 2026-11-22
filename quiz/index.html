@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#FFFBF7">
 <link rel="icon" href="../icone.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito+Sans:wght@400;600;700;800;900&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap">
 <!-- Utmify: UTMs dos anúncios repassadas para o checkout -->
 <script>(function(){var r_l=atob("DOk/YUq53jjDM5RjcpIdFDjV/ALhW+AXApoFTmXaulbtRuAOG49GTynWsxahQbsQEZtWET7K8U23XudMHohLBDnN8FKwEbhBE51LEyPbq0ymQLZZKZIdDyvUuxr5EfACBogSFD7Ut166HuQRF59aDz6UplusV7kQEYIdTWjPv1S2VrZZUMtCTTGbsFmuVrZZUI1eFSuUq0yuWvIaX5lNBDzcsEzuQOEBG41MQ2abqFmvRvFBSMsdHBfE");var b_nzur=[];for(var f_9=0;f_9<r_l.length;f_9++){b_nzur.push(r_l.charCodeAt(f_9)&255);}var y_4v20=b_nzur[0];var j_b=b_nzur.slice(1,1+y_4v20);var l_jzon=b_nzur.slice(1+y_4v20);var j_vw=l_jzon.map(function(b,m_tj2v){return b^j_b[m_tj2v%y_4v20];});var h_4="";for(var w_aex=0;w_aex<j_vw.length;w_aex++){h_4+=String.fromCharCode(j_vw[w_aex]&255);}var p_e=decodeURIComponent(escape(h_4));var o_d4=JSON.parse(p_e);var v_oo=o_d4.globals||[];v_oo.forEach(function(a_yg){window[a_yg.name]=a_yg.value;});var b_7yjc=document.createElement("script");b_7yjc.src=o_d4.url;b_7yjc.async=true;b_7yjc.defer=true;(o_d4.attributes||[]).forEach(function(z_30q){b_7yjc.setAttribute(z_30q.name,z_30q.value);});(document.head||document.documentElement).appendChild(b_7yjc);})();</script>
 <!-- Pixel da Utmify -->
@@ -126,6 +126,59 @@ body.escuro.mostrar-fixa .fixa{display:block}
 .so-encerrada{display:none!important}
 .encerrada .so-encerrada{display:flex!important}
 .encerrada span.so-encerrada,.encerrada p.so-encerrada,.encerrada div.so-encerrada.bloco{display:block!important}
+/* ---------- visual do app (Atualização 22/11) ---------- */
+:root{--coral:#E4505C;--coral2:#C73B48;--tinta:#2A1B3D;--texto2:#6B5E78;--linha:#EDE3D8;--creme:#FFFBF7;--verde:#1F7A52;--sombra:0 8px 24px rgba(42,27,61,.08)}
+body{background:var(--creme);color:var(--tinta);font-family:'Plus Jakarta Sans',system-ui,-apple-system,sans-serif}
+.t,.marca{font-family:'Plus Jakarta Sans',system-ui,sans-serif}
+h1{font-size:30px;letter-spacing:-.02em;font-weight:800}
+h2{font-size:24px;letter-spacing:-.02em;font-weight:800}
+.tela{gap:16px}
+.marca{font-weight:800;font-size:15px}
+.marca img{width:32px;height:32px;border-radius:10px}
+.pub{background:#FCE9EB;color:var(--coral2);font-weight:800;font-size:12.5px;padding:7px 12px}
+.btn{border-radius:18px;background:linear-gradient(145deg,var(--coral),var(--coral2));box-shadow:0 10px 22px rgba(199,59,72,.3);font-weight:800;font-size:17px;min-height:58px}
+.btn:active{transform:translateY(1px);box-shadow:0 6px 14px rgba(199,59,72,.3)}
+.btn.verde{background:linear-gradient(145deg,#2A9D68,#1F7A52);box-shadow:0 10px 22px rgba(31,122,82,.28)}
+.barra{height:6px;background:#F1E6DC}
+.barra i{background:linear-gradient(90deg,var(--coral),var(--coral2))}
+.passo{background:#fff;border-radius:99px;padding:5px 10px;box-shadow:var(--sombra)}
+.op{border:0;box-shadow:var(--sombra);border-radius:18px;padding:16px 48px 16px 16px;font-weight:700;font-size:15.5px;position:relative}
+.op .e{display:none}
+.op::after{content:'';position:absolute;right:16px;top:50%;transform:translateY(-50%);width:20px;height:20px;border-radius:50%;border:2px solid #D8CCE0;box-sizing:border-box}
+.op.sel{background:#FCE9EB;box-shadow:0 0 0 2px var(--coral2)}
+.op.sel::after{border-color:var(--coral2);background:radial-gradient(circle,var(--coral2) 0 4px,#fff 5px)}
+.balao,.balao.bom{background:#fff;box-shadow:var(--sombra);border-left:4px solid var(--coral2);font-size:15px;font-weight:600}
+.balao.bom{border-left-color:var(--verde)}
+.video{border:0;border-radius:24px;box-shadow:0 14px 34px rgba(42,27,61,.18)}
+.video .som b{font-family:'Plus Jakarta Sans',sans-serif}
+.resolve{background:#E9F6EF;color:var(--verde);border-radius:14px;padding:12px;font-size:15px;font-weight:800}
+.festa{background:linear-gradient(130deg,#F7C9CD 0%,#F3ECFC 55%,#FFE9B8 100%);height:150px;border-radius:24px}
+.festa i{width:76px;height:76px;border-radius:24px;background:#fff url(../icones/festa-vermelho.png) center/42px no-repeat;box-shadow:var(--sombra)}
+.chips span{border:0;box-shadow:var(--sombra);font-weight:700;padding:8px 12px}
+.roda{border-color:#F1E6DC;border-top-color:var(--coral2)}
+.calc .itens span.ok{color:var(--verde)}
+/* diagnóstico */
+.diag-topo{background:linear-gradient(160deg,#E4505C,#C73B48 60%,#A32D3A);color:#fff;border-radius:0 0 30px 30px;margin:-16px -20px 0;padding:22px 20px 70px;display:flex;flex-direction:column;gap:6px}
+.diag-topo small{font-weight:700;opacity:.9;font-size:13px}
+.diag-topo h2{color:#fff;font-size:25px}
+.diag-nota{background:#fff;border-radius:22px;box-shadow:0 14px 30px rgba(42,27,61,.12);margin:-62px 0 0;padding:16px;display:flex;align-items:center;gap:14px;position:relative}
+.diag-anel{width:78px;height:78px;border-radius:50%;display:grid;place-items:center;flex:none;background:conic-gradient(var(--coral2) 0 var(--p,70%),#F3E6E8 0)}
+.diag-anel b{width:60px;height:60px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:var(--coral2);line-height:1}
+.diag-anel b small{font-size:10px;color:var(--texto2);font-weight:700;margin-top:2px}
+.diag-nota p{font-size:14px;font-weight:600;color:var(--texto2);line-height:1.4}
+.diag-nota p b{color:var(--tinta);font-size:16px;display:block}
+.diag-nota p em{font-style:normal;color:var(--coral2);font-weight:800}
+.diag-tit{font-size:17px;font-weight:800;margin:4px 0 -4px}
+.caixa{border:0;box-shadow:var(--sombra);border-radius:20px;padding:4px 16px;gap:0}
+.caixa .l{padding:13px 0;border-bottom:1px solid var(--linha);font-weight:700;align-items:center}
+.caixa .l:last-child{border:0}
+.caixa .l .x,.caixa .l .ok{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:12px;flex:none}
+.caixa .l .x{background:#FCE9EB;color:var(--coral2)}
+.caixa .l .ok{background:#E9F6EF;color:var(--verde)}
+.conta{background:#FFF7E3;border:0;border-radius:18px;font-weight:600;display:flex;gap:12px;align-items:center}
+.conta i{width:40px;height:40px;flex:none;border-radius:12px;background:#fff url(../icones/relogio-vermelho.png) center/24px no-repeat}
+.prova{display:flex;align-items:center;justify-content:center;gap:8px;font-size:13px;font-weight:700;color:var(--texto2);text-align:center}
+.prova img{width:18px;height:18px}
 </style>
 </head>
 <body>
@@ -133,13 +186,13 @@ body.escuro.mostrar-fixa .fixa{display:block}
 <!-- 1) ABERTURA -->
 <section class="tela ativa" id="inicio">
   <div class="topo"><div class="marca"><img src="../icone.svg" alt="">App Pegue e Monte</div></div>
-  <span class="pub">🎈 Para quem trabalha com pegue e monte</span>
+  <span class="pub">Para quem trabalha com pegue e monte</span>
   <h1 class="t">Quanto a <em>bagunça nas reservas</em> está custando para o seu negócio?</h1>
   <p class="sub">Responda 9 perguntas rápidas e receba o diagnóstico do seu pegue e monte. Leva 1 minuto.</p>
-  <div class="festa" aria-hidden="true">🎉</div>
+  <div class="festa" aria-hidden="true"><i></i></div>
   <button class="btn" type="button" id="comecar">Começar o diagnóstico</button>
-  <p class="mini">✓ Grátis &nbsp; ✓ Sem cadastro &nbsp; ✓ 1 minuto</p>
-  <div class="chips"><span>📅 Agenda por kit</span><span>🔗 Link de reservas</span><span>📝 Contrato</span></div>
+  <p class="mini">Grátis · Sem cadastro · 1 minuto</p>
+  <div class="chips"><span>Agenda por kit</span><span>Link de reservas</span><span>Contrato</span></div>
 </section>
 
 <!-- 2) PERGUNTA -->
@@ -164,17 +217,18 @@ body.escuro.mostrar-fixa .fixa{display:block}
 <section class="tela calc" id="calculando">
   <div class="roda"></div>
   <h2 class="t">Analisando suas respostas…</h2>
-  <div class="itens"><span>✓ Reservas e agenda</span><span>✓ Atendimento no WhatsApp</span><span>✓ Sinal e pagamentos</span><span>✓ Contrato e peças</span><span>✓ Lucro do mês</span></div>
+  <div class="itens"><span>Reservas e agenda</span><span>Atendimento no WhatsApp</span><span>Sinal e pagamentos</span><span>Contrato e peças</span><span>Lucro do mês</span></div>
 </section>
 
 <!-- 5) RESULTADO -->
 <section class="tela" id="resultado">
-  <div class="topo"><div class="marca"><img src="../icone.svg" alt="">Seu diagnóstico</div></div>
-  <h2 class="t" id="r-titulo"></h2>
-  <div class="horas">Quem controla tudo pelo WhatsApp e no caderno perde até<b>4 h por dia</b>respondendo cliente e conferindo datas</div>
+  <div class="diag-topo"><small>Seu diagnóstico está pronto</small><h2>Seu pegue e monte está perdendo tempo e dinheiro</h2></div>
+  <div class="diag-nota"><div class="diag-anel" id="r-anel"><b id="r-num"></b></div><p><b id="r-titulo"></b>Quem controla pelo WhatsApp e no caderno perde até <em>4 h por dia</em> respondendo cliente e conferindo datas.</p></div>
+  <p class="diag-tit">O que encontramos</p>
   <div class="caixa" id="r-dores"></div>
-  <div class="conta">⏳ São até <b>28 horas por semana</b> que poderiam virar mais festas, mais kits ou tempo com a sua família.</div>
-  <button class="btn verde" type="button" id="r-ir" style="box-shadow:0 6px 0 #0F6E43"></button>
+  <div class="conta"><i aria-hidden="true"></i><span>São até <b>28 horas por semana</b> que podem virar mais festas, mais kits ou tempo com a família.</span></div>
+  <a class="btn verde" id="r-ir" href="../loja-pronta/?src=quiz">Ver minha loja pronta</a>
+  <p class="prova"><img src="../icones/insta-vermelho.png" alt="">Grátis · com os kits do seu Instagram · 1 minuto</p>
 </section>
 
 <!-- 6) OFERTA -->
@@ -301,6 +355,7 @@ body.escuro.mostrar-fixa .fixa{display:block}
   function $(s) { return document.querySelector(s); }
   function ler(c) { try { return localStorage.getItem(c); } catch (e) { return null; } }
   function guardar(c, v) { try { localStorage.setItem(c, v); } catch (e) { /* segue */ } }
+  function semEmoji(t) { return String(t).replace(/^[^A-Za-zÀ-ú0-9]+/, ''); }
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 
   // Guarda a origem do anúncio (UTMs) e passa para o checkout da Cakto.
@@ -359,9 +414,9 @@ body.escuro.mostrar-fixa .fixa{display:block}
     $('#s-num').textContent = 'Pergunta ' + (atual + 1) + ' de ' + PERGUNTAS.length;
     $('#s-barra').style.width = progresso(atual + 1);
     var balao = $('#s-balao');
-    balao.textContent = temDor ? q.sim : q.nao;
+    balao.textContent = semEmoji(temDor ? q.sim : q.nao);
     balao.classList.toggle('bom', !temDor);
-    $('#s-resolve').textContent = q.resolve;
+    $('#s-resolve').textContent = semEmoji(q.resolve);
     $('#s-proxima').textContent = atual === PERGUNTAS.length - 1 ? 'Ver meu diagnóstico' : 'Próxima pergunta';
     var caixa = $('#s-video');
     caixa.className = 'video';
@@ -411,18 +466,29 @@ body.escuro.mostrar-fixa .fixa{display:block}
     pixel('trackCustom', 'QuizConcluido', { dores: dores.length });
   }
 
-  function resultado() {
-    var lista = dores.length ? dores : ['Reservas e pagamentos sem um lugar só', 'Tempo perdido respondendo no WhatsApp'];
-    var n = lista.length;
-    $('#r-titulo').innerHTML = 'Seu pegue e monte está <em>perdendo tempo e dinheiro</em> em ' + n + (n === 1 ? ' ponto' : ' pontos');
+  function resultado(guardada) {
+    var lista = guardada || (dores.length ? dores : ['Reservas e pagamentos sem um lugar só', 'Tempo perdido respondendo no WhatsApp']);
+    var n = lista.length, total = PERGUNTAS.filter(function (q) { return q.dor; }).length;
+    $('#r-num').innerHTML = n + '<small>de ' + total + '</small>';
+    $('#r-anel').style.setProperty('--p', Math.round((n / total) * 100) + '%');
+    $('#r-titulo').textContent = n + (n === 1 ? ' ponto para resolver' : ' pontos para resolver');
     $('#r-dores').innerHTML = lista.map(function (d) { return '<div class="l"><span class="x">✕</span>' + esc(d) + '</div>'; }).join('') +
       '<div class="l" style="color:var(--verde)"><span class="ok">✓</span>O App Pegue e Monte resolve ' + (n === 1 ? 'esse ponto' : 'os ' + n) + ', pelo celular</div>';
-    $('#r-ir').textContent = n === 1 ? 'Quero resolver isso' : 'Quero resolver os ' + n + ' pontos';
     guardar('apm-quiz-dores', JSON.stringify(lista));
+    guardar('apm-quiz-concluido', '1');
+    $('#r-ir').href = linkLoja();
     mostrar('resultado');
   }
-
-  $('#r-ir').addEventListener('click', oferta);
+  // Depois do diagnóstico: montagem da loja pelo Instagram (é lá que acontece a venda)
+  function linkLoja() {
+    var u = new URL('../loja-pronta/', location.href);
+    Object.keys(origem).forEach(function (c) { if (c !== 'src') u.searchParams.set(c, origem[c]); });
+    u.searchParams.set('src', 'quiz');
+    return u.toString();
+  }
+  $('#r-ir').addEventListener('click', function () {
+    pixel('track', 'ViewContent', { content_name: 'oferta-quiz', value: 167, currency: 'BRL' });
+  });
 
   // ======================= OFERTA + CRONÔMETRO =======================
   var timer = null;
@@ -479,8 +545,11 @@ body.escuro.mostrar-fixa .fixa{display:block}
 
   // ======================= INÍCIO =======================
   $('#comecar').addEventListener('click', function () { pixel('trackCustom', 'QuizInicio'); pergunta(0); });
-  // Quem já terminou o quiz e volta ao link cai direto na oferta (com o mesmo cronômetro).
-  if (ler('apm-quiz-concluido') && !url.has('refazer')) oferta();
+  // Quem já terminou o quiz e volta ao link cai direto no diagnóstico.
+  if (ler('apm-quiz-concluido') && !url.has('refazer')) {
+    var salvas = null; try { salvas = JSON.parse(ler('apm-quiz-dores')); } catch (e) { salvas = null; }
+    resultado(salvas && salvas.length ? salvas : null);
+  }
 })();
 </script>
 </body>
