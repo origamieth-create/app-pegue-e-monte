@@ -276,17 +276,19 @@ async function telaPublicar(p) {
       <div>${CHECK_V}Agenda que não deixa reservar 2 vezes</div>
       <div>${CHECK_V}Você coloca os preços quando quiser</div>
     </div>
-    <div class="preco"><div><small>Plano mensal</small><b>R$ 29,90</b></div><div style="text-align:right"><small>por mês</small><small>cancele quando quiser</small></div></div>
+    <div class="planos" role="radiogroup" aria-label="Escolha o plano">
+      <button type="button" class="pl on" data-plano="mensal" role="radio" aria-checked="true"><span class="rd"></span><span class="tx"><small>Plano mensal</small><b>R$ 29,90</b></span><span class="lado">por mês<br>cancele quando quiser</span></button>
+      <button type="button" class="pl" data-plano="anual" role="radio" aria-checked="false"><span class="selo">53% OFF</span><span class="rd"></span><span class="tx"><small>Plano anual</small><b>R$ 167</b></span><span class="lado"><em>R$ 13,92 por mês</em>pago uma vez por 12 meses</span></button>
+    </div>
     <form id="f" novalidate>
       <label class="rot" for="em">E-mail (vai ser o seu acesso ao app)</label>
       <input class="ent" id="em" type="email" inputmode="email" autocomplete="email" placeholder="seu@email.com" maxlength="200" value="${esc(emailSalvo)}">
       <label class="rot" for="zap">WhatsApp da loja</label>
       <input class="ent" id="zap" type="tel" inputmode="tel" autocomplete="tel" placeholder="(11) 99999-0000" maxlength="20" value="${esc(v.whatsapp ? formatarZap(v.whatsapp) : '')}">
       <div class="erro oculto" id="err"></div>
-      <button class="btn r" type="submit">Pagar e publicar minha loja</button>
+      <button class="btn r" type="submit">Continuar para o pagamento</button>
     </form>
-    <div class="gar"><img src="../icones/escudo-vermelho.png" alt="">7 dias de garantia: não gostou, devolvemos</div>
-    <button class="link anual-off" id="anual" type="button"><span class="off-selo">53% OFF</span>Prefere o anual? R$ 167 por 12 meses</button>`;
+    <div class="gar"><img src="../icones/escudo-vermelho.png" alt="">7 dias de garantia: não gostou, devolvemos</div>`;
   $('#volta').onclick = () => abrirPrevia(p);
   const ir = async (plano, b) => {
     const err = $('#err'); err.classList.add('oculto');
@@ -300,8 +302,12 @@ async function telaPublicar(p) {
       location.href = `../assinar/?plano=${plano}&abrir=1`;
     } catch (e) { err.textContent = e.message; err.classList.remove('oculto'); b.disabled = false; b.textContent = textoAntes; }
   };
-  $('#f').onsubmit = (e) => { e.preventDefault(); ir('mensal', $('button[type=submit]')); };
-  $('#anual').onclick = () => ir('anual', $('#anual'));
+  let planoEscolhido = 'mensal';
+  document.querySelectorAll('.pl').forEach((b) => (b.onclick = () => {
+    planoEscolhido = b.dataset.plano;
+    document.querySelectorAll('.pl').forEach((x) => { const on = x === b; x.classList.toggle('on', on); x.setAttribute('aria-checked', on ? 'true' : 'false'); });
+  }));
+  $('#f').onsubmit = (e) => { e.preventDefault(); ir(planoEscolhido, $('button[type=submit]')); };
   const z = $('#zap'); z.addEventListener('input', () => { const p2 = z.selectionStart === z.value.length; z.value = formatarZap(z.value); if (p2) z.selectionStart = z.selectionEnd = z.value.length; });
 }
 function formatarZap(v) {
