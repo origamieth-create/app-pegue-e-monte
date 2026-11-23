@@ -2,8 +2,8 @@
 // App Pegue e Monte — app da dona
 // Abas: Hoje, Agenda, Kits, Mais
 // =====================================================================
-import * as dados from './dados.js?v=20261125c';
-import { abrirCheckout, planos as planosCheckout, linkCakto } from './checkout.js?v=20261125c';
+import * as dados from './dados.js?v=20261126a';
+import { abrirCheckout, planos as planosCheckout, linkCakto } from './checkout.js?v=20261126a';
 import { PERMITIR_CADASTRO, EMAIL_SUPORTE, WHATSAPP_SUPORTE, LINK_MENSAL, LINK_ANUAL, LINK_ANUAL_PROMO, DEMO_SITE, LINK_PLANOS, SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=20261121e';
 
 const { hojeISO, somaDias, cruza } = dados;
@@ -4206,8 +4206,14 @@ function formKit(kit, rascunho) {
     const apagar = $('#apagar-kit', p);
     if (apagar) {
       apagar.onclick = async () => {
-        if (!confirm(`Apagar o kit "${kit.nome}"?`)) return;
-        await acao(apagar, async () => { await dados.apagarKit(kit.id); fecharPainel(); aviso('Kit apagado.'); await recarregar(); });
+        let lista = [];
+        try { lista = await dados.reservasDoKit(kit.id); } catch (e) { lista = []; }
+        if (!lista.length) {
+          if (!confirm(`Apagar o kit "${kit.nome}"?`)) return;
+          await acao(apagar, async () => { await dados.apagarKit(kit.id); fecharPainel(); aviso('Kit apagado.'); await recarregar(); });
+          return;
+        }
+        popupKitComReservas(kit, lista);
       };
     }
   });
@@ -5174,8 +5180,45 @@ function abrirReserva(id) {
     }));
     ligar('cancelar', (b) => {
       if (!confirm('Cancelar esta reserva? A data do kit fica livre de novo.')) return;
-      acao(b, async () => { await dados.atualizarReserva(r.id, { status: 'cancelada' }); fecharPainel(); aviso('Reserva cancelada.'); await recarregar(); });
+      acao(b, async () => { await dados.atualizarReserva(r.id, { status: 'cancelada' }); await recarregar(); popupCancelada(r); });
     });
+  });
+}
+
+// Apagar kit que tem reservas: mostra quais são e oferece esconder o kit ou apagar as canceladas
+function popupKitComReservas(kit, lista) {
+  const canceladas = lista.filter((r) => r.status === 'cancelada');
+  const outras = lista.length - canceladas.length;
+  const so = !outras;
+  const n = lista.length;
+  const linhas = lista.slice(0, 8).map((r) => `<div class="kr-linha"><span>Festa ${esc(new Date(r.data_festa + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }))} · ${esc(String(r.cliente_nome || '').split(' ')[0])}</span>${etiqueta(r.status)}</div>`).join('')
+    + (n > 8 ? `<div class="pequeno" style="padding-top:8px">e mais ${n - 8}</div>` : '');
+  abrirPopup(`
+    <div class="icone-senha">${PIC('calendario')}</div>
+    <h2 class="centro" style="font-size:21px;margin:0">${so ? `Esse kit tem ${n} ${n === 1 ? 'reserva cancelada' : 'reservas canceladas'}` : `Esse kit tem ${n} ${n === 1 ? 'reserva' : 'reservas'}`}</h2>
+    <p class="centro pequeno" style="margin:0">${so ? 'Para apagar o kit, primeiro apague as reservas canceladas. Ou só esconda o kit: ele sai do seu link e as reservas ficam guardadas.' : 'Ele não pode ser apagado porque tem reserva que não foi cancelada. Você pode esconder o kit: ele sai do seu link e as reservas continuam guardadas.'}</p>
+    <div class="kr-lista">${linhas}</div>
+    ${so ? `<button class="btn principal cheio" id="kr-apagar">Apagar ${n === 1 ? 'a cancelada' : 'as canceladas'} e o kit</button><button class="btn contorno cheio" id="kr-esconder">Esconder kit</button>`
+      : `<button class="btn principal cheio" id="kr-esconder">Esconder kit</button>${canceladas.length ? `<button class="link-btn perigo-txt" id="kr-so">Apagar só ${canceladas.length === 1 ? 'a cancelada' : `as ${canceladas.length} canceladas`}</button>` : ''}`}
+    <button class="link-btn" id="kr-voltar">Cancelar</button>`, (pp) => {
+    $('#kr-voltar', pp).onclick = () => fecharPainel();
+    $('#kr-esconder', pp).onclick = (e) => acao(e.currentTarget, async () => { await dados.esconderKit(kit.id); fecharPainel(); aviso('Kit escondido: ele não aparece mais no seu link.'); await recarregar(); });
+    const ap = $('#kr-apagar', pp);
+    if (ap) ap.onclick = () => acao(ap, async () => { await dados.apagarCanceladas(canceladas.map((r) => r.id)); await dados.apagarKit(kit.id); fecharPainel(); aviso('Kit apagado.'); await recarregar(); });
+    const so2 = $('#kr-so', pp);
+    if (so2) so2.onclick = () => acao(so2, async () => { await dados.apagarCanceladas(canceladas.map((r) => r.id)); fecharPainel(); aviso(canceladas.length === 1 ? 'Reserva cancelada apagada.' : 'Reservas canceladas apagadas.'); await recarregar(); });
+  });
+}
+// Depois de cancelar: pode apagar a reserva cancelada na hora
+function popupCancelada(r) {
+  abrirPopup(`
+    <div class="icone-senha">${PIC('calendario')}</div>
+    <h2 class="centro" style="font-size:21px;margin:0">Reserva cancelada</h2>
+    <p class="centro pequeno" style="margin:0">A data do ${esc(nomeKitReserva(r))} ficou livre de novo. Ela fica guardada no histórico; se não precisar dela, pode apagar.</p>
+    <button class="btn contorno cheio" id="rc-ok">Fechar</button>
+    <button class="link-btn perigo-txt" id="rc-apagar">${PIC('lixo')} Apagar reserva</button>`, (pp) => {
+    $('#rc-ok', pp).onclick = () => fecharPainel();
+    $('#rc-apagar', pp).onclick = (e) => acao(e.currentTarget, async () => { await dados.apagarCanceladas([r.id]); fecharPainel(); aviso('Reserva apagada.'); await recarregar(); });
   });
 }
 

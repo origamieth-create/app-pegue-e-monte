@@ -1070,3 +1070,12 @@ body { -webkit-font-smoothing: antialiased; }
 
 /* Nova senha */
 .icone-senha { width: 64px; height: 64px; border-radius: 20px; background: #FCE9EB; display: grid; place-items: center; margin: 0 auto; }
+
+/* Apagar kit com reservas */
+.kr-lista { display: flex; flex-direction: column; }
+.kr-linha { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--linha, #EDE3D8); font-weight: 700; font-size: 15px; }
+.kr-linha:last-child { border-bottom: 0; }
+.link-btn.perigo-txt { color: var(--destaque, #C73B48); font-weight: 800; display: inline-flex; gap: 6px; align-items: center; justify-content: center; }
+.link-btn.perigo-txt .pic { width: 18px; height: 18px; background-color: currentColor; }
+.pic-lixo { --i: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.9%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13M10 11v5M14 11v5%22/%3E%3C/svg%3E"); }
+.icone-senha .pic { width: 28px; height: 28px; background-color: #C73B48; }

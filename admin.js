@@ -3,7 +3,7 @@
 // Só abre para e-mails cadastrados na tabela "administradores".
 // Quem confere é o banco de dados: esta página só mostra o resultado.
 // =====================================================================
-import * as dados from './dados.js?v=20261125c';
+import * as dados from './dados.js?v=20261126a';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=20261121e';
 
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -1153,9 +1153,8 @@ function cartaoPessoa(c) {
       ${c.tem_conta || c.teste_inicio || c.plano ? '<button class="btn mini contorno" data-editar="1">Editar dados</button>' : ''}
       ${c.tem_conta ? '<button class="btn mini contorno" data-senha="1">Link para criar senha</button>' : ''}
       ${c.slug ? `<a class="btn mini contorno" href="reservar.html?l=${encodeURIComponent(c.slug)}" target="_blank" rel="noopener">Ver link</a>` : ''}
-      ${liberada
-        ? `<button class="btn mini perigo" data-acao="bloquear">Bloquear acesso</button>`
-        : `<button class="btn mini claro" data-acao="liberar">Liberar acesso</button>`}
+      ${c.tem_conta || c.plano || c.teste_inicio ? '<button class="btn mini verde" data-lib30="1">Liberar 30 dias</button>' : ''}
+      ${liberada ? `<button class="btn mini perigo" data-acao="bloquear">Bloquear acesso</button>` : ''}
     </div>
     </div>
   </article>`;
@@ -1306,6 +1305,29 @@ function desenharLista() {
       b.disabled = true; b.textContent = 'Entrando…';
       try { await entrarNaLoja(b.closest('[data-email]').dataset.email, true); b.disabled = false; b.textContent = 'Só olhar'; }
       catch (e) { aviso(e.message || 'Não deu para entrar na loja.'); b.disabled = false; b.textContent = 'Só olhar'; }
+    };
+  });
+  $$('[data-lib30]', lista).forEach((b) => {
+    b.onclick = () => {
+      const art = b.closest('[data-email]'); const email = art.dataset.email;
+      const velho = art.querySelector('.senha-prov'); if (velho) velho.remove();
+      const ate = new Date(Date.now() + 30 * 864e5).toLocaleDateString('pt-BR');
+      const caixa = document.createElement('div'); caixa.className = 'senha-prov';
+      caixa.innerHTML = `<div style="flex:1;min-width:280px"><b>Liberar 30 dias no plano mensal?</b><div class="pequeno">O acesso fica liberado até ${esc(ate)}. Perto do vencimento ela recebe o Pix de renovação (R$ 29,90) e os avisos de sempre. Se não pagar, entra nos 2 dias de carência e depois bloqueia.</div></div>
+        <button class="btn mini verde" type="button" data-sim>Confirmar e liberar</button><button class="btn mini contorno" type="button" data-nao>Cancelar</button>`;
+      b.closest('.acoes').after(caixa);
+      caixa.querySelector('[data-nao]').onclick = () => caixa.remove();
+      caixa.querySelector('[data-sim]').onclick = async (ev) => {
+        const bt = ev.currentTarget; bt.disabled = true; bt.textContent = 'Liberando…';
+        try {
+          const r = dados.MODO_DEMO ? { ok: true, vence_em: new Date(Date.now() + 30 * 864e5).toISOString() } : await rpcAdmin('admin_liberar_30', { p_email: email });
+          if (!r || !r.ok) throw new Error('Rode antes o passo do Supabase desta atualização.');
+          const c = (estado.clientes || []).find((x) => x.email === email);
+          if (c) Object.assign(c, { situacao: 'ativa', status: 'ativa', plano: 'mensal', vence_em: r.vence_em });
+          caixa.innerHTML = `<div style="flex:1"><b>Liberado até ${esc(new Date(r.vence_em).toLocaleDateString('pt-BR'))} no plano mensal.</b><div class="pequeno">A renovação acontece sozinha no vencimento.</div></div>`;
+          aviso(`Acesso liberado por 30 dias para ${email}.`);
+        } catch (e) { bt.disabled = false; bt.textContent = 'Confirmar e liberar'; aviso(e.message || 'Não deu certo. Tente de novo.'); }
+      };
     };
   });
   $$('[data-acao]', lista).forEach((b) => {
@@ -1947,13 +1969,25 @@ async function abaIA(tela) {
       { criado_em: h(70), instagram: 'kitsdaju', status: 'pronta', modo: 'instagram', email: 'ju@exemplo.com', publicar_em: null, convertida_em: h(60), kits: 31, onde: 'app', custo: 3.84, completa: 'pronta' }] };
   };
   const demoG = { teste_cat: 31, teste_cat_assinaram: 9, teste_ig: 11, teste_ig_assinaram: 4, teste_total: 38, teste_total_assinaram: 12, sem_ia: 96, sem_ia_assinaram: 8, assin_cat: 17, assin_ig: 2, assin_total: 18 };
-  const [d, lp, g] = await Promise.all([
+  const demoPed = () => {
+    const h = (m) => new Date(Date.now() - m * 6e4).toISOString();
+    const p = (nome, loja, kits, et, dia, usou, lim, falt, extra = {}) => ({ id: 'demo-' + nome, nome, loja, kits, etiqueta: et, dia_teste: dia, usou, limite: lim, faltam: falt, pedido_em: h(30),
+      email: 'cliente@exemplo.com', whatsapp: '11988887777', desde: h(30000), pagamentos: [], historico: [{ data: h(2000), tipo: 'prévia', posts: Math.min(usou, 24), custo: 0.7 }], ...extra });
+    return { media: 0.06, custo_mes: 48.3, posts_mes: 1940, posts_7d: 812, pedidos: [
+      p('Ana Souza', 'Festas da Ana', 31, 'cliente_anual', 1, 100, 100, 84, { pagamentos: [{ data: h(30000), plano: 'anual', valor: 16700, metodo: 'pix', status: 'pago' }], vence_em: h(-500000), historico: [{ data: h(30000), tipo: 'prévia', posts: 12, custo: 0.7 }, { data: h(29000), tipo: 'loja completa', posts: 88, custo: 5.2 }] }),
+      p('Bruna Lima', 'Bru Kits Festa', 18, 'cliente_mensal', 1, 100, 100, 40),
+      p('Carla Dias', 'Kits da Carla', 5, 'teste', 3, 24, 24, 84),
+      p('Débora Melo', 'Pegue e Monte Débora', 5, 'teste_acabou', 7, 24, 24, 120),
+      p('@festasdajuh', 'Festas da Juh', 0, 'nao_cliente', 1, 12, 12, 60, { origem: 'Página /loja-pronta', email: null })] };
+  };
+  const [d, lp, g, ped] = await Promise.all([
     dados.adminIaResultados(f.dias).catch(() => null),
     (dados.MODO_DEMO ? Promise.resolve(demoLp()) : rpcAdmin('admin_previas', { p_dias: f.dias || 3650 })).catch(() => null),
     (dados.MODO_DEMO ? Promise.resolve(demoG) : rpcAdmin('admin_ia_grupos', { p_dias: f.dias })).catch(() => null),
+    (dados.MODO_DEMO ? Promise.resolve(demoPed()) : rpcAdmin('admin_pedidos_ia')).catch(() => null),
   ]);
   if (estado.aba !== 'ia' || !alvo.isConnected) return;
-  if (!d && !lp && !g) { alvo.innerHTML = '<div class="cartao">Não deu para carregar agora. Tente de novo.</div>'; return; }
+  if (!d && !lp && !g && !ped) { alvo.innerHTML = '<div class="cartao">Não deu para carregar agora. Tente de novo.</div>'; return; }
   const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
   const n = (k) => Number((d || {})[k] || 0);
   const m = (k) => Number((lp || {})[k] || 0);
@@ -1966,14 +2000,9 @@ async function abaIA(tela) {
   const dh = (q) => { const x = new Date(q); return `${x.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} ${x.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`; };
   const situ = (x) => x.convertida_em ? ['Loja criada', 'st-pago'] : x.publicar_em ? ['Foi pagar', 'st-pix_pendente'] : x.email ? ['Deixou o e-mail', 'st-pix_pendente'] : x.status === 'pronta' ? ['Viu a prévia', ''] : ['Não terminou', ''];
   const SIT = { assinou: ['Assinou depois', 'ok'], ja_era: ['Já era assinante', ''], nao: ['Ainda não assinou', 'nao'] };
-  const aprovar = (lp && lp.aprovar) || [];
   alvo.innerHTML = `
+    ${ped ? blocoPedidosIA(ped) : ''}
     <div class="etabas">${[[0, 'Desde o início'], [7, '7 dias'], [30, '30 dias'], [90, '90 dias']].map(([v, t]) => `<button class="${f.dias === v ? 'on' : ''}" data-iad="${v}">${t}</button>`).join('')}</div>
-    ${aprovar.length ? `<div class="aprovar-lc" style="margin:0"><b>Passaram do limite na loja completa (${aprovar.length})</b>
-      <p class="pequeno" style="margin:2px 0 8px">Aprovar continua a busca nos posts que faltaram. Recusar deixa a loja com os kits que já entraram.</p>
-      ${aprovar.map((x) => `<div class="pg-ab"><div style="min-width:0"><b class="t">@${esc(x.instagram)}</b>
-        <small>${x.liberados || 0} kits já entraram · gastou ${reaisAdm(x.custo)} · mais ${reaisAdm(x.estimativa)} para terminar</small></div>
-        <div class="ld"><button class="btn mini verde" data-lc-sim="${esc(x.id)}">Aprovar</button><button class="btn mini contorno" data-lc-nao="${esc(x.id)}">Recusar</button></div></div>`).join('')}</div>` : ''}
     <div class="kpis-crm k4" style="margin:0">
       <div class="kpi"><small>Gasto com IA</small><b>${reaisAdm(m('custo'))}</b><i>loja pelo Instagram${d ? ` · catálogo ${usd(d.custo_usd)}` : ''}</i></div>
       ${g ? `<div class="kpi"><small>Usaram no teste grátis</small><b>${q('teste_total')}</b><i class="p">${q('teste_total_assinaram')} assinaram depois · ${pct(q('teste_total_assinaram'), q('teste_total'))}%</i></div>
@@ -1995,18 +2024,84 @@ async function abaIA(tela) {
         ${d.lojas.map((l) => `<div class="tr ia-lj"><span>${esc(l.loja || '—')}</span><span>${Number(l.kits) || 0}</span><span>${esc(dataHora(l.quando))}</span><span><em class="ia-sit ${(SIT[l.situacao] || ['', ''])[1]}">${esc((SIT[l.situacao] || [l.situacao])[0])}</em></span></div>`).join('')}</div>` : ''}
     </details>`;
   $$('[data-iad]', alvo).forEach((b) => (b.onclick = () => { f.dias = Number(b.dataset.iad); abaIA(tela); }));
-  const decidir = async (b, sim) => {
-    $$('[data-lc-sim],[data-lc-nao]', alvo).forEach((x) => { x.disabled = true; });
-    try {
-      const r = dados.MODO_DEMO ? { ok: true } : await rpcAdmin('admin_completa_decidir', { p_id: b.dataset.lcSim || b.dataset.lcNao, p_aprovar: sim });
-      aviso(r && r.ok ? (sim ? 'Aprovado: a IA continua a loja dessa cliente nos próximos minutos.' : 'Recusado: a loja fica com os kits que já entraram.') : ((r && r.mensagem) || 'Não deu certo. Tente de novo.'));
-    } catch (e) { aviso('Não deu certo. Tente de novo.'); }
-    if (dados.MODO_DEMO) { b.closest('.pg-ab').remove(); return; }
-    abaIA(tela);
-  };
-  $$('[data-lc-sim]', alvo).forEach((b) => { b.onclick = () => decidir(b, true); });
-  $$('[data-lc-nao]', alvo).forEach((b) => { b.onclick = () => decidir(b, false); });
+  if (ped) ligarPedidosIA(alvo, ped, () => abaIA(tela));
 }
+
+// Aba IA: limites e pedidos de mais uso da IA (você escolhe quantos posts liberar)
+const IAP_ET = {
+  cliente_anual: ['Cliente anual', 'st-pago'], cliente_mensal: ['Cliente mensal', 'st-pago'],
+  teste: ['Em teste', 'st-pix_pendente'], teste_acabou: ['Teste acabou · não assinou', 'st-cinza'], nao_cliente: ['Não é cliente', 'st-nao'],
+};
+function blocoPedidosIA(r) {
+  const media = Number(r.media) || 0.06;
+  const lista = r.pedidos || [];
+  const totalFalta = lista.reduce((s, x) => s + (Number(x.faltam) || 0) * media, 0);
+  const num = (v) => (Number(v) || 0).toLocaleString('pt-BR');
+  const et = (x) => { const [t, c] = IAP_ET[x.etiqueta] || [x.etiqueta, '']; return `<span class="st ${c}">${esc(t)}${x.etiqueta === 'teste' ? ` · dia ${Number(x.dia_teste) || 1} de 7` : ''}</span>`; };
+  const linhaLim = (et0, lim, posts) => `<tr><td>${et({ etiqueta: et0 })}</td><td>${lim}</td><td>${reaisAdm(posts * media)}</td></tr>`;
+  return `
+    <div class="kpis-crm k4" style="margin:0">
+      <div class="kpi"><small>Custo da IA no mês</small><b>${reaisAdm(r.custo_mes)}</b><i>Instagram + IA, até hoje</i></div>
+      <div class="kpi"><small>Média por post (7 dias)</small><b>${reaisAdm(media)}</b><i>${num(r.posts_7d)} posts analisados</i></div>
+      <div class="kpi"><small>Posts analisados no mês</small><b>${num(r.posts_mes)}</b><i>prévias + lojas completas</i></div>
+      <div class="kpi"><small>Pedidos esperando</small><b>${lista.length}</b><i>${reaisAdm(totalFalta)} se aprovar tudo que falta</i></div>
+    </div>
+    <section class="cartao"><div class="cab-crm"><h2>Limites padrão de posts por tipo</h2></div>
+      <div style="overflow-x:auto"><table class="iap-lim"><tr><th>Tipo</th><th>Limite de posts</th><th>Custo máximo por cliente (${reaisAdm(media)}/post)</th></tr>
+        ${linhaLim('nao_cliente', '12 posts', 12)}
+        <tr><td><span class="st st-pix_pendente">Em teste</span></td><td>24 posts</td><td>${reaisAdm(24 * media)}</td></tr>
+        <tr><td><span class="st st-pago">Cliente mensal ou anual</span></td><td>até 100 posts ou R$ 10</td><td>${reaisAdm(Math.min(10, 100 * media))}</td></tr>
+      </table></div></section>
+    <div class="iap-cab"><h2>Pedidos de mais uso da IA (${lista.length})</h2><span>Custo médio real por post (7 dias): ${reaisAdm(media)}</span></div>
+    ${lista.length ? lista.map((x) => {
+      const falt = Number(x.faltam) || 0, usou = Number(x.usou) || 0, lim = Number(x.limite) || usou || 1;
+      const pagos = (x.pagamentos || []).map((p) => `<p>${esc(dataCurta(p.data))} · ${p.plano === 'anual' ? 'Anual' : 'Mensal'} · ${reaisAdm((Number(p.valor) || 0) / 100)} · ${p.metodo === 'cartao' ? 'Cartão' : 'Pix'} · ${esc(p.status)}</p>`).join('');
+      const hist = x.historico || [];
+      const totP = hist.reduce((s, h) => s + (Number(h.posts) || 0), 0), totC = hist.reduce((s, h) => s + (Number(h.custo) || 0), 0);
+      return `<div class="iap" data-iap="${esc(x.id)}" data-falta="${falt}">
+      <div class="iap-l" data-iap-abrir>
+        <div class="iap-n"><b>${esc(x.nome)}</b><small>${esc(x.origem || x.loja || '')} · ${Number(x.kits) || 0} ${Number(x.kits) === 1 ? 'kit' : 'kits'}</small></div>
+        <div>${et(x)}</div>
+        <div class="iap-u"><small>Limite da IA</small><b>usou ${usou} de ${lim}</b><i><span style="width:${Math.min(100, Math.round((usou / lim) * 100))}%"></span></i></div>
+        <div class="iap-f"><small>Para completar</small><b>Faltam ~${falt} posts</b><em>custo estimado ${reaisAdm(falt * media)}</em></div>
+        <div class="iap-esc"><div class="iap-chips">
+          ${[10, 25, 50].map((n) => `<button type="button" data-iap-n="${n}">+${n}</button>`).join('')}
+          ${falt ? `<button type="button" data-iap-n="${falt}" data-tudo>Tudo que falta</button>` : ''}
+          <input type="number" min="1" max="1000" inputmode="numeric" placeholder="outro" data-iap-outro aria-label="Outro número de posts"></div>
+          <p data-iap-txt>Escolha quantos posts liberar</p></div>
+        <div class="iap-bt"><button class="btn mini verde" data-iap-sim>Aprovar</button><button class="btn mini contorno" data-iap-nao>Recusar</button></div>
+      </div>
+      <div class="iap-det">
+        <div><h4>Contato</h4>${x.email ? `<p>${esc(x.email)}</p>` : '<p>Sem e-mail (só viu a prévia)</p>'}${x.whatsapp ? `<p>WhatsApp ${esc(x.whatsapp)}</p>` : ''}${x.desde && x.etiqueta !== 'nao_cliente' ? `<p>${x.etiqueta.startsWith('cliente') ? 'Cliente' : 'Conta'} desde ${esc(dataCurta(x.desde))}</p>` : ''}${x.instagram && x.instagram !== '-' ? `<p>@${esc(x.instagram)}</p>` : ''}</div>
+        <div><h4>Pagamentos</h4>${pagos || '<p>Nenhum pagamento</p>'}${x.vence_em && x.etiqueta.startsWith('cliente') ? `<p>Próxima renovação: ${esc(dataCurta(x.vence_em))}</p>` : ''}</div>
+        <div><h4>Histórico da IA</h4>${hist.map((h) => `<p>${esc(dataCurta(h.data))} · ${esc(h.tipo)} · ${Number(h.posts) || 0} posts · ${reaisAdm(h.custo)}</p>`).join('')}<p>Total: ${totP} posts · ${reaisAdm(totC)}</p></div>
+      </div></div>`;
+    }).join('') : '<div class="cartao pequeno">Nenhum pedido esperando. Quando a IA achar poucos kits ou uma loja passar do limite, ela aparece aqui.</div>'}`;
+}
+function ligarPedidosIA(alvo, r, recarregar) {
+  const media = Number(r.media) || 0.06;
+  $$('[data-iap]', alvo).forEach((el) => {
+    let n = 0;
+    const txt = $('[data-iap-txt]', el), outro = $('[data-iap-outro]', el);
+    $$('[data-iap-n]', el).forEach((b) => { b.onclick = (e) => { e.stopPropagation(); outro.value = ''; n = Number(b.dataset.iapN); $$('[data-iap-n]', el).forEach((x) => x.classList.toggle('on', x === b)); txt.innerHTML = `Aprovar <b>+${n} posts</b> · custo estimado <b>${reaisAdm(n * media)}</b>`; }; });
+    outro.onclick = (e) => e.stopPropagation();
+    outro.oninput = () => { n = Math.max(0, Math.min(1000, Math.floor(Number(outro.value) || 0))); $$('[data-iap-n]', el).forEach((x) => x.classList.remove('on')); outro.classList.toggle('on', !!outro.value); txt.innerHTML = n ? `Aprovar <b>+${n} posts</b> · custo estimado <b>${reaisAdm(n * media)}</b>` : 'Escolha quantos posts liberar'; };
+    $('[data-iap-abrir]', el).onclick = (e) => { if (e.target.closest('button, input')) return; el.classList.toggle('aberto'); };
+    const decidir = async (sim) => {
+      if (sim && !n) { aviso('Escolha quantos posts liberar (+10, +25, +50, tudo ou outro número).'); return; }
+      $$('button, input', el).forEach((x) => { x.disabled = true; });
+      try {
+        const res = dados.MODO_DEMO ? { ok: true } : await rpcAdmin(sim ? 'admin_ia_aprovar' : 'admin_ia_recusar', sim ? { p_id: el.dataset.iap, p_posts: n } : { p_id: el.dataset.iap });
+        aviso(res && res.ok ? (sim ? `Aprovado: a IA olha mais ${n} posts dessa loja nos próximos minutos.` : 'Recusado: a loja fica com os kits que já tem.') : ((res && res.mensagem) || 'Não deu certo. Tente de novo.'));
+      } catch (e) { aviso('Não deu certo. Tente de novo.'); }
+      if (dados.MODO_DEMO) { el.remove(); return; }
+      recarregar();
+    };
+    $('[data-iap-sim]', el).onclick = (e) => { e.stopPropagation(); decidir(true); };
+    $('[data-iap-nao]', el).onclick = (e) => { e.stopPropagation(); decidir(false); };
+  });
+}
+const dataCurta = (q) => (q ? new Date(q).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '');
 
 async function abaMontagem(tela) {
   tela.innerHTML = '<div id="mt-c" class="coluna" style="gap:16px"><div class="cartao">Carregando…</div></div>';

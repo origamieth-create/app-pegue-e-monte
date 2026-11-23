@@ -4,7 +4,7 @@
 //      abrirCheckout({ plano: 'anual', contexto: 'app' | 'venda', linkReserva: 'https://pay.cakto...' })
 // O cartão vira "token" direto na Appmax (Appmax JS) ou na Pagar.me; o número nunca passa pelo nosso servidor.
 // =====================================================================
-import * as dados from './dados.js?v=20261125c';
+import * as dados from './dados.js?v=20261126a';
 import { PAGARME_PK } from './config.js?v=20261121e';
 
 const PASSOS = ['Sua conta', 'Pagamento', 'Acesso'];
@@ -164,6 +164,8 @@ function css() {
 .ck label{display:flex;flex-direction:column;gap:5px;font-size:13.5px;font-weight:700;color:#6B6175}
 .ck input,.ck select{width:100%;background:#fff;border:1.5px solid #EDE3D8;border-radius:14px;padding:13px 14px;font:inherit;font-size:16px;color:#2A1B3D;font-weight:600}
 .ck input:focus,.ck select:focus{outline:none;border-color:#C73B48}
+.ck input.ck-pre{background:#F4FBF7;border-color:#9FD9BC}
+.ck-pre-ok{display:block;margin-top:4px;font-size:12px;font-weight:800;color:#1F7A52}
 .ck-duas{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .ck-btn{background:#C73B48;color:#fff;border:0;border-radius:16px;padding:16px;font:inherit;font-weight:800;font-size:16.5px;cursor:pointer;box-shadow:0 6px 16px rgba(199,59,72,.28);width:100%}
 .ck-btn:disabled{opacity:.6;cursor:wait}
@@ -195,7 +197,17 @@ function css() {
 .ck-end{font-size:13px;color:#6B6175;margin-top:-6px}
 .ck-oculto{display:none!important}
 .ck-oferta{background:#EEF8F2;border:1.5px solid #BFE3CD;border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:8px;font-size:14.5px;color:#1B4D36}
-.ck-oferta .ck-btn{background:#1F7A52;box-shadow:none;padding:13px;font-size:15.5px}`;
+.ck-oferta .ck-btn{background:#1F7A52;box-shadow:none;padding:13px;font-size:15.5px}
+.ck-dg{text-align:center}
+.ck-dg-ic{width:58px;height:58px;border-radius:18px;background:#FBE9EB;display:grid;place-items:center;margin:4px auto 0}.ck-dg-ic .pic{width:28px;height:28px}
+.ck-dg-tag{align-self:center;background:#1F7A52;color:#fff;font-weight:800;font-size:12.5px;border-radius:99px;padding:5px 13px;letter-spacing:.03em;margin-top:4px}
+.ck-dg-txt{color:#6B6175;font-size:14.5px;font-weight:600;line-height:1.5;margin:-4px 0 0}
+.ck-dg-box{border:2px solid #2A1B3D;border-radius:18px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:10px;text-align:left;background:#fff}
+.ck-dg-box small{display:block;color:#6B6175;font-weight:700;font-size:12.5px}
+.ck-dg-box b{font-family:'Plus Jakarta Sans','Nunito Sans',system-ui,sans-serif;font-size:26px;font-weight:800;white-space:nowrap}
+.ck-dg-box .d{text-align:right;font-size:12.5px;color:#6B6175;font-weight:700;line-height:1.35}.ck-dg-box .d .g{display:block;color:#1F7A52;font-size:14px;font-weight:800}
+.ck-dg-cartao{background:#F5F0F7;border-radius:14px;padding:12px 14px;display:flex;gap:10px;align-items:center;font-weight:800;font-size:15px;text-align:left}
+.ck-link.sub{color:#6B6175;text-decoration:underline}`;
   document.head.appendChild(s);
 }
 
@@ -244,11 +256,13 @@ export async function abrirCheckout(op = {}) {
   document.body.style.overflow = 'hidden';
   let consulta = null, fechado = false;
   const fechar = () => {
-    fechado = true; clearInterval(consulta); veu.remove(); document.body.style.overflow = travaScroll;
+    fechado = true; st.cartao = null; clearInterval(consulta); veu.remove(); document.body.style.overflow = travaScroll;
     if (st.passo === 'acesso' && op.aoConcluir) op.aoConcluir();
   };
   veu.addEventListener('click', (e) => { if (e.target === veu && st.passo !== 'acesso') fechar(); });
-  const precoBase = () => cat.planos[st.plano].valor;
+  // oferta única de R$ 15 no 1º mês (só depois de o cartão recusar o mensal; o servidor confere)
+  const OFERTA_15 = 1500;
+  const precoBase = () => (st.oferta === 'mes1_15' && st.plano === 'mensal' ? OFERTA_15 : cat.planos[st.plano].valor);
   const totalAtual = () => (st.metodo === 'cartao' && st.plano === 'anual' ? cat.parcelas[st.parcelas - 1].total : precoBase());
 
   const cabeca = (n) => {
@@ -269,6 +283,7 @@ export async function abrirCheckout(op = {}) {
     else if (st.passo === 'plano') desenharPlano();
     else if (st.passo === 'pix') desenharPix();
     else if (st.passo === 'cartao') desenharCartao();
+    else if (st.passo === 'dg_mensal' || st.passo === 'dg_15') desenharOferta();
     else desenharAcesso();
     const x = caixa.querySelector('[data-fechar]');
     if (x) x.onclick = fechar;
@@ -282,8 +297,8 @@ export async function abrirCheckout(op = {}) {
       ${erroHtml()}
       <form class="ck-form" novalidate style="display:flex;flex-direction:column;gap:12px">
         <label>Seu nome<input name="nome" autocomplete="name" value="${esc(st.nome)}" maxlength="120" required></label>
-        <label>E-mail<input name="email" type="email" inputmode="email" autocomplete="email" value="${esc(st.email)}" required></label>
-        <label>WhatsApp<input name="telefone" type="tel" inputmode="tel" autocomplete="tel" placeholder="(11) 98765-4321" value="${esc(st.telefone)}" required></label>
+        <label>E-mail<input name="email" type="email" inputmode="email" autocomplete="email" value="${esc(st.email)}" required${op.preenchido && st.email ? ' class="ck-pre"' : ''}>${op.preenchido && st.email ? '<span class="ck-pre-ok">Já preenchido com o que você digitou</span>' : ''}</label>
+        <label>WhatsApp<input name="telefone" type="tel" inputmode="tel" autocomplete="tel" placeholder="(11) 98765-4321" value="${esc(st.telefone)}" required${op.preenchido && st.telefone ? ' class="ck-pre"' : ''}></label>
         <label>Crie uma senha<input name="senha" type="password" autocomplete="new-password" placeholder="mínimo 6 caracteres" minlength="6" required></label>
         <button class="ck-btn" type="submit">Continuar</button>
       </form>
@@ -315,7 +330,7 @@ export async function abrirCheckout(op = {}) {
       <p class="ck-sub">Use o e-mail e a senha do app.</p>
       ${erroHtml()}
       <form novalidate style="display:flex;flex-direction:column;gap:12px">
-        <label>E-mail<input name="email" type="email" inputmode="email" autocomplete="email" value="${esc(st.email)}" required></label>
+        <label>E-mail<input name="email" type="email" inputmode="email" autocomplete="email" value="${esc(st.email)}" required${op.preenchido && st.email ? ' class="ck-pre"' : ''}>${op.preenchido && st.email ? '<span class="ck-pre-ok">Já preenchido com o que você digitou</span>' : ''}</label>
         <label>Senha<input name="senha" type="password" autocomplete="current-password" required></label>
         <button class="ck-btn" type="submit">Entrar e continuar</button>
       </form>
@@ -352,11 +367,11 @@ export async function abrirCheckout(op = {}) {
           <span><b>Anual</b>${an.de ? `<span class="ck-selo">${Math.round((1 - an.valor / an.de) * 100)}% OFF</span><br>` : ''}<small>${reais(Math.round(an.valor / 12))}/mês · 12 meses</small></span>
           <span class="v">${an.de ? `<s>${reais(an.de)}</s>` : ''}${reais(an.valor)}</span></button>
         <button class="ck-pl ${st.plano === 'mensal' ? 'sel' : ''}" data-plano="mensal"><span class="r"></span>
-          <span><b>Mensal</b><small>por mês</small></span><span class="v">${reais(me.valor)}</span></button>
+          <span><b>Mensal</b><small>${st.oferta === 'mes1_15' ? `1º mês · depois ${reais(me.valor)}/mês` : 'por mês'}</small></span><span class="v">${st.oferta === 'mes1_15' ? `<s>${reais(me.valor)}</s>${reais(OFERTA_15)}` : reais(me.valor)}</span></button>
       </div>
       <div class="ck-formas" ${temCartao ? '' : 'style="grid-template-columns:1fr"'}>
         <button class="ck-fo ${st.metodo === 'pix' ? 'sel' : ''}" data-metodo="pix"><span class="tag">Na hora</span><b><i class="pic pic-raio"></i> Pix</b><small>libera em segundos</small></button>
-        ${temCartao ? `<button class="ck-fo ${st.metodo === 'cartao' ? 'sel' : ''}" data-metodo="cartao"><b><i class="pic pic-cartao"></i> Cartão</b><small>${st.plano === 'anual' ? 'até 12x' : 'cobrança automática'}</small></button>` : ''}
+        ${temCartao ? `<button class="ck-fo ${st.metodo === 'cartao' ? 'sel' : ''}" data-metodo="cartao"><b><i class="pic pic-cartao"></i> Cartão</b><small>${st.plano === 'anual' ? 'até 12x' : st.oferta === 'mes1_15' ? '1º mês' : 'cobrança automática'}</small></button>` : ''}
       </div>
       ${pedeCpf ? `<label>CPF (para a nota do pagamento)<input name="cpf" inputmode="numeric" autocomplete="off" placeholder="000.000.000-00" value="${esc(st.cpf)}" maxlength="14"></label>` : ''}
       ${pedeCpf && !so(st.telefone) && st.contexto !== 'venda' ? `<label>WhatsApp<input name="telefone" type="tel" inputmode="tel" placeholder="(11) 98765-4321" value="${esc(st.telefone)}"></label>` : ''}
@@ -437,7 +452,7 @@ export async function abrirCheckout(op = {}) {
     const an = st.plano === 'anual';
     caixa.innerHTML = `${cabeca(1)}
       <h2>Pague com cartão</h2>
-      <p class="ck-sub">Plano ${an ? 'Anual' : 'Mensal'} · ${reais(totalAtual())}${an ? '' : ' por mês, cobrado automaticamente'}</p>
+      <p class="ck-sub">Plano ${an ? 'Anual' : 'Mensal'} · ${reais(totalAtual())}${an ? '' : st.oferta === 'mes1_15' ? ` no 1º mês, depois ${reais(cat.planos.mensal.valor)}/mês` : ' por mês, cobrado automaticamente'}</p>
       ${erroHtml()}
       <form novalidate style="display:flex;flex-direction:column;gap:12px">
         <label>Número do cartão<input name="numero" inputmode="numeric" autocomplete="cc-number" placeholder="0000 0000 0000 0000" maxlength="23" required></label>
@@ -483,9 +498,10 @@ export async function abrirCheckout(op = {}) {
       const b = f.querySelector('button[type=submit]'); b.disabled = true; b.textContent = 'Processando…';
       try {
         evento('AddPaymentInfo', { payment_type: 'cartao', content_name: st.plano, value: totalAtual() / 100, currency: 'BRL' });
-        const token = await tokenizar({ number: numero, holder_name: f.titular.value.trim().toUpperCase(), exp_month: Number(mm), exp_year: Number('20' + so(aa)), cvv });
-        const r = await pagar({ metodo: 'cartao', card_token: token, titular: f.titular.value.trim().toUpperCase(), parcelas: st.plano === 'anual' ? st.parcelas : 1,
-          endereco: { ...end, cep: so(f.cep.value), numero: f.num.value.trim() } });
+        // guarda o cartão só nesta tela (memória), para tentar o mensal ou a oferta sem digitar de novo
+        st.cartao = { numero, titular: f.titular.value.trim().toUpperCase(), mm: Number(mm), aa: Number('20' + so(aa)), cvv, endereco: { ...end, cep: so(f.cep.value), numero: f.num.value.trim() } };
+        const token = await tokenizar({ number: numero, holder_name: st.cartao.titular, exp_month: st.cartao.mm, exp_year: st.cartao.aa, cvv });
+        const r = await pagar({ metodo: 'cartao', card_token: token, titular: st.cartao.titular, parcelas: st.plano === 'anual' ? st.parcelas : 1, endereco: st.cartao.endereco });
         st.pagamento = r;
         if (r.status === 'pago') { st.venceEm = r.vence_em; concluir(r); return; }
         if (r.status === 'analise') {
@@ -496,31 +512,73 @@ export async function abrirCheckout(op = {}) {
           f.after(aviso);
           return;
         }
+        if (proximaOferta()) return;
         b.disabled = false; b.textContent = `Pagar ${reais(totalAtual())}`;
         mostrarErro(r.mensagem || 'Cartão recusado pelo banco. Confira os dados ou pague com Pix, que libera na hora.');
-        if (st.plano === 'anual') ofertaMensal(r.motivo);
       } catch (err) { b.disabled = false; b.textContent = `Pagar ${reais(totalAtual())}`; mostrarErro(err.message); }
     };
   }
-  // Anual recusado no cartão: oferece o mensal (valor bem menor), no mesmo cartão ou no Pix
-  function ofertaMensal(motivo) {
+  // Cartão recusado: anual → oferece o mensal no mesmo cartão; mensal → oferta única de R$ 15 no 1º mês
+  function proximaOferta() {
+    if (!st.cartao) return false;
+    if (st.plano === 'anual') { st.erro = ''; st.passo = 'dg_mensal'; desenhar(); return true; }
+    if (st.plano === 'mensal' && !st.oferta) { st.erro = ''; st.passo = 'dg_15'; desenhar(); return true; }
+    return false;
+  }
+  function desenharOferta() {
     const me = cat.planos.mensal.valor;
-    let caixaOferta = caixa.querySelector('.ck-oferta');
-    if (!caixaOferta) { caixaOferta = document.createElement('div'); caixaOferta.className = 'ck-oferta'; caixa.querySelector('.ck-erro').after(caixaOferta); }
-    caixaOferta.innerHTML = `<b>${motivo === 'limite' ? 'Parece que foi o limite do cartão.' : 'Quer tentar de outro jeito?'}</b>
-      <span>Comece pelo <b>plano mensal: ${reais(me)} por mês</b>. Seus kits e reservas ficam iguais, e dá para passar para o anual depois.</span>
-      <button type="button" class="ck-btn" data-mensal-cartao>Assinar o mensal neste cartão</button>
-      <button type="button" class="ck-link" data-mensal-pix>Pagar o mensal no Pix</button>`;
-    caixaOferta.querySelector('[data-mensal-cartao]').onclick = () => {
-      const f = caixa.querySelector('form');
-      const v = {}; ['numero', 'titular', 'validade', 'cvv', 'cep', 'num'].forEach((c) => { v[c] = f[c] ? f[c].value : ''; });
-      st.plano = 'mensal'; st.parcelas = 1; st.erro = ''; desenhar();
-      const g = caixa.querySelector('form');
-      Object.entries(v).forEach(([c, x]) => { if (g[c]) g[c].value = x; });
-      if (g.cep && v.cep) g.cep.dispatchEvent(new Event('input'));
-      g.cvv.focus();
+    const quinze = st.passo === 'dg_15';
+    const final = st.cartao ? st.cartao.numero.slice(-4) : '';
+    caixa.innerHTML = `<div class="ck-puxa"></div>
+      ${quinze ? '<span class="ck-dg-tag">OFERTA ÚNICA</span>' : '<div class="ck-dg-ic"><i class="pic pic-cartao"></i></div>'}
+      <h2 class="ck-dg">${quinze ? `Comece por ${reais(OFERTA_15).replace(',00', '')} no 1º mês` : 'O cartão não aprovou o anual'}</h2>
+      <p class="ck-dg ck-dg-txt">${quinze
+        ? `Para você não ficar sem organizar suas reservas: o primeiro mês sai por ${reais(OFERTA_15).replace(',00', '')}. Depois, ${reais(me)} por mês. Cancele quando quiser.`
+        : 'Às vezes o limite não cobre o valor de uma vez. Você pode começar pelo plano mensal agora, com o mesmo cartão.'}</p>
+      <div class="ck-dg-box">${quinze
+        ? `<span><small>1º mês</small><b>${reais(OFERTA_15)}</b></span><span class="d"><span class="g">${reais(me - OFERTA_15)} de desconto</span>depois ${reais(me)}/mês</span>`
+        : `<span><small>Plano mensal</small><b>${reais(me)}</b></span><span class="d">por mês<br>cancele quando quiser</span>`}</div>
+      ${final ? `<div class="ck-dg-cartao"><i class="pic pic-cartao"></i> Mesmo cartão · final ${esc(final)}</div>` : ''}
+      ${erroHtml()}
+      <button class="ck-btn" data-sim>${quinze ? `Começar por ${reais(OFERTA_15).replace(',00', '')}` : 'Assinar o mensal'}</button>
+      <button class="ck-link sub" data-outro>${quinze ? 'Pagar com Pix' : 'Usar outro cartão ou Pix'}</button>`;
+    const sim = caixa.querySelector('[data-sim]');
+    sim.onclick = async () => {
+      st.plano = 'mensal'; st.parcelas = 1; st.metodo = 'cartao';
+      if (quinze) st.oferta = 'mes1_15';
+      sim.disabled = true; sim.textContent = 'Processando…';
+      try {
+        const c = st.cartao;
+        evento('AddPaymentInfo', { payment_type: 'cartao', content_name: 'mensal', value: precoBase() / 100, currency: 'BRL' });
+        const token = await tokenizar({ number: c.numero, holder_name: c.titular, exp_month: c.mm, exp_year: c.aa, cvv: c.cvv });
+        const r = await pagar({ metodo: 'cartao', card_token: token, titular: c.titular, parcelas: 1, endereco: c.endereco });
+        st.pagamento = r;
+        if (r.status === 'pago') { st.venceEm = r.vence_em; concluir(r); return; }
+        if (r.status === 'analise') {
+          sim.textContent = 'Em análise pelo banco…'; esperarPagamento(r.id);
+          const aviso = document.createElement('div'); aviso.className = 'ck-espera';
+          aviso.innerHTML = '<span class="ck-spin"></span><span>O banco está conferindo o pagamento. Isso leva poucos minutos; pode deixar esta tela aberta.</span>';
+          sim.after(aviso);
+          return;
+        }
+        if (proximaOferta()) return;
+        // a oferta também não passou no cartão: volta para a tela do cartão (outro cartão) com o aviso
+        st.erro = 'O cartão recusou de novo. Tente outro cartão ou pague com Pix, que libera na hora.'; st.passo = 'cartao'; desenhar();
+      } catch (err) { sim.disabled = false; sim.textContent = quinze ? `Começar por ${reais(OFERTA_15).replace(',00', '')}` : 'Assinar o mensal'; mostrarErro(err.message); }
     };
-    caixaOferta.querySelector('[data-mensal-pix]').onclick = () => { st.plano = 'mensal'; st.metodo = 'pix'; st.parcelas = 1; st.erro = ''; st.passo = 'plano'; desenhar(); };
+    const outro = caixa.querySelector('[data-outro]');
+    outro.onclick = async () => {
+      st.plano = 'mensal'; st.parcelas = 1; st.erro = '';
+      if (!quinze) { st.metodo = 'pix'; st.passo = 'plano'; desenhar(); return; }
+      // oferta no Pix: gera direto o Pix de R$ 15
+      st.oferta = 'mes1_15'; st.metodo = 'pix';
+      outro.disabled = true; outro.textContent = 'Gerando o Pix…';
+      try {
+        const r = await pagar({ metodo: 'pix' });
+        evento('AddPaymentInfo', { payment_type: 'pix', content_name: 'mensal', value: (r.valor || precoBase()) / 100, currency: 'BRL' });
+        st.pagamento = r; st.passo = 'pix'; desenhar();
+      } catch (err) { outro.disabled = false; outro.textContent = 'Pagar com Pix'; mostrarErro(err.message); }
+    };
   }
   async function tokenizar(card) {
     if (dados.MODO_DEMO) return /^4000/.test(card.number) ? 'token_ruim' : 'token_ok';
@@ -537,13 +595,14 @@ export async function abrirCheckout(op = {}) {
     return dados.chamarFuncao(FUNCAO, {
       acao: 'pagar', plano: st.plano, cpf: so(st.cpf), nome: st.nome, telefone: so(st.telefone), ip: appmax.ip || undefined,
       email: st.logado ? undefined : st.email, origem: origemAnuncio(), popup: op.popup || null,
-      fbp: cookie('_fbp'), fbc: cookie('_fbc'), pagina: location.origin + location.pathname, ...extra,
+      fbp: cookie('_fbp'), fbc: cookie('_fbc'), pagina: location.origin + location.pathname,
+      oferta: st.oferta && st.plano === 'mensal' ? st.oferta : undefined, ...extra,
     });
   }
 
   // 4. Acesso liberado
   function concluir(r = {}) {
-    st.passo = 'acesso'; st.erro = '';
+    st.passo = 'acesso'; st.erro = ''; st.cartao = null;
     const id = r.id || (st.pagamento && st.pagamento.id);
     const tipo = r.tipo || (st.pagamento && st.pagamento.tipo);
     // Compra nova = Purchase (renovação não conta como venda nova no Meta)

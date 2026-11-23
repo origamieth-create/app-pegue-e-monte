@@ -493,6 +493,26 @@ export async function salvarKit(kit) {
   if (id) await ok(s.from('kits').update(campos).eq('id', id));
   else await ok(s.from('kits').insert({ ...campos, negocio_id: neg.id }));
 }
+// Reservas de um kit (inclusive canceladas e antigas): para a dona decidir antes de apagar o kit
+export async function reservasDoKit(kitId) {
+  if (MODO_DEMO) return D().reservas.filter((r) => r.kit_id === kitId).map((r) => ({ id: r.id, data_festa: r.data_festa, status: r.status, cliente_nome: r.cliente_nome }));
+  const s = await cliente();
+  return ok(s.from('reservas').select('id, data_festa, status, cliente_nome').eq('kit_id', kitId).order('data_festa', { ascending: false }));
+}
+// Apaga reservas CANCELADAS (o contrato delas vai junto)
+export async function apagarCanceladas(ids) {
+  if (!ids.length) return;
+  if (MODO_DEMO) { D().reservas = D().reservas.filter((r) => !(ids.includes(r.id) && r.status === 'cancelada')); demoSalvar(); return; }
+  const s = await cliente();
+  const { error } = await s.from('reservas').delete().in('id', ids).eq('status', 'cancelada');
+  if (error) falha(error);
+}
+export async function esconderKit(id) {
+  if (MODO_DEMO) { const k = D().kits.find((x) => x.id === id); if (k) k.ativo = false; demoSalvar(); return; }
+  const s = await cliente();
+  const { error } = await s.from('kits').update({ ativo: false }).eq('id', id);
+  if (error) falha(error);
+}
 export async function apagarKit(id) {
   if (MODO_DEMO) {
     if (D().reservas.some((r) => r.kit_id === id)) throw new Error('Esse kit tem reservas. Em vez de apagar, desligue "Mostrar no link".');
@@ -764,8 +784,8 @@ function demoPagamento(c) {
   const parc = (v) => { const l = [{ n: 1, parcela: v, total: v }]; for (let n = 2; n <= 12; n++) { const p = Math.ceil((v * 0.0347) / (1 - Math.pow(1.0347, -n))); l.push({ n, parcela: p, total: p * n }); } return l; };
   if (c.acao === 'planos') return { ativo: true, planos: { mensal: { valor: 2990 }, anual: { valor: 16700, de: 35880 } }, parcelas: parc(16700) };
   const vence = new Date(Date.now() + (c.plano === 'mensal' ? 30 : 365) * 864e5).toISOString();
-  if (c.acao === 'pagar' && c.metodo === 'pix') { demoPagamento.voltas = 0; return { id: 'demo-pix', status: 'pendente', valor: c.plano === 'mensal' ? 2990 : 16700, pix: { codigo: '00020126580014br.gov.bcb.pix0136demo-pegue-e-monte-5204000053039865802BR', url: null, vence } }; }
-  if (c.acao === 'pagar') return c.card_token === 'token_ok' ? { id: 'demo-cartao', status: 'pago', vence_em: vence } : { id: 'demo-cartao', status: 'recusado', mensagem: 'Cartão recusado pelo banco. Confira os dados, tente outro cartão ou pague com Pix, que libera na hora.' };
+  if (c.acao === 'pagar' && c.metodo === 'pix') { demoPagamento.voltas = 0; return { id: 'demo-pix', status: 'pendente', valor: c.oferta === 'mes1_15' && c.plano === 'mensal' ? 1500 : c.plano === 'mensal' ? 2990 : 16700, pix: { codigo: '00020126580014br.gov.bcb.pix0136demo-pegue-e-monte-5204000053039865802BR', url: null, vence } }; }
+  if (c.acao === 'pagar') return c.card_token === 'token_ok' || (c.oferta === 'mes1_15' && c.card_token === 'token_ruim') ? { id: 'demo-cartao', status: 'pago', vence_em: vence } : { id: 'demo-cartao', status: 'recusado', mensagem: 'Cartão recusado pelo banco. Confira os dados, tente outro cartão ou pague com Pix, que libera na hora.' };
   if (c.acao === 'status') { demoPagamento.voltas = (demoPagamento.voltas || 0) + 1; return demoPagamento.voltas >= 2 ? { status: 'pago', vence_em: vence } : { status: 'pendente' }; }
   return {};
 }
