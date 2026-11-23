@@ -296,7 +296,7 @@ async function telaPublicar(p) {
     const textoAntes = b.textContent; b.disabled = true; b.textContent = 'Abrindo o pagamento…';
     try {
       await chamar({ acao: 'publicar', id: p.id, token: p.t, email, whatsapp: zap });
-      try { localStorage.setItem('apm-previa-email', email); } catch (e) { /* segue */ }
+      try { localStorage.setItem('apm-previa-email', email); if (zap) localStorage.setItem('apm-previa-zap', zap); } catch (e) { /* segue */ }
       // origem para a Utmify: anúncio + de onde veio (loja-pronta)
       try { const o = origem() || {}; localStorage.setItem('apm-origem', JSON.stringify({ ...o, src: o.src === 'quiz' ? 'quiz-loja' : 'loja-pronta' })); } catch (e) { /* segue */ }
       location.href = `../assinar/?plano=${plano}&abrir=1`;
