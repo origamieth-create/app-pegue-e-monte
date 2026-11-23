@@ -9,7 +9,7 @@ const ADMIN = {
   convertido: ['Teste virou assinante', 'Toque para ver no painel.', 'admin.html?aba=clientes&f=ativa'],
   recusado: ['Pagamento recusado', 'Toque para ver no painel.', 'admin.html?aba=pagamentos'],
   ping: ['Notificações funcionando', 'Toque para ver no painel.', 'admin.html'],
-  loja_completa: ['Loja completa passou de R$ 4', 'Toque para aprovar ou recusar o restante.', 'admin.html?aba=ia'],
+  loja_completa: ['Loja completa passou do limite', 'Toque para aprovar ou recusar o restante.', 'admin.html?aba=ia'],
 };
 const LOJA = {
   reserva: ['Nova reserva pelo seu link 🎉', 'Toque para ver e confirmar o sinal.', (a) => 'index.html' + (a.ref ? '?reserva=' + a.ref : '')],

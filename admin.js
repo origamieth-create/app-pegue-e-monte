@@ -1969,7 +1969,7 @@ async function abaIA(tela) {
   const aprovar = (lp && lp.aprovar) || [];
   alvo.innerHTML = `
     <div class="etabas">${[[0, 'Desde o início'], [7, '7 dias'], [30, '30 dias'], [90, '90 dias']].map(([v, t]) => `<button class="${f.dias === v ? 'on' : ''}" data-iad="${v}">${t}</button>`).join('')}</div>
-    ${aprovar.length ? `<div class="aprovar-lc" style="margin:0"><b>Passaram de R$ 4 na loja completa (${aprovar.length})</b>
+    ${aprovar.length ? `<div class="aprovar-lc" style="margin:0"><b>Passaram do limite na loja completa (${aprovar.length})</b>
       <p class="pequeno" style="margin:2px 0 8px">Aprovar continua a busca nos posts que faltaram. Recusar deixa a loja com os kits que já entraram.</p>
       ${aprovar.map((x) => `<div class="pg-ab"><div style="min-width:0"><b class="t">@${esc(x.instagram)}</b>
         <small>${x.liberados || 0} kits já entraram · gastou ${reaisAdm(x.custo)} · mais ${reaisAdm(x.estimativa)} para terminar</small></div>
