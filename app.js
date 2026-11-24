@@ -3,7 +3,7 @@
 // Abas: Hoje, Agenda, Kits, Mais
 // =====================================================================
 import * as dados from './dados.js?v=20261126a';
-import { abrirCheckout, planos as planosCheckout, linkCakto } from './checkout.js?v=20261127a';
+import { abrirCheckout, planos as planosCheckout, linkCakto } from './checkout.js?v=20261128a';
 import { PERMITIR_CADASTRO, EMAIL_SUPORTE, WHATSAPP_SUPORTE, LINK_MENSAL, LINK_ANUAL, LINK_ANUAL_PROMO, DEMO_SITE, LINK_PLANOS, SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=20261121e';
 
 const { hojeISO, somaDias, cruza } = dados;
@@ -235,12 +235,12 @@ function carregarCheckout() {
   if (!promessaCheckout) promessaCheckout = planosCheckout().then((c) => { estado.checkout = c; }).catch(() => { estado.checkout = null; });
   return promessaCheckout;
 }
-function abrirPagamento(plano, linkReserva, popup) {
+function abrirPagamento(plano, linkReserva, popup, troca) {
   const a = estado.assinatura || {};
   if (document.getElementById('bloqueio')) { document.getElementById('bloqueio').remove(); document.body.style.overflow = ''; }
   fecharPainel();
   abrirCheckout({
-    plano, contexto: 'app', linkReserva, popup: popup || null,
+    plano, contexto: 'app', linkReserva, popup: popup || null, troca: !!troca,
     email: a.email, telefone: (estado.negocio && estado.negocio.whatsapp) || '', temCliente: !!a.cliente_pagarme,
     aoConcluir: () => { recarregar().then(() => aviso('Pagamento confirmado! Obrigada')).catch(() => location.reload()); },
   });
@@ -1571,6 +1571,13 @@ function abrirPeloAviso() {
   if (q.get('video')) { try { history.replaceState(null, '', location.pathname); } catch (e) { /* segue */ } setTimeout(abrirVideoTutorial, 400); return true; }
   if (q.get('link')) { try { history.replaceState(null, '', location.pathname); } catch (e) { /* segue */ } irPara('kits'); return true; }
   if (q.get('ia')) { try { history.replaceState(null, '', location.pathname); } catch (e) { /* segue */ } irPara('kits'); setTimeout(iaAbrirPendente, 400); return true; }
+  // link da troca do mensal para o anual (paga só a diferença): app.pegueemonte.com/?anual=1
+  if (q.get('anual')) {
+    try { history.replaceState(null, '', location.pathname); } catch (e) { /* segue */ }
+    if (DEMO_SITE || estado.suporte) return false;
+    setTimeout(() => { carregarCheckout().then(() => { if (checkoutProprio()) abrirPagamento('anual', LINK_ANUAL, 'link_troca', true); else { const w = window.open(linkCakto(LINK_ANUAL_PROMO, 'link_troca'), '_blank', 'noopener'); if (!w) location.href = linkCakto(LINK_ANUAL_PROMO, 'link_troca'); } }); }, 400);
+    return true;
+  }
   if (q.get('foto')) { try { history.replaceState(null, '', location.pathname); } catch (e) { /* segue */ } if (podeEditar()) { setTimeout(guiaFotoKit, 400); return true; } return false; }
   if (!reserva && !planos) return false;
   try { history.replaceState(null, '', location.pathname + location.hash); } catch (e) { /* segue */ }

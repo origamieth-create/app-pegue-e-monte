@@ -229,6 +229,8 @@ export async function abrirCheckout(op = {}) {
   css();
   let cat;
   try { cat = await planos(); } catch (e) { cat = null; }
+  // troca: os preços podem ter sido lidos antes do login; lê de novo para saber se a conta tem direito
+  if (op.troca && cat && !cat.troca) { try { planosCache = null; cat = await planos(); } catch (e) { /* segue com o anual normal */ } }
   if (!cat || !cat.ativo) {
     // checkout próprio desligado: paga na Cakto
     if (op.linkReserva) {
@@ -256,6 +258,8 @@ export async function abrirCheckout(op = {}) {
     passo: sessao || op.contexto !== 'venda' ? 'plano' : 'conta',
     erro: '', pagamento: null,
   };
+  // troca do mensal para o anual pagando só a diferença (o servidor diz se a conta tem direito)
+  if (op.troca && sessao && cat.troca && cat.troca.valor > 0) { st.troca = true; st.plano = 'anual'; st.passo = 'troca'; }
   const ehAppmax = FUNCAO === 'appmax';
   if (ehAppmax) carregarAppmax(cat);
   const temCartao = dados.MODO_DEMO || (ehAppmax ? !!cat.cartao : !!PAGARME_PK);
@@ -275,8 +279,10 @@ export async function abrirCheckout(op = {}) {
   veu.addEventListener('click', (e) => { if (e.target === veu && st.passo !== 'acesso' && st.passo !== 'upsell') fechar(); });
   // oferta única de R$ 15 no 1º mês (só depois de o cartão recusar o mensal; o servidor confere)
   const OFERTA_15 = 1500;
-  const precoBase = () => (st.oferta === 'mes1_15' && st.plano === 'mensal' ? OFERTA_15 : cat.planos[st.plano].valor);
-  const totalAtual = () => (st.metodo === 'cartao' && st.plano === 'anual' ? cat.parcelas[st.parcelas - 1].total : precoBase());
+  const emTroca = () => !!st.troca && st.plano === 'anual';
+  const parcelasAnual = () => (emTroca() ? cat.troca.parcelas : cat.parcelas);
+  const precoBase = () => (st.oferta === 'mes1_15' && st.plano === 'mensal' ? OFERTA_15 : emTroca() ? cat.troca.valor : cat.planos[st.plano].valor);
+  const totalAtual = () => (st.metodo === 'cartao' && st.plano === 'anual' ? parcelasAnual()[st.parcelas - 1].total : precoBase());
 
   const cabeca = (n) => {
     const passos = st.contexto === 'venda' ? PASSOS : PASSOS.slice(1);
@@ -298,6 +304,7 @@ export async function abrirCheckout(op = {}) {
     else if (st.passo === 'cartao') desenharCartao();
     else if (st.passo === 'dg_mensal' || st.passo === 'dg_15') desenharOferta();
     else if (st.passo === 'upsell') desenharUpsell();
+    else if (st.passo === 'troca') desenharTroca();
     else desenharAcesso();
     const x = caixa.querySelector('[data-fechar]');
     if (x) x.onclick = fechar;
@@ -476,7 +483,7 @@ export async function abrirCheckout(op = {}) {
         <div class="ck-duas"><label>CEP<input name="cep" inputmode="numeric" autocomplete="postal-code" placeholder="00000-000" maxlength="9" required></label>
           <label>Número da casa<input name="num" autocomplete="off" maxlength="10" required></label></div>
         <div class="ck-end" id="ck-end"></div>
-        ${an ? `<label>Parcelas<select name="parcelas">${cat.parcelas.map((x) => `<option value="${x.n}" ${x.n === st.parcelas ? 'selected' : ''}>${x.n === 1 ? `1x de ${reais(x.total)} (sem juros)` : `${x.n}x de ${reais(x.parcela)} (total ${reais(x.total)})`}</option>`).join('')}</select></label>` : ''}
+        ${an ? `<label>Parcelas<select name="parcelas">${parcelasAnual().map((x) => `<option value="${x.n}" ${x.n === st.parcelas ? 'selected' : ''}>${x.n === 1 ? `1x de ${reais(x.total)} (sem juros)` : `${x.n}x de ${reais(x.parcela)} (total ${reais(x.total)})`}</option>`).join('')}</select></label>` : ''}
         <button class="ck-btn" type="submit">Pagar ${reais(totalAtual())}</button>
       </form>
       <button class="ck-link" data-voltar style="color:#6B6175">Voltar e pagar com Pix</button>
@@ -499,7 +506,7 @@ export async function abrirCheckout(op = {}) {
       } catch (e) { end.cep = d; alvo.textContent = ''; }
     };
     if (f.parcelas) f.parcelas.onchange = () => { st.parcelas = Number(f.parcelas.value); f.querySelector('button[type=submit]').textContent = `Pagar ${reais(totalAtual())}`; };
-    caixa.querySelector('[data-voltar]').onclick = () => { st.metodo = 'pix'; st.erro = ''; st.passo = 'plano'; desenhar(); };
+    caixa.querySelector('[data-voltar]').onclick = () => { st.metodo = 'pix'; st.erro = ''; st.passo = emTroca() ? 'troca' : 'plano'; desenhar(); };
     f.onsubmit = async (e) => {
       e.preventDefault();
       const numero = so(f.numero.value), [mm, aa] = f.validade.value.split('/'), cvv = so(f.cvv.value);
@@ -610,11 +617,49 @@ export async function abrirCheckout(op = {}) {
       acao: 'pagar', plano: st.plano, cpf: so(st.cpf), nome: st.nome, telefone: so(st.telefone), ip: appmax.ip || undefined,
       email: st.logado ? undefined : st.email, origem: origemAnuncio(), popup: op.popup || null,
       fbp: cookie('_fbp'), fbc: cookie('_fbc'), pagina: location.origin + location.pathname,
-      oferta: st.oferta && st.plano === 'mensal' ? st.oferta : undefined, ...extra,
+      oferta: st.oferta && st.plano === 'mensal' ? st.oferta : undefined,
+      troca: emTroca() ? true : undefined, ...extra,
     });
   }
 
   // 4. Acesso liberado
+  // Troca do mensal para o anual (link ?anual=1): paga só a diferença, no Pix ou no cartão
+  function desenharTroca() {
+    const me = cat.planos.mensal.valor, an = cat.planos.anual.valor, t = cat.troca;
+    const pago = t.mensal_pago || (an - t.valor);
+    const ate = t.vence ? new Date(t.vence).toLocaleDateString('pt-BR') : '';
+    caixa.innerHTML = `<div class="ck-puxa"></div>
+      <span class="ck-up-tag">SÓ PARA QUEM JÁ É ASSINANTE</span>
+      <h2 class="ck-dg">Troque para o anual e pague só a diferença</h2>
+      <p class="ck-dg ck-dg-txt">Os ${reais(pago)} que você pagou este mês já contam. A mensalidade é cancelada e você fica 12 meses sem pagar nada.</p>
+      <div class="ck-up-box">
+        <div class="ck-up-l"><span>12 meses no mensal</span><s>${reais(me * 12)}</s></div>
+        <div class="ck-up-l"><span>Anual promocional</span><span style="color:#2A1B3D">${reais(an)}</span></div>
+        <div class="ck-up-l"><span>Seu mensal deste mês</span><span>− ${reais(pago)}</span></div>
+        <div class="ck-up-l tot"><span>Você paga só</span><b>${reais(t.valor)}</b></div>
+      </div>
+      ${ate ? `<div class="ck-up-eco">Seu anual vale até ${esc(ate)}</div>` : ''}
+      <div class="ck-formas" ${temCartao ? '' : 'style="grid-template-columns:1fr"'}>
+        <button class="ck-fo ${st.metodo === 'pix' ? 'sel' : ''}" data-metodo="pix"><span class="tag">Na hora</span><b><i class="pic pic-raio"></i> Pix</b><small>libera na hora</small></button>
+        ${temCartao ? `<button class="ck-fo ${st.metodo === 'cartao' ? 'sel' : ''}" data-metodo="cartao"><b><i class="pic pic-cartao"></i> Cartão</b><small>até 12x</small></button>` : ''}
+      </div>
+      ${erroHtml()}
+      <button class="ck-btn" data-seguir>Continuar · ${reais(t.valor)}</button>
+      <button class="ck-link sub" data-nao>Agora não</button>
+      <p class="ck-up-mini">Depois de pago, o plano muda para anual na hora e a cobrança mensal de ${reais(me)} deixa de existir.</p>`;
+    caixa.querySelectorAll('[data-metodo]').forEach((b) => (b.onclick = () => { st.metodo = b.dataset.metodo; st.erro = ''; desenhar(); }));
+    caixa.querySelector('[data-nao]').onclick = () => fechar();
+    caixa.querySelector('[data-seguir]').onclick = async (e) => {
+      st.erro = ''; st.parcelas = 1;
+      if (st.metodo === 'cartao') { st.passo = 'cartao'; desenhar(); return; }
+      const b = e.currentTarget; b.disabled = true; b.textContent = 'Gerando o Pix…';
+      try {
+        const r = await pagar({ metodo: 'pix' });
+        evento('AddPaymentInfo', { payment_type: 'pix', content_name: 'anual', value: (r.valor || precoBase()) / 100, currency: 'BRL' });
+        st.pagamento = r; st.passo = 'pix'; desenhar();
+      } catch (err) { b.disabled = false; b.textContent = `Continuar · ${reais(t.valor)}`; mostrarErro(err.message); }
+    };
+  }
   // Mensal aprovado no cartão: oferece trocar pelo anual pagando só a diferença (upsell), no mesmo cartão
   function aprovado(r) {
     const pode = st.plano === 'mensal' && !st.oferta && !st.semUpsell && st.cartao && r.tipo !== 'renovacao'
