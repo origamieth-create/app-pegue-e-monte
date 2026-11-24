@@ -220,6 +220,10 @@ function css() {
 .ck-up-sel{display:block;border:1.5px solid #DDD3E0;border-radius:14px;padding:8px 14px;text-align:left}
 .ck-up-sel small{display:block;color:#6B6175;font-weight:700;font-size:12px}
 .ck .ck-up-sel select{border:0;padding:0;margin:0;width:100%;font:inherit;font-weight:800;font-size:15px;background:none;color:#2A1B3D;box-shadow:none}
+.ck-renova{background:#F5F0F7;border-radius:14px;padding:11px 13px;display:flex;gap:10px;align-items:flex-start;font-size:13px;font-weight:700;color:#4A3F57;line-height:1.45;text-align:left}
+.ck-renova svg{flex:none;margin-top:1px}.ck-renova b{color:#2A1B3D}
+.ck-cupom{display:flex;gap:10px;align-items:center;background:#EAF7F0;border:1.5px dashed #7CC9A3;color:#1F7A52;border-radius:14px;padding:10px 14px;font-weight:800;font-size:13.5px;text-align:left}
+.ck-cupom svg{flex:none}.ck-cupom small{display:block;font-weight:700;font-size:12.5px}
 .ck-up-mini{text-align:center;color:#8A8194;font-size:11.5px;font-weight:600;line-height:1.4}`;
   document.head.appendChild(s);
 }
@@ -258,6 +262,8 @@ export async function abrirCheckout(op = {}) {
     passo: sessao || op.contexto !== 'venda' ? 'plano' : 'conta',
     erro: '', pagamento: null,
   };
+  // link dos e-mails com o cupom PRIMEIRA: o desconto já entra (o servidor confere se a pessoa nunca assinou)
+  if (String(op.cupom || '').toUpperCase() === 'PRIMEIRA') { st.oferta = 'primeira'; st.plano = 'mensal'; }
   // troca do mensal para o anual pagando só a diferença (o servidor diz se a conta tem direito)
   if (op.troca && sessao && cat.troca && cat.troca.valor > 0) { st.troca = true; st.plano = 'anual'; st.passo = 'troca'; }
   const ehAppmax = FUNCAO === 'appmax';
@@ -279,9 +285,12 @@ export async function abrirCheckout(op = {}) {
   veu.addEventListener('click', (e) => { if (e.target === veu && st.passo !== 'acesso' && st.passo !== 'upsell') fechar(); });
   // oferta única de R$ 15 no 1º mês (só depois de o cartão recusar o mensal; o servidor confere)
   const OFERTA_15 = 1500;
+  // preço do 1º mês nas ofertas do mensal: R$ 15 (depois do cartão recusado) e cupom PRIMEIRA (link dos e-mails, 50% OFF)
+  const OFERTAS = { mes1_15: OFERTA_15, primeira: 1495 };
+  const ofertaMes = () => st.plano === 'mensal' && !!OFERTAS[st.oferta];
   const emTroca = () => !!st.troca && st.plano === 'anual';
   const parcelasAnual = () => (emTroca() ? cat.troca.parcelas : cat.parcelas);
-  const precoBase = () => (st.oferta === 'mes1_15' && st.plano === 'mensal' ? OFERTA_15 : emTroca() ? cat.troca.valor : cat.planos[st.plano].valor);
+  const precoBase = () => (ofertaMes() ? OFERTAS[st.oferta] : emTroca() ? cat.troca.valor : cat.planos[st.plano].valor);
   const totalAtual = () => (st.metodo === 'cartao' && st.plano === 'anual' ? parcelasAnual()[st.parcelas - 1].total : precoBase());
 
   const cabeca = (n) => {
@@ -383,16 +392,17 @@ export async function abrirCheckout(op = {}) {
     const primeiro = (st.nome || '').split(' ')[0];
     caixa.innerHTML = `${cabeca(1)}
       <h2>${primeiro ? esc(primeiro) + ', escolha' : 'Escolha'} seu plano</h2>
+      ${st.oferta === 'primeira' ? `<div class="ck-cupom"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1F7A52" stroke-width="2"><path d="M3 12V5a2 2 0 0 1 2-2h7l9 9-9 9-9-9z"/><circle cx="8" cy="8" r="1.6"/></svg><span>Cupom PRIMEIRA aplicado<small>50% OFF no 1º mês do mensal</small></span></div>` : ''}
       <div class="ck-planos">
         <button class="ck-pl ${st.plano === 'anual' ? 'sel' : ''}" data-plano="anual"><span class="r"></span>
           <span><b>Anual</b>${an.de ? `<span class="ck-selo">${Math.round((1 - an.valor / an.de) * 100)}% OFF</span><br>` : ''}<small>${reais(Math.round(an.valor / 12))}/mês · 12 meses</small></span>
           <span class="v">${an.de ? `<s>${reais(an.de)}</s>` : ''}${reais(an.valor)}</span></button>
         <button class="ck-pl ${st.plano === 'mensal' ? 'sel' : ''}" data-plano="mensal"><span class="r"></span>
-          <span><b>Mensal</b><small>${st.oferta === 'mes1_15' ? `1º mês · depois ${reais(me.valor)}/mês` : 'por mês'}</small></span><span class="v">${st.oferta === 'mes1_15' ? `<s>${reais(me.valor)}</s>${reais(OFERTA_15)}` : reais(me.valor)}</span></button>
+          <span><b>Mensal</b><small>${OFERTAS[st.oferta] ? `1º mês · depois ${reais(me.valor)}/mês` : 'por mês'}</small></span><span class="v">${OFERTAS[st.oferta] ? `<s>${reais(me.valor)}</s>${reais(OFERTAS[st.oferta])}` : reais(me.valor)}</span></button>
       </div>
       <div class="ck-formas" ${temCartao ? '' : 'style="grid-template-columns:1fr"'}>
         <button class="ck-fo ${st.metodo === 'pix' ? 'sel' : ''}" data-metodo="pix"><span class="tag">Na hora</span><b><i class="pic pic-raio"></i> Pix</b><small>libera em segundos</small></button>
-        ${temCartao ? `<button class="ck-fo ${st.metodo === 'cartao' ? 'sel' : ''}" data-metodo="cartao"><b><i class="pic pic-cartao"></i> Cartão</b><small>${st.plano === 'anual' ? 'até 12x' : st.oferta === 'mes1_15' ? '1º mês' : 'cobrança automática'}</small></button>` : ''}
+        ${temCartao ? `<button class="ck-fo ${st.metodo === 'cartao' ? 'sel' : ''}" data-metodo="cartao"><b><i class="pic pic-cartao"></i> Cartão</b><small>${st.plano === 'anual' ? 'até 12x' : OFERTAS[st.oferta] ? '1º mês' : 'cobrança automática'}</small></button>` : ''}
       </div>
       ${pedeCpf ? `<label>CPF (para a nota do pagamento)<input name="cpf" inputmode="numeric" autocomplete="off" placeholder="000.000.000-00" value="${esc(st.cpf)}" maxlength="14"></label>` : ''}
       ${pedeCpf && !so(st.telefone) && st.contexto !== 'venda' ? `<label>WhatsApp<input name="telefone" type="tel" inputmode="tel" placeholder="(11) 98765-4321" value="${esc(st.telefone)}"></label>` : ''}
@@ -469,11 +479,16 @@ export async function abrirCheckout(op = {}) {
   }
 
   // 3b. Cartão
+  // Anual no cartão em 1x (R$ 167, sem troca/upsell): renova sozinho a cada 12 meses; parcelado renova pelo Pix
+  const anualAuto = () => st.plano === 'anual' && !emTroca() && Number(st.parcelas) === 1 && totalAtual() === cat.planos.anual.valor;
+  const avisoRenovaAnual = () => (anualAuto()
+    ? `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C73B48" stroke-width="1.8"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v5h-5"/></svg><span><b>Renovação automática.</b> Daqui a 12 meses cobramos ${reais(cat.planos.anual.valor).replace(',00', '')} neste cartão para você não perder o acesso. Avisamos por e-mail 7 dias antes e você cancela quando quiser.</span>`
+    : `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C73B48" stroke-width="1.8"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v5h-5"/></svg><span><b>Sem cobrança automática.</b> Daqui a 12 meses mandamos o Pix de renovação por e-mail, com aviso antes.</span>`);
   function desenharCartao() {
     const an = st.plano === 'anual';
     caixa.innerHTML = `${cabeca(1)}
       <h2>Pague com cartão</h2>
-      <p class="ck-sub">Plano ${an ? 'Anual' : 'Mensal'} · ${reais(totalAtual())}${an ? '' : st.oferta === 'mes1_15' ? ` no 1º mês, depois ${reais(cat.planos.mensal.valor)}/mês` : ' por mês, cobrado automaticamente'}</p>
+      <p class="ck-sub">Plano ${an ? 'Anual' : 'Mensal'} · ${reais(totalAtual())}${an ? (anualAuto() ? ' · renova sozinho a cada 12 meses' : '') : ofertaMes() ? ` no 1º mês, depois ${reais(cat.planos.mensal.valor)}/mês` : ' por mês, cobrado automaticamente'}</p>
       ${erroHtml()}
       <form novalidate style="display:flex;flex-direction:column;gap:12px">
         <label>Número do cartão<input name="numero" inputmode="numeric" autocomplete="cc-number" placeholder="0000 0000 0000 0000" maxlength="23" required></label>
@@ -484,6 +499,7 @@ export async function abrirCheckout(op = {}) {
           <label>Número da casa<input name="num" autocomplete="off" maxlength="10" required></label></div>
         <div class="ck-end" id="ck-end"></div>
         ${an ? `<label>Parcelas<select name="parcelas">${parcelasAnual().map((x) => `<option value="${x.n}" ${x.n === st.parcelas ? 'selected' : ''}>${x.n === 1 ? `1x de ${reais(x.total)} (sem juros)` : `${x.n}x de ${reais(x.parcela)} (total ${reais(x.total)})`}</option>`).join('')}</select></label>` : ''}
+        ${an ? `<div class="ck-renova" data-renova>${avisoRenovaAnual()}</div>` : ''}
         <button class="ck-btn" type="submit">Pagar ${reais(totalAtual())}</button>
       </form>
       <button class="ck-link" data-voltar style="color:#6B6175">Voltar e pagar com Pix</button>
@@ -505,7 +521,11 @@ export async function abrirCheckout(op = {}) {
         alvo.textContent = [r.logradouro, r.bairro, `${r.localidade}/${r.uf}`].filter(Boolean).join(', ');
       } catch (e) { end.cep = d; alvo.textContent = ''; }
     };
-    if (f.parcelas) f.parcelas.onchange = () => { st.parcelas = Number(f.parcelas.value); f.querySelector('button[type=submit]').textContent = `Pagar ${reais(totalAtual())}`; };
+    if (f.parcelas) f.parcelas.onchange = () => {
+      st.parcelas = Number(f.parcelas.value); f.querySelector('button[type=submit]').textContent = `Pagar ${reais(totalAtual())}`;
+      const rn = f.querySelector('[data-renova]'); if (rn) rn.innerHTML = avisoRenovaAnual();
+      const sub = caixa.querySelector('.ck-sub'); if (sub) sub.textContent = `Plano Anual · ${reais(totalAtual())}${anualAuto() ? ' · renova sozinho a cada 12 meses' : ''}`;
+    };
     caixa.querySelector('[data-voltar]').onclick = () => { st.metodo = 'pix'; st.erro = ''; st.passo = emTroca() ? 'troca' : 'plano'; desenhar(); };
     f.onsubmit = async (e) => {
       e.preventDefault();
@@ -613,6 +633,16 @@ export async function abrirCheckout(op = {}) {
   }
   async function pagar(extra) {
     if (ehAppmax) await Promise.race([appmax.pronto, new Promise((ok) => setTimeout(ok, 1500))]);
+    try { return await chamarPagar(extra); } catch (e) {
+      // cupom recusado (a pessoa já assinou antes): tira o cupom e mostra o preço normal
+      if (st.oferta === 'primeira' && /PRIMEIRA/.test(e.message || '')) {
+        st.oferta = ''; st.passo = 'plano'; desenhar();
+        throw new Error(`${e.message} O mensal fica ${reais(cat.planos.mensal.valor)}.`);
+      }
+      throw e;
+    }
+  }
+  function chamarPagar(extra) {
     return dados.chamarFuncao(FUNCAO, {
       acao: 'pagar', plano: st.plano, cpf: so(st.cpf), nome: st.nome, telefone: so(st.telefone), ip: appmax.ip || undefined,
       email: st.logado ? undefined : st.email, origem: origemAnuncio(), popup: op.popup || null,
