@@ -207,7 +207,20 @@ function css() {
 .ck-dg-box b{font-family:'Plus Jakarta Sans','Nunito Sans',system-ui,sans-serif;font-size:26px;font-weight:800;white-space:nowrap}
 .ck-dg-box .d{text-align:right;font-size:12.5px;color:#6B6175;font-weight:700;line-height:1.35}.ck-dg-box .d .g{display:block;color:#1F7A52;font-size:14px;font-weight:800}
 .ck-dg-cartao{background:#F5F0F7;border-radius:14px;padding:12px 14px;display:flex;gap:10px;align-items:center;font-weight:800;font-size:15px;text-align:left}
-.ck-link.sub{color:#6B6175;text-decoration:underline}`;
+.ck-link.sub{color:#6B6175;text-decoration:underline}
+.ck-up-ok{display:flex;gap:10px;align-items:center;background:#EAF7F0;color:#1F7A52;border-radius:14px;padding:10px 14px;font-weight:800;font-size:13.5px;text-align:left}
+.ck-up-ok svg{flex:none}
+.ck-up-tag{align-self:center;background:#C73B48;color:#fff;font-weight:800;font-size:12px;border-radius:99px;padding:5px 13px;letter-spacing:.04em}
+.ck-up-box{border:2px solid #2A1B3D;border-radius:18px;padding:12px 16px}
+.ck-up-l{display:flex;justify-content:space-between;gap:10px;font-size:14px;font-weight:700;color:#6B6175;padding:3px 0}
+.ck-up-l.tot{border-top:1px dashed #DDD3E0;margin-top:6px;padding-top:9px;color:#2A1B3D;font-size:15px;font-weight:800;align-items:center}
+.ck-up-l.tot b{font-family:'Plus Jakarta Sans','Nunito Sans',system-ui,sans-serif;font-size:24px}
+.ck-up-eco{text-align:center;color:#1F7A52;font-weight:800;font-size:13.5px}
+.ck-up-aviso{background:#FFF4E5;color:#8A5A12;border-radius:12px;padding:9px 12px;font-size:12.5px;font-weight:700;text-align:center;line-height:1.4}
+.ck-up-sel{display:block;border:1.5px solid #DDD3E0;border-radius:14px;padding:8px 14px;text-align:left}
+.ck-up-sel small{display:block;color:#6B6175;font-weight:700;font-size:12px}
+.ck .ck-up-sel select{border:0;padding:0;margin:0;width:100%;font:inherit;font-weight:800;font-size:15px;background:none;color:#2A1B3D;box-shadow:none}
+.ck-up-mini{text-align:center;color:#8A8194;font-size:11.5px;font-weight:600;line-height:1.4}`;
   document.head.appendChild(s);
 }
 
@@ -257,9 +270,9 @@ export async function abrirCheckout(op = {}) {
   let consulta = null, fechado = false;
   const fechar = () => {
     fechado = true; st.cartao = null; clearInterval(consulta); veu.remove(); document.body.style.overflow = travaScroll;
-    if (st.passo === 'acesso' && op.aoConcluir) op.aoConcluir();
+    if ((st.passo === 'acesso' || st.passo === 'upsell') && op.aoConcluir) op.aoConcluir();
   };
-  veu.addEventListener('click', (e) => { if (e.target === veu && st.passo !== 'acesso') fechar(); });
+  veu.addEventListener('click', (e) => { if (e.target === veu && st.passo !== 'acesso' && st.passo !== 'upsell') fechar(); });
   // oferta única de R$ 15 no 1º mês (só depois de o cartão recusar o mensal; o servidor confere)
   const OFERTA_15 = 1500;
   const precoBase = () => (st.oferta === 'mes1_15' && st.plano === 'mensal' ? OFERTA_15 : cat.planos[st.plano].valor);
@@ -284,6 +297,7 @@ export async function abrirCheckout(op = {}) {
     else if (st.passo === 'pix') desenharPix();
     else if (st.passo === 'cartao') desenharCartao();
     else if (st.passo === 'dg_mensal' || st.passo === 'dg_15') desenharOferta();
+    else if (st.passo === 'upsell') desenharUpsell();
     else desenharAcesso();
     const x = caixa.querySelector('[data-fechar]');
     if (x) x.onclick = fechar;
@@ -503,7 +517,7 @@ export async function abrirCheckout(op = {}) {
         const token = await tokenizar({ number: numero, holder_name: st.cartao.titular, exp_month: st.cartao.mm, exp_year: st.cartao.aa, cvv });
         const r = await pagar({ metodo: 'cartao', card_token: token, titular: st.cartao.titular, parcelas: st.plano === 'anual' ? st.parcelas : 1, endereco: st.cartao.endereco });
         st.pagamento = r;
-        if (r.status === 'pago') { st.venceEm = r.vence_em; concluir(r); return; }
+        if (r.status === 'pago') { st.venceEm = r.vence_em; aprovado(r); return; }
         if (r.status === 'analise') {
           b.textContent = 'Em análise pelo banco…';
           st.erro = ''; esperarPagamento(r.id);
@@ -544,7 +558,7 @@ export async function abrirCheckout(op = {}) {
       <button class="ck-link sub" data-outro>${quinze ? 'Pagar com Pix' : 'Usar outro cartão ou Pix'}</button>`;
     const sim = caixa.querySelector('[data-sim]');
     sim.onclick = async () => {
-      st.plano = 'mensal'; st.parcelas = 1; st.metodo = 'cartao';
+      st.plano = 'mensal'; st.parcelas = 1; st.metodo = 'cartao'; st.semUpsell = true;
       if (quinze) st.oferta = 'mes1_15';
       sim.disabled = true; sim.textContent = 'Processando…';
       try {
@@ -601,12 +615,77 @@ export async function abrirCheckout(op = {}) {
   }
 
   // 4. Acesso liberado
-  function concluir(r = {}) {
-    st.passo = 'acesso'; st.erro = ''; st.cartao = null;
+  // Mensal aprovado no cartão: oferece trocar pelo anual pagando só a diferença (upsell), no mesmo cartão
+  function aprovado(r) {
+    const pode = st.plano === 'mensal' && !st.oferta && !st.semUpsell && st.cartao && r.tipo !== 'renovacao'
+      && Array.isArray(cat.upsell) && cat.upsell.length && cat.planos.anual;
+    if (!pode) { concluir(r); return; }
+    compraFeita(r);
+    st.upsellDe = r; st.upParcelas = 1; st.erro = ''; st.passo = 'upsell'; desenhar();
+  }
+  function desenharUpsell() {
+    const me = cat.planos.mensal.valor, an = cat.planos.anual.valor, dif = an - me;
+    const p = cat.upsell[st.upParcelas - 1] || cat.upsell[0];
+    const opcoes = cat.upsell.map((o) => `<option value="${o.n}"${o.n === st.upParcelas ? ' selected' : ''}>${o.n === 1 ? `1x de ${reais(o.total)}` : `${o.n}x de ${reais(o.parcela)} (total ${reais(o.total)})`}</option>`).join('');
+    const final = st.cartao ? st.cartao.numero.slice(-4) : '';
+    caixa.innerHTML = `<div class="ck-puxa"></div>
+      <div class="ck-up-ok"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1F7A52" stroke-width="2.4"><circle cx="12" cy="12" r="10"/><path d="M7.5 12.5l3 3 6-6.5"/></svg>Plano mensal aprovado. Seu acesso já está liberado.</div>
+      <span class="ck-up-tag">PREÇO PROMOCIONAL · SÓ NESTA TELA</span>
+      <h2 class="ck-dg">Garanta o anual pelo preço promocional</h2>
+      <p class="ck-dg ck-dg-txt">Os ${reais(me)} que você acabou de pagar já contam. Você paga só a diferença e fica 12 meses sem mensalidade.</p>
+      <div class="ck-up-box">
+        <div class="ck-up-l"><span>12 meses no mensal</span><s>${reais(me * 12)}</s></div>
+        <div class="ck-up-l"><span>Anual promocional</span><span style="color:#2A1B3D">${reais(an)}</span></div>
+        <div class="ck-up-l"><span>Já pago hoje</span><span>− ${reais(me)}</span></div>
+        <div class="ck-up-l tot"><span>Você paga só</span><b>${reais(dif)}</b></div>
+      </div>
+      <div class="ck-up-eco">Você economiza ${reais(me * 12 - an)} no ano · fica ${reais(Math.round(an / 12))} por mês</div>
+      <div class="ck-up-aviso">Esta oferta aparece uma vez só. Se fechar esta tela, para passar ao anual depois você paga os ${reais(an).replace(',00', '')} inteiros.</div>
+      <label class="ck-up-sel"><small>Pagamento</small><select data-parc>${opcoes}</select></label>
+      ${final ? `<div class="ck-dg-cartao" style="justify-content:center;background:none;padding:0;color:#6B6175;font-size:14px"><i class="pic pic-cartao"></i> Mesmo cartão · final ${esc(final)}</div>` : ''}
+      ${erroHtml()}
+      <button class="ck-btn" data-sim>Trocar pelo anual · ${reais(p.total)}</button>
+      <button class="ck-link sub" data-nao>Continuar no mensal</button>
+      <p class="ck-up-mini">Ao tocar no botão, ${reais(p.total)} ${p.n > 1 ? `(${p.n}x de ${reais(p.parcela)}) ` : ''}são cobrados neste cartão e a mensalidade de ${reais(me)} deixa de existir.</p>`;
+    caixa.querySelector('[data-parc]').onchange = (e) => { st.upParcelas = Number(e.target.value) || 1; st.erro = ''; desenhar(); };
+    caixa.querySelector('[data-nao]').onclick = () => { concluir(st.upsellDe, true); };
+    const sim = caixa.querySelector('[data-sim]');
+    sim.onclick = async () => {
+      sim.disabled = true; sim.textContent = 'Processando…';
+      try {
+        const c = st.cartao;
+        evento('AddPaymentInfo', { payment_type: 'cartao', content_name: 'anual', value: p.total / 100, currency: 'BRL' });
+        const token = await tokenizar({ number: c.numero, holder_name: c.titular, exp_month: c.mm, exp_year: c.aa, cvv: c.cvv });
+        const r = await dados.chamarFuncao(FUNCAO, { acao: 'upsell', pagamento: st.upsellDe.id, card_token: token, parcelas: st.upParcelas, titular: c.titular });
+        if (r.status === 'pago') {
+          st.plano = 'anual'; st.parcelas = st.upParcelas; st.venceEm = r.vence_em || st.venceEm;
+          compraFeita(r);
+          concluir(r, true);
+          return;
+        }
+        if (r.status === 'analise') {
+          // o banco está conferindo: o mensal já vale; quando aprovar, o plano muda sozinho
+          concluir(st.upsellDe, true);
+          st.aviso = 'A troca pelo anual está em análise pelo banco. Assim que aprovar, seu plano muda sozinho.';
+          desenhar();
+          return;
+        }
+        // recusou a diferença: segue no mensal, que já está pago
+        concluir(st.upsellDe, true);
+        st.aviso = r.mensagem || 'O cartão não aprovou a troca. Você continua no plano mensal, que já está pago.';
+        desenhar();
+      } catch (err) { sim.disabled = false; sim.textContent = `Trocar pelo anual · ${reais(p.total)}`; mostrarErro(err.message); }
+    };
+  }
+  // Compra nova = Purchase (renovação não conta como venda nova no Meta)
+  function compraFeita(r) {
     const id = r.id || (st.pagamento && st.pagamento.id);
     const tipo = r.tipo || (st.pagamento && st.pagamento.tipo);
-    // Compra nova = Purchase (renovação não conta como venda nova no Meta)
     if (tipo !== 'renovacao') evento('Purchase', { value: (r.valor || (st.pagamento && st.pagamento.valor) || totalAtual()) / 100, currency: 'BRL', content_name: st.plano, content_ids: [st.plano], content_type: 'product' }, id ? 'compra-' + id : undefined);
+  }
+  function concluir(r = {}, jaContou = false) {
+    st.passo = 'acesso'; st.erro = ''; st.cartao = null;
+    if (!jaContou) compraFeita(r);
     desenhar();
   }
   function desenharAcesso() {
@@ -616,6 +695,7 @@ export async function abrirCheckout(op = {}) {
       <div class="ck-ok">✓</div>
       <h2 class="ck-centro">Pagamento aprovado!</h2>
       <p class="ck-sub ck-centro" style="margin-top:-6px">Seu Plano ${st.plano === 'anual' ? 'Anual' : 'Mensal'} está ativo${ate ? ` até ${esc(ate)}` : ''}.</p>
+      ${st.aviso ? `<p class="ck-up-aviso">${esc(st.aviso)}</p>` : ''}
       ${noApp ? '<button class="ck-btn" data-fim>Continuar usando o app</button>'
         : `<a class="ck-btn" style="text-align:center;text-decoration:none" href="${esc(linkDoApp())}">Abrir meu app</a>
            ${st.logado ? '' : `<p class="ck-seg">Entre no app com <b>${esc(st.email)}</b> e a senha que você criou.</p>`}`}`;

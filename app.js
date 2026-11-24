@@ -3,7 +3,7 @@
 // Abas: Hoje, Agenda, Kits, Mais
 // =====================================================================
 import * as dados from './dados.js?v=20261126a';
-import { abrirCheckout, planos as planosCheckout, linkCakto } from './checkout.js?v=20261126a';
+import { abrirCheckout, planos as planosCheckout, linkCakto } from './checkout.js?v=20261127a';
 import { PERMITIR_CADASTRO, EMAIL_SUPORTE, WHATSAPP_SUPORTE, LINK_MENSAL, LINK_ANUAL, LINK_ANUAL_PROMO, DEMO_SITE, LINK_PLANOS, SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=20261121e';
 
 const { hojeISO, somaDias, cruza } = dados;
