@@ -756,7 +756,24 @@ export async function abrirCheckout(op = {}) {
   function compraFeita(r) {
     const id = r.id || (st.pagamento && st.pagamento.id);
     const tipo = r.tipo || (st.pagamento && st.pagamento.tipo);
-    if (tipo !== 'renovacao') evento('Purchase', { value: (r.valor || (st.pagamento && st.pagamento.valor) || totalAtual()) / 100, currency: 'BRL', content_name: st.plano, content_ids: [st.plano], content_type: 'product' }, id ? 'compra-' + id : undefined);
+    if (tipo === 'renovacao') return;
+    const dadosCompra = { value: (r.valor || (st.pagamento && st.pagamento.valor) || totalAtual()) / 100, currency: 'BRL', content_name: st.plano, content_ids: [st.plano], content_type: 'product' };
+    // cartão liberado na hora, ainda na análise antifraude da Appmax: a venda só conta no Meta quando aprovar
+    if (r.analise && id) { vigiarAnalise(id, dadosCompra); return; }
+    evento('Purchase', dadosCompra, id ? 'compra-' + id : undefined);
+  }
+  // Confere em segundo plano (mesmo com a janela fechada) até a análise antifraude terminar
+  function vigiarAnalise(id, dadosCompra) {
+    let voltas = 0;
+    const t = setInterval(async () => {
+      voltas++;
+      try {
+        const r = await dados.chamarFuncao(FUNCAO, { acao: 'status', id });
+        if (r.status === 'pago' && !r.analise) { clearInterval(t); evento('Purchase', dadosCompra, 'compra-' + id); return; }
+        if (r.status === 'recusado') { clearInterval(t); window.dispatchEvent(new CustomEvent('apm-antifraude-recusado')); return; }
+      } catch (e) { /* tenta de novo */ }
+      if (voltas >= 180) clearInterval(t);
+    }, 15000);
   }
   function concluir(r = {}, jaContou = false) {
     st.passo = 'acesso'; st.erro = ''; st.cartao = null;

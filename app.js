@@ -3,7 +3,7 @@
 // Abas: Hoje, Agenda, Kits, Mais
 // =====================================================================
 import * as dados from './dados.js?v=20261126a';
-import { abrirCheckout, planos as planosCheckout, linkCakto } from './checkout.js?v=20261129a';
+import { abrirCheckout, planos as planosCheckout, linkCakto } from './checkout.js?v=20261130a';
 import { PERMITIR_CADASTRO, EMAIL_SUPORTE, WHATSAPP_SUPORTE, LINK_MENSAL, LINK_ANUAL, LINK_ANUAL_PROMO, DEMO_SITE, LINK_PLANOS, SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=20261121e';
 
 const { hojeISO, somaDias, cruza } = dados;
@@ -565,6 +565,30 @@ function popupPagamento() {
   }, heroiPix);
 }
 
+// A Appmax recusou na análise antifraude um cartão que já tinha liberado o acesso: nada foi cobrado; paga com Pix
+function popupAntifraude() {
+  const a = estado.assinatura || {};
+  const plano = a.antifraude_plano === 'anual' ? 'anual' : 'mensal';
+  const pagar = (e) => acao(e.currentTarget, async () => {
+    estado.checkout = await planosCheckout();
+    abrirPagamento(plano, null, 'antifraude');
+  });
+  const corpo = `
+    ${etiquetaPop('Pagamento no cartão')}
+    ${tituloPop('Não conseguimos [[confirmar]] o pagamento no cartão')}
+    <p class="pop-tx">A operadora não confirmou a compra e <b>nada foi cobrado</b>. Pague com Pix para continuar usando o app: libera na hora.</p>
+    <div class="nota-amarela pequeno">Seus kits, reservas e loja continuam salvos.</div>
+    <button class="btn principal cheio" id="af-pix">Pagar com Pix</button>
+    <button class="link-btn" id="af-cartao">Tentar outro cartão</button>
+    ${botaoZapSuporte(ZAP_PAGAMENTO)}
+    <button class="link-btn" id="af-fechar">Fechar</button>`;
+  abrirPopup(corpo, (p) => {
+    $('#af-pix', p).onclick = pagar;
+    $('#af-cartao', p).onclick = pagar;
+    $('#af-fechar', p).onclick = () => fecharPainel();
+  }, heroiIcone('cartao', 'Nada foi cobrado'));
+}
+
 // ---------------------------------------------------------------------
 // Conversão do teste grátis
 // ---------------------------------------------------------------------
@@ -803,6 +827,12 @@ function bloqueioFimDoTeste() {
 
 let relogioFaixa = null;
 let popupPagamentoMostrado = false;
+let popupAntifraudeMostrado = false;
+// O checkout avisa quando a análise antifraude recusa um cartão que já tinha liberado o acesso
+window.addEventListener('apm-antifraude-recusado', () => {
+  popupAntifraudeMostrado = false;
+  recarregar().then(() => desenharFaixaAssinatura()).catch(() => location.reload());
+});
 function ajustarAlturaFaixa() {
   const f = $('#faixa');
   document.documentElement.style.setProperty('--altura-faixa', (f ? f.offsetHeight : 0) + 'px');
@@ -837,6 +867,10 @@ function desenharFaixaAssinatura() {
   const sit = situacaoAssinatura();
   if (sit !== 'teste_fim' && $('#bloqueio')) { $('#bloqueio').remove(); document.body.style.overflow = ''; }
   const ass = estado.assinatura || {};
+  // Cartão liberado na hora e depois recusado no antifraude da Appmax: aviso com o Pix (1 vez por sessão)
+  if (ass.antifraude_recusado && !popupAntifraudeMostrado && !$('#painel').innerHTML) {
+    popupAntifraudeMostrado = true; popupPagamentoMostrado = true; setTimeout(popupAntifraude, 300);
+  }
   // 1º mês (oferta de R$ 14,90): aviso 3 dias antes de acabar e, depois, escolher o plano
   if (ass.primeiro_mes && ass.vence_em && (sit === null || sit === 'cancelada')) {
     const fimMes = new Date(ass.vence_em).getTime();

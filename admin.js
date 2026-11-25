@@ -1503,6 +1503,7 @@ function abaPagamentos(tela) {
       <div class="ld"><span class="v">${x.b ? esc(reais(x.b)) : ''}</span>${zap ? `<a class="zapb" href="${esc(zap)}" target="_blank" rel="noopener">Chamar no WhatsApp</a>` : ''}</div></div>`;
   };
   tela.innerHTML = `
+    <div id="af-c"></div>
     ${abasPeriodo([['hoje', 'Hoje'], ['ontem', 'Ontem'], ['7', '7 dias'], ['30', '30 dias']], f.per, 'data-pag-per')}
     <div class="kpis-crm k4">
       ${cart('pago', 'Pagos', reais(grupo.pago.reduce((t, x) => t + Number(x.b || 0), 0)))}
@@ -1527,6 +1528,31 @@ function abaPagamentos(tela) {
   $$('[data-pag-per]', tela).forEach((b) => (b.onclick = () => { f.per = b.dataset.pagPer; desenhar(); }));
   $$('[data-pag-aba]', tela).forEach((b) => (b.onclick = () => { f.aba = b.dataset.pagAba; desenhar(); }));
   $$('[data-pag-c]', tela).forEach((b) => (b.onclick = () => { f[b.dataset.pagC] = b.dataset.pagV; desenhar(); }));
+  blocoAntifraude($('#af-c', tela));
+}
+
+// Cartão liberado na hora enquanto a Appmax faz a análise antifraude (últimos 30 dias)
+async function blocoAntifraude(caixa) {
+  if (!caixa) return;
+  let r = null;
+  try {
+    r = dados.MODO_DEMO
+      ? { em_analise: 1, recusadas_7d: 1, lista: [
+          { q: new Date(Date.now() - 9 * 6e4).toISOString(), no: 'Ana Paula', em: 'ana@exemplo.com', pl: 'mensal', v: 2990, af: 'analise' },
+          { q: new Date(Date.now() - 20 * 36e5).toISOString(), no: 'Carla Souza', em: 'carla@exemplo.com', pl: 'anual', v: 16700, af: 'aprovado' },
+          { q: new Date(Date.now() - 50 * 36e5).toISOString(), no: 'Joana Martins', em: 'joana@exemplo.com', pl: 'mensal', v: 2990, af: 'recusado' }] }
+      : await rpcAdmin('admin_cartao_analise');
+  } catch (e) { r = null; }
+  if (!caixa.isConnected || !r || !(r.lista || []).length) { if (caixa.isConnected) caixa.innerHTML = ''; return; }
+  const SIT = { analise: ['s1', 'liberada · em análise'], aprovado: ['s2', 'aprovada'], recusado: ['s3', 'recusada no antifraude'] };
+  const rec = Number(r.recusadas_7d) || 0;
+  caixa.innerHTML = `<section class="cartao af-bloco">
+    <div class="cab-crm"><h2>Cartão em análise da Appmax</h2><span>o acesso libera na hora; a Appmax confere o antifraude depois</span></div>
+    ${rec ? `<div class="af-alerta"><b>${rec} ${rec === 1 ? 'cliente liberada e depois recusada' : 'clientes liberadas e depois recusadas'} no antifraude (7 dias).</b> O acesso voltou a ser como era antes e ela recebeu o aviso para pagar com Pix. Nada foi cobrado.</div>` : ''}
+    <div style="overflow-x:auto"><table class="iap-lim"><tr><th>Quando</th><th>Cliente</th><th>Plano</th><th>Situação</th></tr>
+      ${(r.lista || []).slice(0, 15).map((x) => { const s = SIT[x.af] || ['s1', x.af]; return `<tr><td>${esc(dataHora(x.q))}</td><td>${esc(x.no || x.em)}<small class="af-em">${esc(x.no ? x.em : '')}</small></td>
+        <td>${x.pl === 'anual' ? 'Anual' : 'Mensal'} · ${esc(reais(Number(x.v) / 100))}</td><td><span class="af-st ${s[0]}">${esc(s[1])}</span></td></tr>`; }).join('')}
+    </table></div></section>`;
 }
 
 // =====================================================================
@@ -2001,10 +2027,10 @@ async function abaIA(tela) {
   const situ = (x) => x.convertida_em ? ['Loja criada', 'st-pago'] : x.publicar_em ? ['Foi pagar', 'st-pix_pendente'] : x.email ? ['Deixou o e-mail', 'st-pix_pendente'] : x.status === 'pronta' ? ['Viu a prévia', ''] : ['Não terminou', ''];
   const SIT = { assinou: ['Assinou depois', 'ok'], ja_era: ['Já era assinante', ''], nao: ['Ainda não assinou', 'nao'] };
   alvo.innerHTML = `
+    <div id="iac-c" class="coluna" style="gap:16px"><div class="cartao pequeno">Carregando os gastos…</div></div>
     ${ped ? blocoPedidosIA(ped) : ''}
     <div class="etabas">${[[0, 'Desde o início'], [7, '7 dias'], [30, '30 dias'], [90, '90 dias']].map(([v, t]) => `<button class="${f.dias === v ? 'on' : ''}" data-iad="${v}">${t}</button>`).join('')}</div>
-    <div class="kpis-crm k4" style="margin:0">
-      <div class="kpi"><small>Gasto com IA</small><b>${reaisAdm(m('custo'))}</b><i>loja pelo Instagram${d ? ` · catálogo ${usd(d.custo_usd)}` : ''}</i></div>
+    <div class="kpis-crm ${g ? 'k3' : 'k1'}" style="margin:0">
       ${g ? `<div class="kpi"><small>Usaram no teste grátis</small><b>${q('teste_total')}</b><i class="p">${q('teste_total_assinaram')} assinaram depois · ${pct(q('teste_total_assinaram'), q('teste_total'))}%</i></div>
       <div class="kpi"><small>Assinantes que usaram</small><b>${q('assin_total')}</b><i>catálogo ${q('assin_cat')} · loja completa ${q('assin_ig')}</i></div>` : ''}
       <div class="kpi"><small>Pagaram pela página</small><b>${m('pagaram')}</b><i>/loja-pronta · de ${m('prontas')} que viram</i></div>
@@ -2025,9 +2051,156 @@ async function abaIA(tela) {
     </details>`;
   $$('[data-iad]', alvo).forEach((b) => (b.onclick = () => { f.dias = Number(b.dataset.iad); abaIA(tela); }));
   if (ped) ligarPedidosIA(alvo, ped, () => abaIA(tela));
+  blocoCustosIA($('#iac-c', alvo), ped && ped.media);
 }
 
-// Aba IA: limites e pedidos de mais uso da IA (você escolhe quantos posts liberar)
+// Aba IA: gastos por serviço (Apify real, lido da conta; Claude pelos tokens, descontado do crédito grátis) e limites editáveis
+const IAC_AREA = { previa: 'Prévias do Instagram (página e teste grátis)', completa: 'Loja completa (assinantes)', catalogo: 'Cadastro de kits com IA (fotos, PDF, WhatsApp)' };
+function demoCustosIA(per) {
+  const f = { hoje: 0.12, '7d': 0.55, mes: 1, tudo: 1.4 }[per] || 1;
+  const h = (m) => new Date(Date.now() - m * 6e4).toISOString();
+  return { periodo: per, dolar: 6,
+    apify: { usd: +(9.8 * f).toFixed(2), lojas: Math.round(612 * f), lido_em: h(17), ciclo_inicio: '2026-11-22T03:00:00Z', ciclo_fim: '2026-12-22T02:59:59Z', ciclo_usd: 9.8, limite_usd: 19, por_dia: 2.1 },
+    claude: { usd: +(29.4 * f).toFixed(2), real_usd: 0, credito: 200, usado: 36.2, sobra: 163.8, usado_base: 24.99, usado_em: h(4000), vence: '2026-12-20T00:00:00Z', inicio: '2026-11-18T03:00:00Z', por_dia: 4.02, dias_vence: 23.2 },
+    areas: [{ area: 'previa', apify_usd: +(7.9 * f).toFixed(2), claude_usd: +(18.2 * f).toFixed(2), claude_real: 0 }, { area: 'completa', apify_usd: +(1.9 * f).toFixed(2), claude_usd: +(6.1 * f).toFixed(2), claude_real: 0 }, { area: 'catalogo', apify_usd: 0, claude_usd: +(5.1 * f).toFixed(2), claude_real: 0 }],
+    comparar: { estimado: +(31.5 * f).toFixed(2), real: +(209 * f).toFixed(2), desde: '2026-11-22T03:00:00Z' },
+    limites: { posts_nao_cliente: 24, posts_teste: 48, posts_cliente: 200, trava_cliente: 10, dolar: 6 } };
+}
+async function blocoCustosIA(caixa, media) {
+  const per = estado.iaPer || (estado.iaPer = 'mes');
+  let c = null;
+  try { c = dados.MODO_DEMO ? demoCustosIA(per) : await rpcAdmin('admin_ia_custos', { p_periodo: per }); } catch (e) { c = null; }
+  if (!caixa.isConnected) return;
+  if (!c) { caixa.innerHTML = '<div class="cartao pequeno">Os gastos por serviço ainda não carregaram. Se a atualização 39 ainda não foi instalada no Supabase, eles aparecem depois dela.</div>'; return; }
+  const dolar = Number(c.dolar) || 6;
+  const ap = c.apify || {}, cl = c.claude || {}, lim = c.limites || {};
+  const usd = (v) => 'US$ ' + (Number(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const br = (v) => reaisAdm((Number(v) || 0) * dolar);
+  const dia = (iso) => iso ? new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' }) : '';
+  const hora = (iso) => iso ? new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }) : '';
+  const lido = !!ap.lido_em;
+  const apUsd = Number(ap.usd) || 0, clUsd = Number(cl.usd) || 0, clReal = Number(cl.real_usd) || 0;
+  const credito = Number(cl.credito) || 0, usado = Number(cl.usado) || 0, sobra = Number(cl.sobra) || 0;
+  const vencido = cl.vence && new Date(cl.vence).getTime() < Date.now();
+  const gratis = credito > 0 && !vencido && sobra > 0;
+  const porDia = Number(cl.por_dia) || 0, diasV = Number(cl.dias_vence);
+  // Claude: o que acontece com o crédito no ritmo atual
+  let ritmo = '';
+  if (gratis && porDia > 0) {
+    const ateVencer = Number.isFinite(diasV) && cl.vence ? porDia * diasV : Infinity;
+    if (ateVencer < sobra) ritmo = `No ritmo atual (${usd(porDia)} por dia), sobram cerca de <b>${usd(sobra - ateVencer)}</b> que vencem sem usar em ${dia(cl.vence)}. Depois, a Claude custa cerca de <b>${br(porDia * 30)} por mês</b>.`;
+    else { const acaba = new Date(Date.now() + (sobra / porDia) * 864e5); ritmo = `No ritmo atual (${usd(porDia)} por dia), o crédito acaba por volta de <b>${dia(acaba.toISOString())}</b>. Depois, a Claude custa cerca de <b>${br(porDia * 30)} por mês</b>.`; }
+  } else if (porDia > 0) ritmo = `No ritmo atual: cerca de <b>${br(porDia * 30)} por mês</b> (${usd(porDia)} por dia).`;
+  // Avisos
+  const avisos = [];
+  const cUsd = Number(ap.ciclo_usd) || 0, cLim = Number(ap.limite_usd) || 0, aDia = Number(ap.por_dia) || 0;
+  if (lido && cLim > 0) {
+    const pctL = Math.round((cUsd / cLim) * 100);
+    const chega = aDia > 0 ? new Date(Date.now() + ((cLim - cUsd) / aDia) * 864e5) : null;
+    if (cUsd >= cLim * 0.98) avisos.push(`<b>A conta da Apify chegou no limite de ${usd(cLim)} deste ciclo.</b> A busca pelo Instagram fica parada até ${dia(ap.ciclo_fim)} ou até você aumentar o limite na Apify (Billing &gt; Limits).`);
+    else if (pctL >= 70 || (chega && ap.ciclo_fim && chega < new Date(ap.ciclo_fim))) avisos.push(`<b>A conta da Apify já usou ${pctL}% do limite de ${usd(cLim)} deste ciclo.</b> No ritmo atual (${usd(aDia)} por dia) chega no limite por volta de <b>${dia(chega && chega.toISOString())}</b>, antes do ciclo virar em ${dia(ap.ciclo_fim)}. Quando chegar, a busca pelo Instagram para. Aumente o limite na Apify (Billing &gt; Limits) ou baixe os limites de posts abaixo.`);
+  }
+  if (gratis && Number.isFinite(diasV) && diasV <= 7) avisos.push(`<b>O crédito grátis da Claude vence em ${Math.max(0, Math.ceil(diasV))} ${Math.ceil(diasV) === 1 ? 'dia' : 'dias'} (${dia(cl.vence)}).</b> Depois disso a IA passa a custar cerca de ${br(porDia * 30)} por mês no ritmo atual. Se quiser gastar menos, baixe os limites de posts abaixo.`);
+  else if (gratis && credito && sobra < credito * 0.15) avisos.push(`<b>Sobram só ${usd(sobra)} do crédito grátis da Claude.</b> Quando acabar, a IA passa a sair do bolso.`);
+  else if (credito > 0 && !gratis) avisos.push(`<b>O crédito grátis da Claude ${vencido ? 'venceu' : 'acabou'}.</b> Os tokens agora são custo real e entram no total.`);
+  const totalBolso = apUsd + clReal;
+  const areas = c.areas || [];
+  const pctCred = credito ? Math.min(100, Math.round((usado / credito) * 100)) : 0;
+  const cmp = c.comparar;
+  const m = Number(media) || 0.06;
+  const custoLim = (campo, n, trava) => campo === 'posts_cliente' && trava > 0 ? Math.min(n * m, trava) : n * m;
+  const linhaLim = (et, cls, campo, min, max, extra = '') => `<tr><td><span class="st ${cls}">${et}</span></td>
+      <td><span class="iac-in"><input type="number" inputmode="numeric" min="${min}" max="${max}" step="1" value="${Number(lim[campo]) || ''}" data-lim="${campo}" aria-label="Limite de posts: ${et}"> posts</span>${extra}</td>
+      <td data-lim-custo="${campo}">${reaisAdm(custoLim(campo, Number(lim[campo]) || 0, Number(lim.trava_cliente) || 0))}</td><td class="iac-faixa">de ${min} a ${max}</td></tr>`;
+  caixa.innerHTML = `
+    <section class="cartao iac">
+      <div class="iac-topo"><div><h2>Gastos da IA por serviço</h2><span>Apify: valor real lido da sua conta na Apify. Claude: soma dos tokens de cada uso, descontada do crédito grátis.</span></div>
+        <button class="btn mini contorno" data-iac-atu>Atualizar agora</button></div>
+      <div class="etabas" style="margin:12px 0 14px">${[['hoje', 'Hoje'], ['7d', '7 dias'], ['mes', 'Mês'], ['tudo', 'Desde o início']].map(([v, t]) => `<button class="${per === v ? 'on' : ''}" data-iac-per="${v}">${t}</button>`).join('')}</div>
+      ${avisos.map((t) => `<div class="iac-aviso">${t}</div>`).join('')}
+      <div class="iac-grid">
+        <div class="iac-c"><h3>Apify · Instagram <span class="iac-tag real">custo real</span></h3>
+          ${lido ? `<div class="iac-v">${br(apUsd)}<small>${usd(apUsd)}</small></div>
+          <div class="iac-l"><span>Buscas no Instagram</span><b>${(Number(ap.lojas) || 0).toLocaleString('pt-BR')}</b></div>
+          <div class="iac-l"><span>Custo médio por busca</span><b>${Number(ap.lojas) ? br(apUsd / Number(ap.lojas)) : '—'}</b></div>
+          ${cLim ? `<div class="iac-barra${cUsd >= cLim * 0.7 ? ' alto' : ''}"><i style="width:${Math.min(100, Math.round((cUsd / cLim) * 100))}%"></i></div>
+          <div class="iac-mini">Ciclo ${dia(ap.ciclo_inicio)} a ${dia(ap.ciclo_fim)}: ${usd(cUsd)} de ${usd(cLim)} do limite da conta</div>` : ''}
+          <div class="iac-mini">Fonte: conta da Apify · atualizado ${dia(ap.lido_em)} às ${hora(ap.lido_em)}</div>`
+          : `<div class="iac-v">—</div><div class="iac-mini" style="margin-top:8px">Esperando a primeira leitura da conta da Apify. Toque em "Atualizar agora".</div>`}</div>
+        <div class="iac-c"><h3>Claude · IA ${gratis ? '<span class="iac-tag gratis">crédito grátis</span>' : '<span class="iac-tag real">custo real</span>'}</h3>
+          <div class="iac-v">${usd(clUsd)}<small>${br(clUsd)}</small></div>
+          ${credito ? `<div class="iac-barra verde"><i style="width:${pctCred}%"></i></div>
+          <div class="iac-mini">Crédito: ${usd(usado)} usados de ${usd(credito)} · sobra ${usd(sobra)}${cl.vence ? ` · ${vencido ? 'venceu' : 'vence'} ${dia(cl.vence)}` : ''}</div>` : ''}
+          <div class="iac-l"><span>Custo real para você</span><b>${br(clReal)}</b></div>
+          ${ritmo ? `<div class="iac-mini" style="margin-top:6px">${ritmo}</div>` : ''}
+          <details class="iac-cred"><summary>Conferir com o console da Claude</summary>
+            <p>Abra console.anthropic.com &gt; Billing e copie o que aparece lá. O app soma os usos novos a partir de agora.</p>
+            <label>Crédito grátis total (US$)<input type="number" step="0.01" min="0" value="${credito || ''}" data-cred="claude_credito"></label>
+            <label>Já usado hoje, segundo o console (US$)<input type="number" step="0.01" min="0" value="${usado.toFixed(2)}" data-cred="claude_usado"></label>
+            <label>Vence em<input type="date" value="${cl.vence ? new Date(new Date(cl.vence).getTime() - 3 * 36e5).toISOString().slice(0, 10) : ''}" data-cred="claude_vence"></label>
+            <button class="btn mini verde" data-iac-cred>Salvar crédito</button></details></div>
+        <div class="iac-c tot"><h3>Saiu do bolso ${({ hoje: 'hoje', '7d': 'em 7 dias', mes: 'no mês', tudo: 'desde o início' })[per]}</h3>
+          <div class="iac-v">${br(totalBolso)}</div>
+          <div class="iac-l"><span>Apify</span><b>${br(apUsd)}</b></div>
+          <div class="iac-l"><span>Claude (depois do crédito)</span><b>${br(clReal)}</b></div></div>
+      </div>
+      <div style="overflow-x:auto;margin-top:14px"><table class="iap-lim iac-t"><tr><th>Onde gastou</th><th class="n">Apify</th><th class="n">Claude</th><th class="n">Saiu do bolso</th></tr>
+        ${areas.map((a) => { const apA = a.apify_usd == null ? null : Number(a.apify_usd) || 0; return `<tr><td>${esc(IAC_AREA[a.area] || a.area)}</td>
+          <td class="n">${a.area === 'catalogo' ? '—' : apA == null ? (lido && apUsd ? '<span class="iac-faixa">sem divisão ainda</span>' : '—') : br(apA)}</td>
+          <td class="n">${usd(a.claude_usd)}</td><td class="n">${br((apA || 0) + (Number(a.claude_real) || 0))}</td></tr>`; }).join('')}
+      </table></div>
+      ${cmp && (Number(cmp.estimado) || Number(cmp.real)) ? `<div class="iac-cmp"><b>Antes:</b> o app calculava ${reaisAdm(cmp.estimado)} pela conta de posts (Instagram + IA) desde ${dia(cmp.desde)}. O valor real (Apify da conta + tokens da Claude) é <b>${reaisAdm(cmp.real)}</b>.</div>` : ''}
+      <p class="pequeno" style="margin:10px 0 0">A Apify da conta é dividida entre as áreas na proporção do que cada uma buscou. O dólar usado na conta é R$ ${dolar.toFixed(2).replace('.', ',')}.</p>
+    </section>
+    <section class="cartao"><div class="cab-crm"><h2>Limites de posts por tipo</h2><span>vale para as próximas lojas em até 1 minuto</span></div>
+      <div style="overflow-x:auto"><table class="iap-lim"><tr><th>Tipo</th><th>Limite de posts</th><th>Custo estimado por loja (${reaisAdm(m)}/post)</th><th></th></tr>
+        ${linhaLim('Não é cliente', 'st-nao', 'posts_nao_cliente', 12, 60)}
+        ${linhaLim('Em teste', 'st-pix_pendente', 'posts_teste', 12, 100)}
+        ${linhaLim('Cliente mensal ou anual', 'st-pago', 'posts_cliente', 12, 1000, `<span class="iac-in" style="margin-left:10px">trava de R$ <input type="number" inputmode="decimal" min="1" max="200" step="0.5" value="${Number(lim.trava_cliente) || ''}" data-lim="trava_cliente" aria-label="Trava em reais por cliente"></span>`)}
+      </table></div>
+      <div class="iac-salvar"><span class="pequeno">Mais posts trazem mais kits na prévia. A trava para a loja completa quando o gasto daquela loja chega no valor.</span><button class="btn mini verde" data-iac-lim>Salvar limites</button></div>
+    </section>`;
+  $$('[data-iac-per]', caixa).forEach((b) => (b.onclick = () => { estado.iaPer = b.dataset.iacPer; blocoCustosIA(caixa, media); }));
+  $$('[data-lim]', caixa).forEach((i) => { i.oninput = () => {
+    const v = (k) => Number(($(`[data-lim="${k}"]`, caixa) || {}).value) || 0;
+    $$('[data-lim-custo]', caixa).forEach((td) => { td.textContent = reaisAdm(custoLim(td.dataset.limCusto, v(td.dataset.limCusto), v('trava_cliente'))); });
+  }; });
+  const salvar = async (botao, dadosNovos, okMsg) => {
+    botao.disabled = true;
+    try {
+      const r = dados.MODO_DEMO ? { ok: true } : await rpcAdmin('admin_ia_ajustes_salvar', { p: dadosNovos });
+      aviso(r && r.ok ? okMsg : ((r && r.mensagem) || 'Não deu certo. Tente de novo.'));
+      if (r && r.ok && !dados.MODO_DEMO) { blocoCustosIA(caixa, media); return; }
+    } catch (e) { aviso('Não deu certo. Tente de novo.'); }
+    botao.disabled = false;
+  };
+  $('[data-iac-lim]', caixa).onclick = (e) => {
+    const novo = {};
+    for (const i of $$('[data-lim]', caixa)) {
+      const v = Number(i.value), min = Number(i.min), max = Number(i.max);
+      if (!i.value || !Number.isFinite(v) || v < min || v > max) { aviso(`Confira os números: cada limite tem que ficar entre o mínimo e o máximo (${min} a ${max}).`); i.focus(); return; }
+      novo[i.dataset.lim] = i.dataset.lim === 'trava_cliente' ? Math.round(v * 100) / 100 : Math.round(v);
+    }
+    salvar(e.currentTarget, novo, 'Limites salvos. As próximas lojas já usam os números novos.');
+  };
+  $('[data-iac-cred]', caixa).onclick = (e) => {
+    const novo = {};
+    for (const i of $$('[data-cred]', caixa)) {
+      if (i.dataset.cred === 'claude_vence') { novo.claude_vence = i.value ? i.value + 'T21:00:00-03:00' : ''; continue; }
+      const v = Number(i.value);
+      if (i.value === '' || !Number.isFinite(v) || v < 0) { aviso('Confira os valores do crédito (só números, com ponto ou vírgula).'); i.focus(); return; }
+      novo[i.dataset.cred] = Math.round(v * 100) / 100;
+    }
+    salvar(e.currentTarget, novo, 'Crédito da Claude atualizado.');
+  };
+  $('[data-iac-atu]', caixa).onclick = async (e) => {
+    const b = e.currentTarget; b.disabled = true; b.textContent = 'Lendo a Apify…';
+    try { if (!dados.MODO_DEMO) await rpcAdmin('admin_apify_atualizar'); } catch (_) { /* tenta mostrar o que já tem */ }
+    setTimeout(() => { if (caixa.isConnected) blocoCustosIA(caixa, media); }, dados.MODO_DEMO ? 400 : 5000);
+  };
+}
+
+// Aba IA: pedidos de mais uso da IA (você escolhe quantos posts liberar)
 const IAP_ET = {
   cliente_anual: ['Cliente anual', 'st-pago'], cliente_mensal: ['Cliente mensal', 'st-pago'],
   teste: ['Em teste', 'st-pix_pendente'], teste_acabou: ['Teste acabou · não assinou', 'st-cinza'], nao_cliente: ['Não é cliente', 'st-nao'],
@@ -2038,20 +2211,12 @@ function blocoPedidosIA(r) {
   const totalFalta = lista.reduce((s, x) => s + (Number(x.faltam) || 0) * media, 0);
   const num = (v) => (Number(v) || 0).toLocaleString('pt-BR');
   const et = (x) => { const [t, c] = IAP_ET[x.etiqueta] || [x.etiqueta, '']; return `<span class="st ${c}">${esc(t)}${x.etiqueta === 'teste' ? ` · dia ${Number(x.dia_teste) || 1} de 7` : ''}</span>`; };
-  const linhaLim = (et0, lim, posts) => `<tr><td>${et({ etiqueta: et0 })}</td><td>${lim}</td><td>${reaisAdm(posts * media)}</td></tr>`;
   return `
-    <div class="kpis-crm k4" style="margin:0">
-      <div class="kpi"><small>Custo da IA no mês</small><b>${reaisAdm(r.custo_mes)}</b><i>Instagram + IA, até hoje</i></div>
+    <div class="kpis-crm k3" style="margin:0">
       <div class="kpi"><small>Média por post (7 dias)</small><b>${reaisAdm(media)}</b><i>${num(r.posts_7d)} posts analisados</i></div>
       <div class="kpi"><small>Posts analisados no mês</small><b>${num(r.posts_mes)}</b><i>prévias + lojas completas</i></div>
       <div class="kpi"><small>Pedidos esperando</small><b>${lista.length}</b><i>${reaisAdm(totalFalta)} se aprovar tudo que falta</i></div>
     </div>
-    <section class="cartao"><div class="cab-crm"><h2>Limites padrão de posts por tipo</h2></div>
-      <div style="overflow-x:auto"><table class="iap-lim"><tr><th>Tipo</th><th>Limite de posts</th><th>Custo máximo por cliente (${reaisAdm(media)}/post)</th></tr>
-        ${linhaLim('nao_cliente', '12 posts', 12)}
-        <tr><td><span class="st st-pix_pendente">Em teste</span></td><td>24 posts</td><td>${reaisAdm(24 * media)}</td></tr>
-        <tr><td><span class="st st-pago">Cliente mensal ou anual</span></td><td>até 100 posts ou R$ 10</td><td>${reaisAdm(Math.min(10, 100 * media))}</td></tr>
-      </table></div></section>
     <div class="iap-cab"><h2>Pedidos de mais uso da IA (${lista.length})</h2><span>Custo médio real por post (7 dias): ${reaisAdm(media)}</span></div>
     ${lista.length ? lista.map((x) => {
       const falt = Number(x.faltam) || 0, usou = Number(x.usou) || 0, lim = Number(x.limite) || usou || 1;
